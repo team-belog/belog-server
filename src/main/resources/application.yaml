@@ -1,3 +1,17 @@
 spring:
   application:
     name: belog
+  profiles:
+    default: local
+  jpa:
+    open-in-view: false
+
+  web:
+    error:
+      include-exception: false
+      include-message: never
+      include-binding-errors: never
+      include-stacktrace: never
+
+server:
+  shutdown: graceful
