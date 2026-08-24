@@ -2,6 +2,13 @@
 build/
 /AGENTS.md
 /CLAUDE.md
+.DS_Store
+
+### Environment variables and secrets ###
+.env
+.env.*
+!.env.example
+
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
