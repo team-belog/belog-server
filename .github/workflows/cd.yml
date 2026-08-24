@@ -1,0 +1,102 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - develop
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy-inactive:
+    name: Deploy inactive environment
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+      EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
+      REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure SSH
+        run: |
+          test -n "$EC2_HOST"
+          test -n "$EC2_USER"
+          test -n "$EC2_SSH_PRIVATE_KEY"
+          test -n "$EC2_KNOWN_HOSTS"
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > "$HOME/.ssh/belog-deploy-key"
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/belog-deploy-key" "$HOME/.ssh/known_hosts"
+
+      - name: Upload deployment script
+        run: |
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/deploy-inactive.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_SCRIPT"
+
+      - name: Configure production environment
+        run: |
+          test -n "$PROD_ENV_FILE"
+          printf '%s\n' "$PROD_ENV_FILE" | ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.prod"'
+
+      - name: Log in to GHCR from EC2
+        run: |
+          printf '%s' "$GHCR_TOKEN" | ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "docker login ghcr.io --username '$GITHUB_ACTOR' --password-stdin"
+
+      - name: Deploy image to inactive environment
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "chmod 700 '$REMOTE_SCRIPT' && '$REMOTE_SCRIPT' '$IMAGE_REF'"
+
+      - name: Remove temporary credentials and script
+        if: always()
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "docker logout ghcr.io >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT'" \
+            || true
+          rm -f "$HOME/.ssh/belog-deploy-key"
