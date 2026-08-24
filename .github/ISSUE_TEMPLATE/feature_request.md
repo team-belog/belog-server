@@ -1,7 +1,7 @@
 ---
 name: 기능 제안
 about: 새로운 기능 또는 기존 기능의 개선을 제안합니다.
-title: "[Feature] "
+title: "[Feat] "
 labels: ""
 assignees: ""
 ---
