@@ -1,0 +1,60 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "ko-KR"
+tone_instructions: "핵심 문제와 영향, 수정 방향을 한국어로 간결하게 설명하고 근거 없는 스타일 지적은 피한다."
+
+reviews:
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    base_branches:
+      - ".*"
+
+  path_filters:
+    - "!**/build/**"
+    - "!**/.gradle/**"
+    - "!**/out/**"
+    - "!**/generated/**"
+    - "!**/generated-sources/**"
+    - "!**/generated-test-sources/**"
+    - "!**/*.class"
+
+  path_instructions:
+    - path: "src/main/java/**/*.java"
+      instructions: |
+        Spring Boot와 JPA 코드의 정확성 및 유지보수성을 중심으로 리뷰한다.
+
+        계층 책임:
+        - Controller는 요청 검증과 응답 변환에 집중하고 비즈니스 로직이나 Repository 접근을 직접 수행하지 않는지 확인한다.
+        - Service는 비즈니스 규칙과 유스케이스를 담당하며, Repository에는 영속성 접근 책임만 있는지 확인한다.
+        - 엔티티가 API 요청·응답 모델로 직접 노출되거나 계층 간 DTO 변환 책임이 뒤섞이지 않는지 확인한다.
+
+        트랜잭션:
+        - 트랜잭션 경계가 Service 계층의 유스케이스 단위로 설정되어 있는지 확인한다.
+        - 조회 작업의 readOnly 설정, 트랜잭션 내부의 외부 API 호출, 과도하게 긴 트랜잭션, self-invocation 문제를 확인한다.
+        - 트랜잭션 종료 후 지연 로딩에 의존하거나 예외 처리로 인해 의도치 않게 커밋될 가능성을 확인한다.
+
+        JPA 및 N+1:
+        - 반복문, DTO 변환, JSON 직렬화 과정에서 연관관계 지연 로딩으로 N+1 쿼리가 발생하는지 확인한다.
+        - fetch join, EntityGraph, batch fetch 또는 DTO 조회가 필요한지 검토하되 무조건적인 EAGER 변경은 제안하지 않는다.
+        - 컬렉션 fetch join과 페이지네이션 조합, 불필요한 전체 엔티티 조회, 과도한 쿼리 실행을 확인한다.
+
+        보안:
+        - 인증과 인가 검사가 누락되거나 서로 혼동되지 않았는지 확인한다.
+        - 사용자 입력 검증, 권한 없는 리소스 접근, 민감정보 로그 출력, 하드코딩된 비밀값, 과도한 오류 정보 노출을 확인한다.
+        - 클라이언트 입력으로 엔티티의 권한·소유권·관리 필드가 임의 변경될 가능성을 확인한다.
+
+    - path: "src/test/**/*.java"
+      instructions: |
+        - 정상 흐름뿐 아니라 실패, 경계값, 권한, 예외 처리 시나리오가 검증되는지 확인한다.
+        - 테스트가 구현 세부사항보다 외부에서 관찰 가능한 동작을 검증하는지 확인한다.
+        - 테스트 간 상태 공유, 실행 순서 의존, 불필요한 전체 컨텍스트 로딩과 과도한 mocking을 확인한다.
+        - 테스트 이름과 @DisplayName이 검증 대상과 기대 결과를 분명하게 설명하는지 확인한다.
+        - 버그 수정이나 동작 변경에 대응하는 회귀 테스트가 포함되었는지 확인한다.
+
+    - path: "src/main/resources/application*.yaml"
+      instructions: |
+        - 비밀번호, 토큰, API 키 등 실제 비밀값이 저장소에 포함되지 않았는지 확인한다.
+        - 환경별 설정이 올바르게 분리되고 운영 환경에서 디버그 정보나 내부 API 문서가 불필요하게 노출되지 않는지 확인한다.
+        - 위험한 JPA 스키마 자동 변경이나 과도한 SQL 로깅이 운영 프로필에 활성화되지 않았는지 확인한다.
