@@ -13,5 +13,11 @@ spring:
       include-binding-errors: never
       include-stacktrace: never
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
 server:
   shutdown: graceful
