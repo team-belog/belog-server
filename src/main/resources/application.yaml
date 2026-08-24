@@ -1,8 +1,6 @@
 spring:
   application:
     name: belog
-  profiles:
-    default: local
   jpa:
     open-in-view: false
 
