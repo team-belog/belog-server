@@ -9,6 +9,7 @@ fi
 
 IMAGE_REF="$1"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
+NETWORK_NAME="${BELOG_NETWORK_NAME:-belog-network}"
 ENV_FILE="${DEPLOY_DIR}/.env.prod"
 ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
@@ -25,6 +26,9 @@ if [[ ! -r "$ENV_FILE" ]]; then
 fi
 
 mkdir -p "$DEPLOY_DIR"
+
+docker network inspect "$NETWORK_NAME" >/dev/null 2>&1 \
+  || docker network create "$NETWORK_NAME"
 
 active_color=""
 if [[ -f "$ACTIVE_COLOR_FILE" ]]; then
@@ -56,6 +60,7 @@ docker pull "$IMAGE_REF"
 docker rm --force "$container_name" >/dev/null 2>&1 || true
 docker run --detach \
   --name "$container_name" \
+  --network "$NETWORK_NAME" \
   --restart unless-stopped \
   --env-file "$ENV_FILE" \
   --env SPRING_PROFILES_ACTIVE=prod \
