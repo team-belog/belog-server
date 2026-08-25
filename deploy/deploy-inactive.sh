@@ -130,7 +130,7 @@ cleanup() {
     fi
 
     if [[ "$container_started" == true ]]; then
-      docker rm --force "$container_name" >/dev/null 2>&1 || true
+      docker stop --time 10 "$container_name" >/dev/null 2>&1 || true
     fi
 
     rm -f \
