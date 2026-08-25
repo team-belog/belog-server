@@ -2,18 +2,20 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 2 ]]; then
-  echo "Usage: $0 <image-ref> <nginx-config>" >&2
+if [[ $# -ne 3 ]]; then
+  echo "Usage: $0 <image-ref> <nginx-config> <cleanup-script>" >&2
   exit 1
 fi
 
 IMAGE_REF="$1"
 NGINX_CONFIG_SOURCE="$2"
+CLEANUP_SCRIPT_SOURCE="$3"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
 NETWORK_NAME="${BELOG_NETWORK_NAME:-belog-network}"
 HEALTH_CHECK_ATTEMPTS="${BELOG_HEALTH_CHECK_ATTEMPTS:-30}"
 HEALTH_CHECK_INTERVAL_SECONDS="${BELOG_HEALTH_CHECK_INTERVAL_SECONDS:-2}"
 HEALTH_CHECK_TIMEOUT_SECONDS="${BELOG_HEALTH_CHECK_TIMEOUT_SECONDS:-3}"
+ROLLBACK_WINDOW_SECONDS="${BELOG_ROLLBACK_WINDOW_SECONDS:-600}"
 ENV_FILE="${DEPLOY_DIR}/.env.prod"
 ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
@@ -39,10 +41,16 @@ if [[ ! -r "$NGINX_CONFIG_SOURCE" ]]; then
   exit 1
 fi
 
+if [[ ! -r "$CLEANUP_SCRIPT_SOURCE" ]]; then
+  echo "Container cleanup script is missing: $CLEANUP_SCRIPT_SOURCE" >&2
+  exit 1
+fi
+
 if [[ ! "$HEALTH_CHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
   || [[ ! "$HEALTH_CHECK_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]] \
-  || [[ ! "$HEALTH_CHECK_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Health check settings must be positive integers." >&2
+  || [[ ! "$HEALTH_CHECK_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
+  || [[ ! "$ROLLBACK_WINDOW_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Health check and rollback settings must be positive integers." >&2
   exit 1
 fi
 
@@ -216,6 +224,18 @@ fi
 if ! "${ROOT_COMMAND[@]}" nginx -s reload; then
   echo "Nginx reload failed. Restoring the previous configuration." >&2
   exit 1
+fi
+
+if [[ -n "$active_color" ]]; then
+  installed_cleanup_script="${DEPLOY_DIR}/stop-previous-container.sh"
+  cleanup_log="${DEPLOY_DIR}/cleanup-${active_color}.log"
+  install -m 700 "$CLEANUP_SCRIPT_SOURCE" "$installed_cleanup_script"
+  nohup "$installed_cleanup_script" \
+    "$ROLLBACK_WINDOW_SECONDS" \
+    "$ACTIVE_COLOR_FILE" \
+    "$target_color" \
+    "belog-${active_color}" \
+    > "$cleanup_log" 2>&1 &
 fi
 
 printf '%s\n' "$target_color" > "${ACTIVE_COLOR_FILE}.tmp"

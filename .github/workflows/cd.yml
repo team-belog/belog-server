@@ -32,8 +32,10 @@ jobs:
       PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
+      ROLLBACK_WINDOW_SECONDS: ${{ vars.ROLLBACK_WINDOW_SECONDS || '600' }}
       REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
+      REMOTE_CLEANUP_SCRIPT: /tmp/belog-stop-previous-${{ github.run_id }}.sh
 
     steps:
       - name: Check out repository
@@ -67,6 +69,12 @@ jobs:
             -o StrictHostKeyChecking=yes \
             deploy/nginx/belog.conf \
             "$EC2_USER@$EC2_HOST:$REMOTE_NGINX_CONFIG"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/stop-previous-container.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_CLEANUP_SCRIPT"
 
       - name: Configure production environment
         run: |
@@ -94,7 +102,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_SCRIPT' && '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_NGINX_CONFIG'"
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
 
       - name: Remove temporary credentials and script
         if: always()
@@ -104,6 +112,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker logout ghcr.io >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_NGINX_CONFIG'" \
+            "docker logout ghcr.io >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
             || true
           rm -f "$HOME/.ssh/belog-deploy-key"
