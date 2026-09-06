@@ -3,6 +3,7 @@ build/
 /AGENTS.md
 /CLAUDE.md
 .DS_Store
+docs/
 
 ### Environment variables and secrets ###
 .env

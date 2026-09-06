@@ -1,0 +1,78 @@
+name: Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Roll back development to the previous Blue/Green environment
+        required: true
+        type: boolean
+
+concurrency:
+  group: development-deployment
+  cancel-in-progress: false
+
+jobs:
+  rollback:
+    name: Roll back development
+    if: inputs.confirm
+    runs-on: ubuntu-latest
+    environment: development
+    permissions:
+      contents: read
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_HOST_KEY: ${{ secrets.EC2_HOST_KEY }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      SPRING_PROFILE: dev
+      REMOTE_ROLLBACK_SCRIPT: /tmp/belog-rollback-${{ github.run_id }}.sh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          ref: develop
+
+      - name: Configure SSH
+        run: |
+          test -n "$EC2_HOST"
+          test -n "$EC2_HOST_KEY"
+          test -n "$EC2_USER"
+          test -n "$EC2_SSH_KEY"
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-rollback-key"
+          printf '%s\n' "$EC2_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          test -s "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/belog-rollback-key" "$HOME/.ssh/known_hosts"
+
+      - name: Upload rollback script
+        run: |
+          scp \
+            -i "$HOME/.ssh/belog-rollback-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/rollback.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_ROLLBACK_SCRIPT"
+
+      - name: Roll back to previous environment
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-rollback-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "chmod 700 '$REMOTE_ROLLBACK_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' '$REMOTE_ROLLBACK_SCRIPT'"
+
+      - name: Remove temporary SSH key and script
+        if: always()
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-rollback-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "rm -f '$REMOTE_ROLLBACK_SCRIPT'" \
+            || true
+          rm -f "$HOME/.ssh/belog-rollback-key"

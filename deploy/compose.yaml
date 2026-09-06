@@ -1,0 +1,45 @@
+x-belog-app: &belog-app
+  restart: unless-stopped
+  env_file:
+    - ${BELOG_ENV_FILE:-./.env.dev}
+  environment:
+    SPRING_PROFILES_ACTIVE: ${BELOG_SPRING_PROFILE:-dev}
+    SERVER_PORT: 8080
+  networks:
+    - belog-network
+
+services:
+  blue:
+    <<: *belog-app
+    image: ${BELOG_BLUE_IMAGE:-belog-server:unconfigured}
+    container_name: belog-blue
+    ports:
+      - "127.0.0.1:8081:8080"
+    labels:
+      belog.environment: blue
+      belog.image: ${BELOG_BLUE_IMAGE:-belog-server:unconfigured}
+
+  green:
+    <<: *belog-app
+    image: ${BELOG_GREEN_IMAGE:-belog-server:unconfigured}
+    container_name: belog-green
+    ports:
+      - "127.0.0.1:8082:8080"
+    labels:
+      belog.environment: green
+      belog.image: ${BELOG_GREEN_IMAGE:-belog-server:unconfigured}
+
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: belog-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx:/etc/nginx/conf.d:ro
+    networks:
+      - belog-network
+
+networks:
+  belog-network:
+    name: belog-network
