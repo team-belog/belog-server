@@ -2,16 +2,20 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: $0 <image-ref> <nginx-config> <cleanup-script>" >&2
+if [[ $# -ne 4 ]]; then
+  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <cleanup-script>" >&2
   exit 1
 fi
 
 IMAGE_REF="$1"
-NGINX_CONFIG_SOURCE="$2"
-CLEANUP_SCRIPT_SOURCE="$3"
+COMPOSE_FILE_SOURCE="$2"
+NGINX_CONFIG_SOURCE="$3"
+CLEANUP_SCRIPT_SOURCE="$4"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
-NETWORK_NAME="${BELOG_NETWORK_NAME:-belog-network}"
+COMPOSE_FILE="${DEPLOY_DIR}/compose.yaml"
+NGINX_DIR="${DEPLOY_DIR}/nginx"
+NGINX_CONFIG_PATH="${NGINX_DIR}/belog.conf"
+NGINX_UPSTREAM_PATH="${NGINX_DIR}/belog-upstream.inc"
 HEALTH_CHECK_ATTEMPTS="${BELOG_HEALTH_CHECK_ATTEMPTS:-30}"
 HEALTH_CHECK_INTERVAL_SECONDS="${BELOG_HEALTH_CHECK_INTERVAL_SECONDS:-2}"
 HEALTH_CHECK_TIMEOUT_SECONDS="${BELOG_HEALTH_CHECK_TIMEOUT_SECONDS:-3}"
@@ -22,35 +26,30 @@ ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
 CANDIDATE_IMAGE_FILE="${DEPLOY_DIR}/candidate-image"
-NGINX_CONFIG_PATH="/etc/nginx/conf.d/belog.conf"
-NGINX_UPSTREAM_PATH="/etc/nginx/conf.d/belog-upstream.inc"
 
-for command_name in docker curl nginx; do
+for command_name in docker curl; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
     echo "Required command is not installed: $command_name" >&2
     exit 1
   fi
 done
 
+if ! docker compose version >/dev/null 2>&1; then
+  echo "Docker Compose plugin is not installed." >&2
+  exit 1
+fi
+
 if [[ ! "$SPRING_PROFILE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
   echo "Spring profile contains unsupported characters: $SPRING_PROFILE" >&2
   exit 1
 fi
 
-if [[ ! -r "$ENV_FILE" ]]; then
-  echo "Environment file is missing: $ENV_FILE" >&2
-  exit 1
-fi
-
-if [[ ! -r "$NGINX_CONFIG_SOURCE" ]]; then
-  echo "Nginx configuration file is missing: $NGINX_CONFIG_SOURCE" >&2
-  exit 1
-fi
-
-if [[ ! -r "$CLEANUP_SCRIPT_SOURCE" ]]; then
-  echo "Container cleanup script is missing: $CLEANUP_SCRIPT_SOURCE" >&2
-  exit 1
-fi
+for required_file in "$ENV_FILE" "$COMPOSE_FILE_SOURCE" "$NGINX_CONFIG_SOURCE" "$CLEANUP_SCRIPT_SOURCE"; do
+  if [[ ! -r "$required_file" ]]; then
+    echo "Required deployment file is missing: $required_file" >&2
+    exit 1
+  fi
+done
 
 if [[ ! "$HEALTH_CHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
   || [[ ! "$HEALTH_CHECK_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]] \
@@ -60,19 +59,8 @@ if [[ ! "$HEALTH_CHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
   exit 1
 fi
 
-ROOT_COMMAND=()
-if [[ "$EUID" -ne 0 ]]; then
-  if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true; then
-    echo "Passwordless sudo is required to update and reload Nginx." >&2
-    exit 1
-  fi
-  ROOT_COMMAND=(sudo -n)
-fi
-
-mkdir -p "$DEPLOY_DIR"
-
-docker network inspect "$NETWORK_NAME" >/dev/null 2>&1 \
-  || docker network create "$NETWORK_NAME"
+mkdir -p "$DEPLOY_DIR" "$NGINX_DIR"
+install -m 600 "$COMPOSE_FILE_SOURCE" "$COMPOSE_FILE"
 
 active_color=""
 if [[ -f "$ACTIVE_COLOR_FILE" ]]; then
@@ -98,6 +86,32 @@ case "$active_color" in
     ;;
 esac
 
+image_for_container() {
+  local container_name="$1"
+  local image
+  image="$(docker inspect --format '{{ index .Config.Labels "belog.image" }}' "$container_name" 2>/dev/null || true)"
+  if [[ -z "$image" || "$image" == "<no value>" ]]; then
+    image="$IMAGE_REF"
+  fi
+  printf '%s\n' "$image"
+}
+
+blue_image="$(image_for_container belog-blue)"
+green_image="$(image_for_container belog-green)"
+if [[ "$target_color" == blue ]]; then
+  blue_image="$IMAGE_REF"
+else
+  green_image="$IMAGE_REF"
+fi
+
+compose() {
+  BELOG_BLUE_IMAGE="$blue_image" \
+    BELOG_GREEN_IMAGE="$green_image" \
+    BELOG_ENV_FILE="$ENV_FILE" \
+    BELOG_SPRING_PROFILE="$SPRING_PROFILE" \
+    docker compose --project-name belog --file "$COMPOSE_FILE" "$@"
+}
+
 container_name="belog-${target_color}"
 health_check_url="http://127.0.0.1:${target_port}/actuator/health"
 nginx_backup_dir=""
@@ -109,17 +123,24 @@ deployment_succeeded=false
 
 restore_nginx_configuration() {
   if [[ "$nginx_config_existed" == true ]]; then
-    "${ROOT_COMMAND[@]}" install -m 644 \
-      "${nginx_backup_dir}/belog.conf" "$NGINX_CONFIG_PATH"
+    install -m 644 "${nginx_backup_dir}/belog.conf" "$NGINX_CONFIG_PATH"
   else
-    "${ROOT_COMMAND[@]}" rm -f "$NGINX_CONFIG_PATH"
+    rm -f "$NGINX_CONFIG_PATH"
   fi
 
   if [[ "$nginx_upstream_existed" == true ]]; then
-    "${ROOT_COMMAND[@]}" install -m 644 \
-      "${nginx_backup_dir}/belog-upstream.inc" "$NGINX_UPSTREAM_PATH"
+    install -m 644 "${nginx_backup_dir}/belog-upstream.inc" "$NGINX_UPSTREAM_PATH"
   else
-    "${ROOT_COMMAND[@]}" rm -f "$NGINX_UPSTREAM_PATH"
+    rm -f "$NGINX_UPSTREAM_PATH"
+  fi
+}
+
+restore_running_nginx() {
+  if docker container inspect belog-nginx >/dev/null 2>&1; then
+    compose up --detach --no-deps nginx >/dev/null 2>&1 || true
+    docker exec belog-nginx nginx -t >/dev/null 2>&1 \
+      && docker exec belog-nginx nginx -s reload >/dev/null 2>&1 \
+      || true
   fi
 }
 
@@ -130,26 +151,18 @@ cleanup() {
   if [[ "$deployment_succeeded" != true ]]; then
     if [[ "$nginx_changes_staged" == true ]]; then
       restore_nginx_configuration || true
-      "${ROOT_COMMAND[@]}" nginx -t >/dev/null 2>&1 \
-        && "${ROOT_COMMAND[@]}" nginx -s reload >/dev/null 2>&1 \
-        || true
+      restore_running_nginx
     fi
 
     if [[ "$container_started" == true ]]; then
-      docker stop --time 10 "$container_name" >/dev/null 2>&1 || true
+      compose stop --timeout 10 "$target_color" >/dev/null 2>&1 || true
     fi
 
-    rm -f \
-      "$CANDIDATE_COLOR_FILE" \
-      "$CANDIDATE_IMAGE_FILE" \
-      "${DEPLOY_DIR}/belog-upstream.inc.candidate"
+    rm -f "$CANDIDATE_COLOR_FILE" "$CANDIDATE_IMAGE_FILE"
   fi
 
   if [[ -n "$nginx_backup_dir" ]]; then
-    "${ROOT_COMMAND[@]}" rm -f \
-      "${nginx_backup_dir}/belog.conf" \
-      "${nginx_backup_dir}/belog-upstream.inc"
-    rmdir "$nginx_backup_dir" 2>/dev/null || true
+    rm -rf "$nginx_backup_dir"
   fi
 
   exit "$status"
@@ -157,19 +170,9 @@ cleanup() {
 
 trap cleanup EXIT
 
-docker pull "$IMAGE_REF"
-docker rm --force "$container_name" >/dev/null 2>&1 || true
-docker run --detach \
-  --name "$container_name" \
-  --network "$NETWORK_NAME" \
-  --restart unless-stopped \
-  --env-file "$ENV_FILE" \
-  --env SPRING_PROFILES_ACTIVE="$SPRING_PROFILE" \
-  --env SERVER_PORT=8080 \
-  --publish "127.0.0.1:${target_port}:8080" \
-  --label "belog.environment=${target_color}" \
-  --label "belog.image=${IMAGE_REF}" \
-  "$IMAGE_REF"
+compose pull "$target_color"
+compose rm --force --stop "$target_color" >/dev/null 2>&1 || true
+compose up --detach --no-deps "$target_color"
 container_started=true
 
 printf '%s\n' "$target_color" > "$CANDIDATE_COLOR_FILE"
@@ -203,32 +206,38 @@ fi
 
 nginx_backup_dir="$(mktemp -d "${DEPLOY_DIR}/nginx-backup.XXXXXX")"
 
-if "${ROOT_COMMAND[@]}" test -f "$NGINX_CONFIG_PATH"; then
+if [[ -f "$NGINX_CONFIG_PATH" ]]; then
   nginx_config_existed=true
-  "${ROOT_COMMAND[@]}" cp "$NGINX_CONFIG_PATH" "${nginx_backup_dir}/belog.conf"
+  cp "$NGINX_CONFIG_PATH" "${nginx_backup_dir}/belog.conf"
 fi
 
-if "${ROOT_COMMAND[@]}" test -f "$NGINX_UPSTREAM_PATH"; then
+if [[ -f "$NGINX_UPSTREAM_PATH" ]]; then
   nginx_upstream_existed=true
-  "${ROOT_COMMAND[@]}" cp "$NGINX_UPSTREAM_PATH" \
-    "${nginx_backup_dir}/belog-upstream.inc"
+  cp "$NGINX_UPSTREAM_PATH" "${nginx_backup_dir}/belog-upstream.inc"
 fi
 
-printf 'server 127.0.0.1:%s max_fails=3 fail_timeout=10s;\n' "$target_port" \
-  > "${DEPLOY_DIR}/belog-upstream.inc.candidate"
-
+install -m 644 "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_PATH"
+printf 'server belog-%s:8080 max_fails=3 fail_timeout=10s;\n' "$target_color" \
+  > "$NGINX_UPSTREAM_PATH"
 nginx_changes_staged=true
-"${ROOT_COMMAND[@]}" install -m 644 "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_PATH"
-"${ROOT_COMMAND[@]}" install -m 644 \
-  "${DEPLOY_DIR}/belog-upstream.inc.candidate" "$NGINX_UPSTREAM_PATH"
 
-if ! "${ROOT_COMMAND[@]}" nginx -t; then
+if ! compose run --rm --no-deps nginx nginx -t; then
   echo "Nginx configuration validation failed. Keeping the existing environment active." >&2
   exit 1
 fi
 
-if ! "${ROOT_COMMAND[@]}" nginx -s reload; then
-  echo "Nginx reload failed. Restoring the previous configuration." >&2
+if ! compose up --detach --no-deps nginx; then
+  echo "Nginx container failed to start. Keeping the existing environment active." >&2
+  exit 1
+fi
+
+if ! docker exec belog-nginx nginx -t; then
+  echo "Running Nginx configuration validation failed. Keeping the existing environment active." >&2
+  exit 1
+fi
+
+if ! docker exec belog-nginx nginx -s reload; then
+  echo "Nginx reload failed. Restoring the previous upstream." >&2
   exit 1
 fi
 
@@ -240,7 +249,12 @@ if [[ -n "$active_color" ]]; then
     "$ROLLBACK_WINDOW_SECONDS" \
     "$ACTIVE_COLOR_FILE" \
     "$target_color" \
-    "belog-${active_color}" \
+    "$active_color" \
+    "$COMPOSE_FILE" \
+    "$ENV_FILE" \
+    "$SPRING_PROFILE" \
+    "$blue_image" \
+    "$green_image" \
     > "$cleanup_log" 2>&1 &
 fi
 
@@ -250,10 +264,7 @@ mv "${ACTIVE_COLOR_FILE}.tmp" "$ACTIVE_COLOR_FILE"
 printf '%s\n' "$IMAGE_REF" > "${ACTIVE_IMAGE_FILE}.tmp"
 mv "${ACTIVE_IMAGE_FILE}.tmp" "$ACTIVE_IMAGE_FILE"
 
-rm -f \
-  "$CANDIDATE_COLOR_FILE" \
-  "$CANDIDATE_IMAGE_FILE" \
-  "${DEPLOY_DIR}/belog-upstream.inc.candidate"
+rm -f "$CANDIDATE_COLOR_FILE" "$CANDIDATE_IMAGE_FILE"
 
 deployment_succeeded=true
-echo "Activated $IMAGE_REF on $target_color via 127.0.0.1:$target_port"
+echo "Activated $IMAGE_REF on $target_color through the Nginx container"

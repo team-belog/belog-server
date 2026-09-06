@@ -2,15 +2,20 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 <delay-seconds> <active-color-file> <expected-color> <container-name>" >&2
+if [[ $# -ne 9 ]]; then
+  echo "Usage: $0 <delay-seconds> <active-color-file> <expected-color> <previous-color> <compose-file> <env-file> <spring-profile> <blue-image> <green-image>" >&2
   exit 1
 fi
 
 DELAY_SECONDS="$1"
 ACTIVE_COLOR_FILE="$2"
 EXPECTED_COLOR="$3"
-CONTAINER_NAME="$4"
+PREVIOUS_COLOR="$4"
+COMPOSE_FILE="$5"
+ENV_FILE="$6"
+SPRING_PROFILE="$7"
+BLUE_IMAGE="$8"
+GREEN_IMAGE="$9"
 
 if [[ ! "$DELAY_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
   echo "Cleanup delay must be a positive integer." >&2
@@ -18,8 +23,8 @@ if [[ ! "$DELAY_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
 fi
 
 if [[ ! "$EXPECTED_COLOR" =~ ^(blue|green)$ ]] \
-  || [[ ! "$CONTAINER_NAME" =~ ^belog-(blue|green)$ ]]; then
-  echo "Invalid deployment color or container name." >&2
+  || [[ ! "$PREVIOUS_COLOR" =~ ^(blue|green)$ ]]; then
+  echo "Invalid deployment color." >&2
   exit 1
 fi
 
@@ -35,9 +40,14 @@ if [[ "$current_color" != "$EXPECTED_COLOR" ]]; then
   exit 0
 fi
 
-if [[ -n "$(docker ps --quiet --filter "name=^/${CONTAINER_NAME}$")" ]]; then
-  docker stop --time 30 "$CONTAINER_NAME"
-  echo "Stopped previous container after rollback window: $CONTAINER_NAME"
+if [[ -n "$(docker ps --quiet --filter "name=^/belog-${PREVIOUS_COLOR}$")" ]]; then
+  BELOG_BLUE_IMAGE="$BLUE_IMAGE" \
+    BELOG_GREEN_IMAGE="$GREEN_IMAGE" \
+    BELOG_ENV_FILE="$ENV_FILE" \
+    BELOG_SPRING_PROFILE="$SPRING_PROFILE" \
+    docker compose --project-name belog --file "$COMPOSE_FILE" \
+      stop --timeout 30 "$PREVIOUS_COLOR"
+  echo "Stopped previous service after rollback window: $PREVIOUS_COLOR"
 else
-  echo "Previous container is already stopped or missing: $CONTAINER_NAME"
+  echo "Previous service is already stopped or missing: $PREVIOUS_COLOR"
 fi

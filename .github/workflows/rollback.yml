@@ -24,6 +24,7 @@ jobs:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      SPRING_PROFILE: dev
       REMOTE_ROLLBACK_SCRIPT: /tmp/belog-rollback-${{ github.run_id }}.sh
 
     steps:
@@ -60,7 +61,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_ROLLBACK_SCRIPT' && '$REMOTE_ROLLBACK_SCRIPT'"
+            "chmod 700 '$REMOTE_ROLLBACK_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' '$REMOTE_ROLLBACK_SCRIPT'"
 
       - name: Remove temporary SSH key and script
         if: always()

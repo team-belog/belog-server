@@ -81,6 +81,7 @@ jobs:
       IMAGE_REF: ${{ needs.publish-image.outputs.image-ref }}
       ROLLBACK_WINDOW_SECONDS: ${{ vars.ROLLBACK_WINDOW_SECONDS || '600' }}
       REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
+      REMOTE_COMPOSE_FILE: /tmp/belog-compose-${{ github.run_id }}.yaml
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
       REMOTE_CLEANUP_SCRIPT: /tmp/belog-stop-previous-${{ github.run_id }}.sh
 
@@ -111,6 +112,12 @@ jobs:
             -o StrictHostKeyChecking=yes \
             deploy/deploy-inactive.sh \
             "$EC2_USER@$EC2_HOST:$REMOTE_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/compose.yaml \
+            "$EC2_USER@$EC2_HOST:$REMOTE_COMPOSE_FILE"
           scp \
             -i "$HOME/.ssh/belog-deploy-key" \
             -o IdentitiesOnly=yes \
@@ -150,7 +157,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
 
       - name: Remove temporary credentials and script
         if: always()
@@ -160,6 +167,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
+            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
             || true
           rm -f "$HOME/.ssh/belog-deploy-key"
