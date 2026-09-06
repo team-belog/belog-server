@@ -16,7 +16,8 @@ HEALTH_CHECK_ATTEMPTS="${BELOG_HEALTH_CHECK_ATTEMPTS:-30}"
 HEALTH_CHECK_INTERVAL_SECONDS="${BELOG_HEALTH_CHECK_INTERVAL_SECONDS:-2}"
 HEALTH_CHECK_TIMEOUT_SECONDS="${BELOG_HEALTH_CHECK_TIMEOUT_SECONDS:-3}"
 ROLLBACK_WINDOW_SECONDS="${BELOG_ROLLBACK_WINDOW_SECONDS:-600}"
-ENV_FILE="${DEPLOY_DIR}/.env.prod"
+SPRING_PROFILE="${BELOG_SPRING_PROFILE:-prod}"
+ENV_FILE="${DEPLOY_DIR}/.env.${SPRING_PROFILE}"
 ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
@@ -31,8 +32,13 @@ for command_name in docker curl nginx; do
   fi
 done
 
+if [[ ! "$SPRING_PROFILE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  echo "Spring profile contains unsupported characters: $SPRING_PROFILE" >&2
+  exit 1
+fi
+
 if [[ ! -r "$ENV_FILE" ]]; then
-  echo "Production environment file is missing: $ENV_FILE" >&2
+  echo "Environment file is missing: $ENV_FILE" >&2
   exit 1
 fi
 
@@ -158,7 +164,7 @@ docker run --detach \
   --network "$NETWORK_NAME" \
   --restart unless-stopped \
   --env-file "$ENV_FILE" \
-  --env SPRING_PROFILES_ACTIVE=prod \
+  --env SPRING_PROFILES_ACTIVE="$SPRING_PROFILE" \
   --env SERVER_PORT=8080 \
   --publish "127.0.0.1:${target_port}:8080" \
   --label "belog.environment=${target_color}" \

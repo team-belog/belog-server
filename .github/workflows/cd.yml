@@ -1,37 +1,72 @@
 name: CD
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
+  push:
     branches:
       - develop
 
 concurrency:
-  group: production-deployment
+  group: development-deployment
   cancel-in-progress: false
 
 jobs:
+  publish-image:
+    name: Build and publish Docker image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: type=sha,prefix=sha-,format=long
+
+      - name: Build and publish Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   deploy-inactive:
     name: Deploy inactive environment
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
+    needs: publish-image
     runs-on: ubuntu-latest
-    environment: production
+    environment: development
     permissions:
       contents: read
       packages: read
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER }}
-      EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-      EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
-      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      APP_ENV: ${{ secrets.APP_ENV }}
+      SPRING_PROFILE: dev
       GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ github.event.workflow_run.head_sha }}
+      IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
       ROLLBACK_WINDOW_SECONDS: ${{ vars.ROLLBACK_WINDOW_SECONDS || '600' }}
       REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
@@ -40,19 +75,17 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Configure SSH
         run: |
           test -n "$EC2_HOST"
           test -n "$EC2_USER"
-          test -n "$EC2_SSH_PRIVATE_KEY"
-          test -n "$EC2_KNOWN_HOSTS"
+          test -n "$EC2_SSH_KEY"
 
           install -d -m 700 "$HOME/.ssh"
-          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > "$HOME/.ssh/belog-deploy-key"
-          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-deploy-key"
+          ssh-keyscan -T 10 -H "$EC2_HOST" > "$HOME/.ssh/known_hosts"
+          test -s "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/belog-deploy-key" "$HOME/.ssh/known_hosts"
 
       - name: Upload deployment files
@@ -76,15 +109,15 @@ jobs:
             deploy/stop-previous-container.sh \
             "$EC2_USER@$EC2_HOST:$REMOTE_CLEANUP_SCRIPT"
 
-      - name: Configure production environment
+      - name: Configure development environment
         run: |
-          test -n "$PROD_ENV_FILE"
-          printf '%s\n' "$PROD_ENV_FILE" | ssh \
+          test -n "$APP_ENV"
+          printf '%s\n' "$APP_ENV" | ssh \
             -i "$HOME/.ssh/belog-deploy-key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.prod"'
+            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.dev"'
 
       - name: Log in to GHCR from EC2
         run: |
@@ -102,7 +135,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_SCRIPT' && BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
 
       - name: Remove temporary credentials and script
         if: always()
