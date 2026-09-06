@@ -13,41 +13,53 @@ jobs:
   publish-image:
     name: Build and publish Docker image
     runs-on: ubuntu-latest
+    environment: development
     permissions:
       contents: read
-      packages: write
+      id-token: write
+    outputs:
+      image-ref: ${{ steps.image.outputs.image-ref }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
     env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'belog-server' }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Validate AWS configuration
+        run: |
+          test -n "$AWS_REGION"
+          test -n "$AWS_ROLE_ARN"
+          test -n "$ECR_REPOSITORY"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.6
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract Docker metadata
-        id: metadata
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: type=sha,prefix=sha-,format=long
+      - name: Define image reference
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: echo "image-ref=$ECR_REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Build and publish Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
           push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+          tags: ${{ steps.image.outputs.image-ref }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -58,15 +70,15 @@ jobs:
     environment: development
     permissions:
       contents: read
-      packages: read
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
       APP_ENV: ${{ secrets.APP_ENV }}
       SPRING_PROFILE: dev
-      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      IMAGE_REF: ghcr.io/${{ github.repository }}:sha-${{ github.sha }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+      ECR_REGISTRY: ${{ needs.publish-image.outputs.registry }}
+      IMAGE_REF: ${{ needs.publish-image.outputs.image-ref }}
       ROLLBACK_WINDOW_SECONDS: ${{ vars.ROLLBACK_WINDOW_SECONDS || '600' }}
       REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
@@ -81,6 +93,9 @@ jobs:
           test -n "$EC2_HOST"
           test -n "$EC2_USER"
           test -n "$EC2_SSH_KEY"
+          test -n "$AWS_REGION"
+          test -n "$ECR_REGISTRY"
+          test -n "$IMAGE_REF"
 
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-deploy-key"
@@ -119,14 +134,14 @@ jobs:
             "$EC2_USER@$EC2_HOST" \
             'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.dev"'
 
-      - name: Log in to GHCR from EC2
+      - name: Log in to Amazon ECR from EC2
         run: |
-          printf '%s' "$GHCR_TOKEN" | ssh \
+          ssh \
             -i "$HOME/.ssh/belog-deploy-key" \
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker login ghcr.io --username '$GITHUB_ACTOR' --password-stdin"
+            "aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY'"
 
       - name: Deploy image to inactive environment
         run: |
@@ -145,6 +160,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker logout ghcr.io >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
+            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
             || true
           rm -f "$HOME/.ssh/belog-deploy-key"
