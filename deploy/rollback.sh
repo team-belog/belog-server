@@ -56,6 +56,14 @@ case "$active_color" in
     ;;
 esac
 
+active_container="belog-${active_color}"
+previous_container="belog-${previous_color}"
+
+if ! docker container inspect "$previous_container" >/dev/null 2>&1; then
+  echo "Previous service is not available for rollback: $previous_color" >&2
+  exit 1
+fi
+
 image_for_container() {
   local container_name="$1"
   local image
@@ -67,8 +75,19 @@ image_for_container() {
   printf '%s\n' "$image"
 }
 
-blue_image="$(image_for_container belog-blue)"
-green_image="$(image_for_container belog-green)"
+previous_image="$(image_for_container "$previous_container")"
+active_image="$(image_for_container "$active_container" 2>/dev/null || true)"
+if [[ -z "$active_image" ]]; then
+  active_image="$previous_image"
+fi
+
+if [[ "$active_color" == blue ]]; then
+  blue_image="$active_image"
+  green_image="$previous_image"
+else
+  blue_image="$previous_image"
+  green_image="$active_image"
+fi
 
 compose() {
   BELOG_BLUE_IMAGE="$blue_image" \
@@ -78,8 +97,6 @@ compose() {
     docker compose --project-name belog --file "$COMPOSE_FILE" "$@"
 }
 
-active_container="belog-${active_color}"
-previous_container="belog-${previous_color}"
 health_check_url="http://127.0.0.1:${previous_port}/actuator/health"
 upstream_backup=""
 upstream_changes_staged=false
@@ -111,11 +128,6 @@ cleanup() {
 }
 
 trap cleanup EXIT
-
-if ! docker container inspect "$previous_container" >/dev/null 2>&1; then
-  echo "Previous service is not available for rollback: $previous_color" >&2
-  exit 1
-fi
 
 if [[ "$(docker inspect --format '{{.State.Running}}' "$previous_container")" != true ]]; then
   compose start "$previous_color" >/dev/null
