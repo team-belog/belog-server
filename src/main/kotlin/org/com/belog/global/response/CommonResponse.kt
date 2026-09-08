@@ -8,7 +8,7 @@ import org.com.belog.global.response.code.SuccessCode
 data class CommonResponse<T>(
     @field:Schema(description = "응답 코드", example = "CMN-S001")
     val code: String,
-    @field:Schema(description = "응답 메시지", example = "요청에 성공했습니다.")
+    @field:Schema(description = "응답 메시지", example = "요청이 성공했습니다.")
     val message: String,
     @field:Schema(description = "응답 데이터")
     val data: T?,
