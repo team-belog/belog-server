@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test
 
 @DisplayName("BusinessException 테스트")
 class BusinessExceptionTest {
-
     @Test
     @DisplayName("에러 코드로 비즈니스 예외를 생성한다")
     fun errorCodeCreatesBusinessException() {

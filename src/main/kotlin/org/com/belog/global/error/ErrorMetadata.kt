@@ -14,7 +14,6 @@ data class ErrorMetadata private constructor(
     companion object {
         fun empty(): ErrorMetadata = of(emptyList())
 
-        fun of(fieldErrors: List<FieldErrorDetail>): ErrorMetadata =
-            ErrorMetadata(fieldErrors.toList(), Instant.now())
+        fun of(fieldErrors: List<FieldErrorDetail>): ErrorMetadata = ErrorMetadata(fieldErrors.toList(), Instant.now())
     }
 }

@@ -26,14 +26,14 @@ import org.springframework.web.bind.annotation.RestController
 @Import(GlobalExceptionHandler::class, GlobalExceptionHandlerMvcTest.TestController::class)
 @DisplayName("전역 예외 처리 테스트")
 class GlobalExceptionHandlerMvcTest {
-
     @Autowired
     private lateinit var mockMvc: MockMvc
 
     @Test
     @DisplayName("경로 변수의 타입이 올바르지 않으면 400 응답을 반환한다")
     fun invalidPathVariableTypeReturnsBadRequest() {
-        mockMvc.perform(get("/test/numbers/not-a-number"))
+        mockMvc
+            .perform(get("/test/numbers/not-a-number"))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
             .andExpect(jsonPath("$.data.fieldErrors[0].field").value("id"))
@@ -42,7 +42,8 @@ class GlobalExceptionHandlerMvcTest {
     @Test
     @DisplayName("필수 요청 파라미터가 누락되면 400 응답을 반환한다")
     fun missingRequestParameterReturnsBadRequest() {
-        mockMvc.perform(get("/test/required"))
+        mockMvc
+            .perform(get("/test/required"))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
     }
@@ -50,7 +51,8 @@ class GlobalExceptionHandlerMvcTest {
     @Test
     @DisplayName("메서드 파라미터 검증에 실패하면 400 응답을 반환한다")
     fun methodValidationFailureReturnsBadRequest() {
-        mockMvc.perform(get("/test/validated").param("page", "0"))
+        mockMvc
+            .perform(get("/test/validated").param("page", "0"))
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
             .andExpect(jsonPath("$.data.fieldErrors").isArray)
@@ -59,7 +61,8 @@ class GlobalExceptionHandlerMvcTest {
     @Test
     @DisplayName("지원하지 않는 Content-Type이면 415 응답을 반환한다")
     fun unsupportedContentTypeReturnsUnsupportedMediaType() {
-        mockMvc.perform(post("/test/json").contentType(MediaType.TEXT_PLAIN))
+        mockMvc
+            .perform(post("/test/json").contentType(MediaType.TEXT_PLAIN))
             .andExpect(status().isUnsupportedMediaType)
             .andExpect(jsonPath("$.code").value("CMN-E007"))
     }
@@ -67,7 +70,8 @@ class GlobalExceptionHandlerMvcTest {
     @Test
     @DisplayName("지원하지 않는 응답 형식을 요청하면 406 응답을 반환한다")
     fun unacceptableResponseTypeReturnsNotAcceptable() {
-        mockMvc.perform(get("/test/json").accept(MediaType.APPLICATION_XML))
+        mockMvc
+            .perform(get("/test/json").accept(MediaType.APPLICATION_XML))
             .andExpect(status().isNotAcceptable)
     }
 
@@ -82,13 +86,19 @@ class GlobalExceptionHandlerMvcTest {
 
         assertThat(response.statusCode.value()).isEqualTo(400)
         assertThat(body.code).isEqualTo("CMN-E001")
-        assertThat(body.data?.fieldErrors?.first()?.field).isEqualTo("name")
+        assertThat(
+            body.data
+                ?.fieldErrors
+                ?.first()
+                ?.field,
+        ).isEqualTo("name")
     }
 
     @Test
     @DisplayName("매핑되지 않은 경로를 요청하면 404 응답을 반환한다")
     fun unmappedRequestReturnsNotFound() {
-        mockMvc.perform(get("/not-found"))
+        mockMvc
+            .perform(get("/not-found"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("CMN-E003"))
     }
@@ -96,15 +106,20 @@ class GlobalExceptionHandlerMvcTest {
     @RestController
     @RequestMapping("/test")
     class TestController {
-
         @GetMapping("/numbers/{id}")
-        fun number(@PathVariable(name = "id") id: Long) = Unit
+        fun number(
+            @PathVariable(name = "id") id: Long,
+        ) = Unit
 
         @GetMapping("/required")
-        fun required(@RequestParam(name = "query") query: String) = Unit
+        fun required(
+            @RequestParam(name = "query") query: String,
+        ) = Unit
 
         @GetMapping("/validated")
-        fun validated(@RequestParam(name = "page") @Min(1) page: Int) = Unit
+        fun validated(
+            @RequestParam(name = "page") @Min(1) page: Int,
+        ) = Unit
 
         @PostMapping(value = ["/json"], consumes = [MediaType.APPLICATION_JSON_VALUE])
         fun consumeJson() = Unit

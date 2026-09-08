@@ -29,15 +29,12 @@ import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
-
     @ExceptionHandler(BusinessException::class)
     fun handleBusinessException(exception: BusinessException): ResponseEntity<CommonResponse<ErrorMetadata>> =
         createResponse(exception.errorCode)
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
-    fun handleMethodArgumentNotValid(
-        exception: MethodArgumentNotValidException,
-    ): ResponseEntity<CommonResponse<ErrorMetadata>> =
+    fun handleMethodArgumentNotValid(exception: MethodArgumentNotValidException): ResponseEntity<CommonResponse<ErrorMetadata>> =
         createResponse(CommonErrorCode.INVALID_INPUT, toFieldErrors(exception.bindingResult))
 
     @ExceptionHandler(BindException::class)
@@ -45,20 +42,17 @@ class GlobalExceptionHandler {
         createResponse(CommonErrorCode.INVALID_INPUT, toFieldErrors(exception.bindingResult))
 
     @ExceptionHandler(ConstraintViolationException::class)
-    fun handleConstraintViolation(
-        exception: ConstraintViolationException,
-    ): ResponseEntity<CommonResponse<ErrorMetadata>> {
-        val fieldErrors = exception.constraintViolations.map { violation ->
-            FieldErrorDetail(violation.propertyPath.toString(), violation.message)
-        }
+    fun handleConstraintViolation(exception: ConstraintViolationException): ResponseEntity<CommonResponse<ErrorMetadata>> {
+        val fieldErrors =
+            exception.constraintViolations.map { violation ->
+                FieldErrorDetail(violation.propertyPath.toString(), violation.message)
+            }
 
         return createResponse(CommonErrorCode.INVALID_INPUT, fieldErrors)
     }
 
     @ExceptionHandler(HandlerMethodValidationException::class)
-    fun handleHandlerMethodValidation(
-        exception: HandlerMethodValidationException,
-    ): ResponseEntity<CommonResponse<ErrorMetadata>> {
+    fun handleHandlerMethodValidation(exception: HandlerMethodValidationException): ResponseEntity<CommonResponse<ErrorMetadata>> {
         val fieldErrors =
             exception.parameterValidationResults.flatMap(::toFieldErrors) +
                 exception.crossParameterValidationResults.map { error ->
@@ -69,9 +63,7 @@ class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException::class)
-    fun handleMethodArgumentTypeMismatch(
-        exception: MethodArgumentTypeMismatchException,
-    ): ResponseEntity<CommonResponse<ErrorMetadata>> {
+    fun handleMethodArgumentTypeMismatch(exception: MethodArgumentTypeMismatchException): ResponseEntity<CommonResponse<ErrorMetadata>> {
         val fieldError = FieldErrorDetail(exception.name, "올바른 형식의 값을 입력해 주세요.")
         return createResponse(CommonErrorCode.INVALID_INPUT, listOf(fieldError))
     }
@@ -81,36 +73,29 @@ class GlobalExceptionHandler {
         MissingRequestHeaderException::class,
         MissingRequestCookieException::class,
     )
-    fun handleMissingRequestValue(): ResponseEntity<CommonResponse<ErrorMetadata>> =
-        createResponse(CommonErrorCode.INVALID_INPUT)
+    fun handleMissingRequestValue(): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(CommonErrorCode.INVALID_INPUT)
 
     @ExceptionHandler(MissingServletRequestPartException::class)
-    fun handleMissingServletRequestPart(
-        exception: MissingServletRequestPartException,
-    ): ResponseEntity<CommonResponse<ErrorMetadata>> {
+    fun handleMissingServletRequestPart(exception: MissingServletRequestPartException): ResponseEntity<CommonResponse<ErrorMetadata>> {
         val fieldError = FieldErrorDetail(exception.requestPartName, "필수 요청 파트입니다.")
         return createResponse(CommonErrorCode.INVALID_INPUT, listOf(fieldError))
     }
 
     @ExceptionHandler(HttpMessageNotReadableException::class)
-    fun handleHttpMessageNotReadable(): ResponseEntity<CommonResponse<ErrorMetadata>> =
-        createResponse(CommonErrorCode.INVALID_REQUEST_BODY)
+    fun handleHttpMessageNotReadable(): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(CommonErrorCode.INVALID_REQUEST_BODY)
 
     @ExceptionHandler(NoHandlerFoundException::class, NoResourceFoundException::class)
-    fun handleNoResourceFound(): ResponseEntity<CommonResponse<ErrorMetadata>> =
-        createResponse(CommonErrorCode.RESOURCE_NOT_FOUND)
+    fun handleNoResourceFound(): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(CommonErrorCode.RESOURCE_NOT_FOUND)
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException::class)
-    fun handleMethodNotSupported(): ResponseEntity<CommonResponse<ErrorMetadata>> =
-        createResponse(CommonErrorCode.METHOD_NOT_ALLOWED)
+    fun handleMethodNotSupported(): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(CommonErrorCode.METHOD_NOT_ALLOWED)
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException::class)
     fun handleMediaTypeNotSupported(): ResponseEntity<CommonResponse<ErrorMetadata>> =
         createResponse(CommonErrorCode.UNSUPPORTED_MEDIA_TYPE)
 
     @ExceptionHandler(HttpMediaTypeNotAcceptableException::class)
-    fun handleMediaTypeNotAcceptable(): ResponseEntity<Void> =
-        ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()
+    fun handleMediaTypeNotAcceptable(): ResponseEntity<Void> = ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE).build()
 
     @ExceptionHandler(Exception::class)
     fun handleUnexpectedException(exception: Exception): ResponseEntity<CommonResponse<ErrorMetadata>> {
@@ -118,8 +103,7 @@ class GlobalExceptionHandler {
         return createResponse(CommonErrorCode.INTERNAL_SERVER_ERROR)
     }
 
-    private fun createResponse(errorCode: ErrorCode): ResponseEntity<CommonResponse<ErrorMetadata>> =
-        createResponse(errorCode, emptyList())
+    private fun createResponse(errorCode: ErrorCode): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(errorCode, emptyList())
 
     private fun createResponse(
         errorCode: ErrorCode,

@@ -31,6 +31,9 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Check Kotlin code style
+        run: ./gradlew ktlintCheck --no-daemon
+
       - name: Run tests
         run: ./gradlew test --no-daemon
 

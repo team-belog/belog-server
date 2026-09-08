@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration(proxyBeanMethods = false)
 class OpenApiConfig {
-
     @Bean
     fun belogOpenApi(): OpenAPI =
         OpenAPI().info(
@@ -15,5 +14,5 @@ class OpenApiConfig {
                 .title("Belog API")
                 .description("Belog 서비스 API 문서")
                 .version("v1"),
-            )
+        )
 }

@@ -14,16 +14,18 @@ data class CommonResponse<T>(
     val data: T?,
 ) {
     companion object {
-        fun <T> success(successCode: SuccessCode, data: T): CommonResponse<T> =
-            CommonResponse(successCode.code, successCode.message, data)
+        fun <T> success(
+            successCode: SuccessCode,
+            data: T,
+        ): CommonResponse<T> = CommonResponse(successCode.code, successCode.message, data)
 
-        fun success(successCode: SuccessCode): CommonResponse<Nothing> =
-            CommonResponse(successCode.code, successCode.message, null)
+        fun success(successCode: SuccessCode): CommonResponse<Nothing> = CommonResponse(successCode.code, successCode.message, null)
 
-        fun <T> error(errorCode: ErrorCode, data: T): CommonResponse<T> =
-            CommonResponse(errorCode.code, errorCode.message, data)
+        fun <T> error(
+            errorCode: ErrorCode,
+            data: T,
+        ): CommonResponse<T> = CommonResponse(errorCode.code, errorCode.message, data)
 
-        fun error(errorCode: ErrorCode): CommonResponse<Nothing> =
-            CommonResponse(errorCode.code, errorCode.message, null)
+        fun error(errorCode: ErrorCode): CommonResponse<Nothing> = CommonResponse(errorCode.code, errorCode.message, null)
     }
 }
