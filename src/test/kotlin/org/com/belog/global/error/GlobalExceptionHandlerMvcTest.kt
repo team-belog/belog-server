@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
-@WebMvcTest
+@WebMvcTest(controllers = [GlobalExceptionHandlerMvcTest.TestController::class])
 @Import(GlobalExceptionHandler::class, GlobalExceptionHandlerMvcTest.TestController::class)
 @DisplayName("전역 예외 처리 테스트")
 class GlobalExceptionHandlerMvcTest {

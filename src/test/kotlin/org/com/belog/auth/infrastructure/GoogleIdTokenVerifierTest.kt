@@ -1,7 +1,7 @@
 package org.com.belog.auth.infrastructure
 
+import org.com.belog.auth.code.AuthErrorCode
 import org.com.belog.auth.config.GoogleAuthProperties
-import org.com.belog.auth.response.code.AuthErrorCode
 import org.com.belog.global.error.BusinessException
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.jwt.JwtDecoder
@@ -77,6 +77,11 @@ class GoogleIdTokenVerifierTest {
 
     companion object {
         private const val CLIENT_ID = "test-google-client-id"
-        private val properties = GoogleAuthProperties(clientId = CLIENT_ID)
+        private val properties =
+            GoogleAuthProperties(
+                clientId = CLIENT_ID,
+                clientSecret = "test-google-client-secret",
+                redirectUris = setOf("http://localhost:3000/oauth/google/callback"),
+            )
     }
 }
