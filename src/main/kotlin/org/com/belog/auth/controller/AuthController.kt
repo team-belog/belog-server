@@ -30,7 +30,6 @@ class AuthController(
         val response =
             GoogleLoginResponse(
                 accessToken = result.tokens.accessToken,
-                tokenType = BEARER_TOKEN_TYPE,
                 expiresIn = result.tokens.accessTokenExpiration.seconds,
                 onboardingRequired = result.isNewUser,
             )
@@ -51,7 +50,6 @@ class AuthController(
     }
 
     companion object {
-        private const val BEARER_TOKEN_TYPE = "Bearer"
         private const val REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
         private const val REFRESH_TOKEN_COOKIE_SAME_SITE = "Lax"
         private const val REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth/refresh"

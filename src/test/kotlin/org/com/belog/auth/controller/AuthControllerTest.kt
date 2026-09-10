@@ -61,7 +61,7 @@ class AuthControllerTest {
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.code").value("AUTH-S001"))
             .andExpect(jsonPath("$.data.accessToken").value("access-token"))
-            .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+            .andExpect(jsonPath("$.data.tokenType").doesNotExist())
             .andExpect(jsonPath("$.data.expiresIn").value(1800))
             .andExpect(jsonPath("$.data.onboardingRequired").value(true))
             .andExpect(jsonPath("$.data.isNewUser").doesNotExist())

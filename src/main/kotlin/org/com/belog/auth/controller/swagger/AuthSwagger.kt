@@ -148,7 +148,7 @@ interface AuthSwagger {
 }
 
 private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
-    """{"code":"AUTH-S001","message":"Google 로그인에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","tokenType":"Bearer","expiresIn":1800,"onboardingRequired":true}}"""
+    """{"code":"AUTH-S001","message":"Google 로그인에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800,"onboardingRequired":true}}"""
 
 private const val REFRESH_COOKIE_EXAMPLE =
     "refresh_token=eyJ...; Path=/api/v1/auth/refresh; Max-Age=1209600; " +
