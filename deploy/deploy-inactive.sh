@@ -2,8 +2,8 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 5 ]]; then
-  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <cleanup-script> <renewal-script>" >&2
+if [[ $# -ne 7 ]]; then
+  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <cleanup-script> <renewal-script> <image-prune-script> <maintenance-config-script>" >&2
   exit 1
 fi
 
@@ -12,6 +12,8 @@ COMPOSE_FILE_SOURCE="$2"
 NGINX_CONFIG_SOURCE="$3"
 CLEANUP_SCRIPT_SOURCE="$4"
 RENEWAL_SCRIPT_SOURCE="$5"
+IMAGE_PRUNE_SCRIPT_SOURCE="$6"
+MAINTENANCE_CONFIG_SCRIPT_SOURCE="$7"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
 COMPOSE_FILE="${DEPLOY_DIR}/compose.yaml"
 NGINX_DIR="${DEPLOY_DIR}/nginx"
@@ -58,6 +60,8 @@ for required_file in \
   "$NGINX_CONFIG_SOURCE" \
   "$CLEANUP_SCRIPT_SOURCE" \
   "$RENEWAL_SCRIPT_SOURCE" \
+  "$IMAGE_PRUNE_SCRIPT_SOURCE" \
+  "$MAINTENANCE_CONFIG_SCRIPT_SOURCE" \
   "${NGINX_DIR}/swagger.htpasswd" \
   "${CERTIFICATE_DIR}/fullchain.pem" \
   "${CERTIFICATE_DIR}/privkey.pem"; do
@@ -288,7 +292,15 @@ mv "${ACTIVE_IMAGE_FILE}.tmp" "$ACTIVE_IMAGE_FILE"
 
 rm -f "$CANDIDATE_COLOR_FILE" "$CANDIDATE_IMAGE_FILE"
 
-install -m 700 "$RENEWAL_SCRIPT_SOURCE" "${DEPLOY_DIR}/renew-certificate.sh"
+installed_renewal_script="${DEPLOY_DIR}/renew-certificate.sh"
+installed_image_prune_script="${DEPLOY_DIR}/prune-images.sh"
+installed_maintenance_config_script="${DEPLOY_DIR}/configure-maintenance.sh"
+install -m 700 "$RENEWAL_SCRIPT_SOURCE" "$installed_renewal_script"
+install -m 700 "$IMAGE_PRUNE_SCRIPT_SOURCE" "$installed_image_prune_script"
+install -m 700 "$MAINTENANCE_CONFIG_SCRIPT_SOURCE" "$installed_maintenance_config_script"
 
 deployment_succeeded=true
 echo "Activated $IMAGE_REF on $target_color through the Nginx container"
+
+BELOG_DOMAIN="$DOMAIN" "$installed_maintenance_config_script"
+echo "Configured certificate renewal and image cleanup schedules"
