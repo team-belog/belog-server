@@ -11,8 +11,8 @@ class OpenApiConfig {
     fun belogOpenApi(): OpenAPI =
         OpenAPI().info(
             Info()
-                .title("Belog API")
-                .description("Belog 서비스 API 문서")
+                .title("BELOG API")
+                .description("BELOG 서비스 API 문서")
                 .version("v1"),
         )
 }

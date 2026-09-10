@@ -5,6 +5,7 @@ import org.com.belog.auth.code.AuthSuccessCode
 import org.com.belog.auth.config.JwtProperties
 import org.com.belog.auth.controller.dto.GoogleLoginRequest
 import org.com.belog.auth.controller.dto.GoogleLoginResponse
+import org.com.belog.auth.controller.swagger.AuthSwagger
 import org.com.belog.auth.service.AuthService
 import org.com.belog.global.response.CommonResponse
 import org.springframework.http.HttpHeaders
@@ -20,9 +21,9 @@ import org.springframework.web.bind.annotation.RestController
 class AuthController(
     private val authService: AuthService,
     private val jwtProperties: JwtProperties,
-) {
+) : AuthSwagger {
     @PostMapping("/google")
-    fun loginWithGoogle(
+    override fun loginWithGoogle(
         @Valid @RequestBody request: GoogleLoginRequest,
     ): ResponseEntity<CommonResponse<GoogleLoginResponse>> {
         val result = authService.loginWithGoogle(request.authorizationCode, request.redirectUri)
