@@ -20,3 +20,7 @@ springdoc:
 
 server:
   port: 0
+
+auth:
+  google:
+    client-id: test-google-client-id

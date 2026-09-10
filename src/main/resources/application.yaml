@@ -19,3 +19,7 @@ springdoc:
 
 server:
   shutdown: graceful
+
+auth:
+  google:
+    client-id: "${GOOGLE_CLIENT_ID}"
