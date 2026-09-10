@@ -24,3 +24,14 @@ server:
 auth:
   google:
     client-id: test-google-client-id
+    client-secret: test-google-client-secret
+    redirect-uris:
+      - http://localhost:3000/oauth/google/callback
+      - https://belog.co.kr/oauth/google/callback
+      - https://www.belog.co.kr/oauth/google/callback
+  jwt:
+    secret: test-jwt-secret-must-be-at-least-32-characters
+    issuer: belog
+    access-token-expiration: 30m
+    refresh-token-expiration: 14d
+    refresh-cookie-secure: false
