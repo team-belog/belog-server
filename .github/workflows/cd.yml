@@ -77,6 +77,7 @@ jobs:
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
       APP_ENV: ${{ secrets.APP_ENV }}
       SPRING_PROFILE: dev
+      API_DOMAIN: ${{ vars.API_DOMAIN }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
       ECR_REGISTRY: ${{ needs.publish-image.outputs.registry }}
       IMAGE_REF: ${{ needs.publish-image.outputs.image-ref }}
@@ -85,6 +86,7 @@ jobs:
       REMOTE_COMPOSE_FILE: /tmp/belog-compose-${{ github.run_id }}.yaml
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
       REMOTE_CLEANUP_SCRIPT: /tmp/belog-stop-previous-${{ github.run_id }}.sh
+      REMOTE_RENEWAL_SCRIPT: /tmp/belog-renew-certificate-${{ github.run_id }}.sh
 
     steps:
       - name: Check out repository
@@ -99,6 +101,7 @@ jobs:
           test -n "$AWS_REGION"
           test -n "$ECR_REGISTRY"
           test -n "$IMAGE_REF"
+          test -n "$API_DOMAIN"
 
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-deploy-key"
@@ -132,6 +135,12 @@ jobs:
             -o StrictHostKeyChecking=yes \
             deploy/stop-previous-container.sh \
             "$EC2_USER@$EC2_HOST:$REMOTE_CLEANUP_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/renew-certificate.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_RENEWAL_SCRIPT"
 
       - name: Configure development environment
         run: |
@@ -142,6 +151,24 @@ jobs:
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
             'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.dev"'
+
+      - name: Configure Swagger credentials
+        env:
+          SWAGGER_USERNAME: ${{ secrets.SWAGGER_USERNAME }}
+          SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
+        run: |
+          test -n "$SWAGGER_USERNAME"
+          test -n "$SWAGGER_PASSWORD"
+          [[ "$SWAGGER_USERNAME" =~ ^[a-zA-Z0-9._-]+$ ]]
+          command -v openssl >/dev/null
+
+          SWAGGER_PASSWORD_HASH="$(printf '%s' "$SWAGGER_PASSWORD" | openssl passwd -apr1 -stdin)"
+          printf '%s:%s\n' "$SWAGGER_USERNAME" "$SWAGGER_PASSWORD_HASH" | ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            'install -d -m 755 "$HOME/belog/nginx" && umask 022 && cat > "$HOME/belog/nginx/swagger.htpasswd" && chmod 644 "$HOME/belog/nginx/swagger.htpasswd"'
 
       - name: Log in to Amazon ECR from EC2
         run: |
@@ -159,7 +186,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_SCRIPT' && BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'"
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_DOMAIN='$API_DOMAIN' BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT'"
 
       - name: Remove temporary credentials and script
         if: always()
@@ -169,6 +196,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT'" \
+            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT'" \
             || true
           rm -f "$HOME/.ssh/belog-deploy-key"
