@@ -1,9 +1,9 @@
 package org.com.belog.auth.infrastructure
 
+import org.com.belog.auth.code.AuthErrorCode
 import org.com.belog.auth.config.GoogleAuthProperties
 import org.com.belog.auth.config.GoogleTokenConfig
 import org.com.belog.auth.domain.GoogleUserInfo
-import org.com.belog.auth.response.code.AuthErrorCode
 import org.com.belog.global.error.BusinessException
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.security.oauth2.jwt.Jwt
