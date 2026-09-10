@@ -32,7 +32,7 @@ ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
 CANDIDATE_IMAGE_FILE="${DEPLOY_DIR}/candidate-image"
-CERTIFICATE_DIR="${DEPLOY_DIR}/certbot/conf/live/${DOMAIN}"
+CERTIFICATE_DIR="/etc/letsencrypt/live/${DOMAIN}"
 
 for command_name in docker curl; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -253,7 +253,16 @@ render_nginx_config() {
 }
 
 certificate_exists() {
-  [[ -r "${CERTIFICATE_DIR}/fullchain.pem" && -r "${CERTIFICATE_DIR}/privkey.pem" ]]
+  if [[ "$(docker inspect --format '{{.State.Running}}' belog-nginx 2>/dev/null)" == true ]]; then
+    docker exec belog-nginx /bin/sh \
+      -c 'test -s "$1/fullchain.pem" && test -s "$1/privkey.pem"' \
+      certificate-check "$CERTIFICATE_DIR"
+    return
+  fi
+
+  compose run --rm --no-deps --entrypoint /bin/sh certbot \
+    -c 'test -s "$1/fullchain.pem" && test -s "$1/privkey.pem"' \
+    certificate-check "$CERTIFICATE_DIR"
 }
 
 if ! certificate_exists; then
@@ -288,6 +297,7 @@ if ! certificate_exists; then
     --webroot \
     --webroot-path /var/www/certbot \
     --domain "$DOMAIN" \
+    --cert-name "$DOMAIN" \
     --email "$CERTBOT_EMAIL" \
     --agree-tos \
     --no-eff-email \
