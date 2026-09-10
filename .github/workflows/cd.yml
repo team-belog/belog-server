@@ -76,6 +76,7 @@ jobs:
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
       APP_ENV: ${{ secrets.APP_ENV }}
+      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
       SPRING_PROFILE: dev
       API_DOMAIN: ${{ vars.API_DOMAIN }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
@@ -85,6 +86,7 @@ jobs:
       REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
       REMOTE_COMPOSE_FILE: /tmp/belog-compose-${{ github.run_id }}.yaml
       REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
+      REMOTE_NGINX_BOOTSTRAP_CONFIG: /tmp/belog-nginx-bootstrap-${{ github.run_id }}.conf
       REMOTE_CLEANUP_SCRIPT: /tmp/belog-stop-previous-${{ github.run_id }}.sh
       REMOTE_RENEWAL_SCRIPT: /tmp/belog-renew-certificate-${{ github.run_id }}.sh
       REMOTE_IMAGE_PRUNE_SCRIPT: /tmp/belog-prune-images-${{ github.run_id }}.sh
@@ -104,6 +106,8 @@ jobs:
           test -n "$ECR_REGISTRY"
           test -n "$IMAGE_REF"
           test -n "$API_DOMAIN"
+          test -n "$CERTBOT_EMAIL"
+          [[ "$CERTBOT_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
 
           install -d -m 700 "$HOME/.ssh"
           printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-deploy-key"
@@ -131,6 +135,12 @@ jobs:
             -o StrictHostKeyChecking=yes \
             deploy/nginx/belog.conf \
             "$EC2_USER@$EC2_HOST:$REMOTE_NGINX_CONFIG"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/nginx/belog-bootstrap.conf \
+            "$EC2_USER@$EC2_HOST:$REMOTE_NGINX_BOOTSTRAP_CONFIG"
           scp \
             -i "$HOME/.ssh/belog-deploy-key" \
             -o IdentitiesOnly=yes \
@@ -200,7 +210,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "chmod 700 '$REMOTE_SCRIPT' && BELOG_DOMAIN='$API_DOMAIN' BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'"
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_DOMAIN='$API_DOMAIN' BELOG_CERTBOT_EMAIL='$CERTBOT_EMAIL' BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_NGINX_BOOTSTRAP_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'"
 
       - name: Remove temporary credentials and script
         if: always()
@@ -210,6 +220,6 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'" \
+            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_NGINX_BOOTSTRAP_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'" \
             || true
           rm -f "$HOME/.ssh/belog-deploy-key"
