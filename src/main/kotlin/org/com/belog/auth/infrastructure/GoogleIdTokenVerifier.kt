@@ -18,6 +18,8 @@ class GoogleIdTokenVerifier(
     private val jwtDecoder: JwtDecoder,
     private val properties: GoogleAuthProperties,
 ) {
+    private val supportedClientIds = setOf(properties.clientId)
+
     fun verify(idToken: String): GoogleUserInfo {
         if (idToken.isBlank()) {
             throw BusinessException(AuthErrorCode.INVALID_GOOGLE_ID_TOKEN)
@@ -46,7 +48,7 @@ class GoogleIdTokenVerifier(
         val expiresAt = jwt.expiresAt
         val valid =
             issuer in GOOGLE_ISSUERS &&
-                jwt.audience?.contains(properties.clientId) == true &&
+                hasValidAudience(jwt) &&
                 expiresAt != null &&
                 expiresAt.isAfter(Instant.now()) &&
                 jwt.getClaimAsBoolean(EMAIL_VERIFIED_CLAIM) == true &&
@@ -58,6 +60,16 @@ class GoogleIdTokenVerifier(
         }
     }
 
+    private fun hasValidAudience(jwt: Jwt): Boolean {
+        val audiences = jwt.audience.orEmpty()
+
+        if (audiences.none(supportedClientIds::contains)) {
+            return false
+        }
+
+        return audiences.size == 1 || jwt.getClaimAsString(AUTHORIZED_PARTY_CLAIM) in supportedClientIds
+    }
+
     private fun requiredClaim(value: String?): String = value ?: throw BusinessException(AuthErrorCode.INVALID_GOOGLE_ID_TOKEN)
 
     companion object {
@@ -66,5 +78,6 @@ class GoogleIdTokenVerifier(
         private const val EMAIL_VERIFIED_CLAIM = "email_verified"
         private const val NAME_CLAIM = "name"
         private const val PICTURE_CLAIM = "picture"
+        private const val AUTHORIZED_PARTY_CLAIM = "azp"
     }
 }

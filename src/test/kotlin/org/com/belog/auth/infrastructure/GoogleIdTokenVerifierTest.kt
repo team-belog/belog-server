@@ -32,6 +32,38 @@ class GoogleIdTokenVerifierTest {
     }
 
     @Test
+    fun `다중 audience의 azp가 지원하는 Client ID이면 인증에 성공한다`() {
+        val jwt =
+            validJwt(
+                audience = listOf(CLIENT_ID, "another-client-id"),
+                authorizedParty = CLIENT_ID,
+            )
+        val verifier = verifierReturning(jwt)
+
+        val userInfo = verifier.verify("google-id-token")
+
+        assertEquals("google-subject", userInfo.providerUserId)
+    }
+
+    @Test
+    fun `다중 audience에 azp가 없으면 인증에 실패한다`() {
+        val jwt = validJwt(audience = listOf(CLIENT_ID, "another-client-id"))
+
+        assertInvalidToken(verifierReturning(jwt))
+    }
+
+    @Test
+    fun `다중 audience의 azp가 지원하지 않는 Client ID이면 인증에 실패한다`() {
+        val jwt =
+            validJwt(
+                audience = listOf(CLIENT_ID, "another-client-id"),
+                authorizedParty = "another-client-id",
+            )
+
+        assertInvalidToken(verifierReturning(jwt))
+    }
+
+    @Test
     fun `이메일이 검증되지 않았으면 인증에 실패한다`() {
         val jwt = validJwt(emailVerified = false)
 
@@ -59,21 +91,29 @@ class GoogleIdTokenVerifierTest {
 
     private fun validJwt(
         audience: List<String> = listOf(CLIENT_ID),
+        authorizedParty: String? = null,
         emailVerified: Boolean = true,
-    ): Jwt =
-        Jwt
-            .withTokenValue("google-id-token")
-            .header("alg", "RS256")
-            .issuer("https://accounts.google.com")
-            .subject("google-subject")
-            .audience(audience)
-            .issuedAt(Instant.now().minusSeconds(60))
-            .expiresAt(Instant.now().plusSeconds(300))
-            .claim("email", "user@example.com")
-            .claim("email_verified", emailVerified)
-            .claim("name", "belog")
-            .claim("picture", "https://example.com/profile.png")
-            .build()
+    ): Jwt {
+        val builder =
+            Jwt
+                .withTokenValue("google-id-token")
+                .header("alg", "RS256")
+                .issuer("https://accounts.google.com")
+                .subject("google-subject")
+                .audience(audience)
+                .issuedAt(Instant.now().minusSeconds(60))
+                .expiresAt(Instant.now().plusSeconds(300))
+                .claim("email", "user@example.com")
+                .claim("email_verified", emailVerified)
+                .claim("name", "belog")
+                .claim("picture", "https://example.com/profile.png")
+
+        if (authorizedParty != null) {
+            builder.claim("azp", authorizedParty)
+        }
+
+        return builder.build()
+    }
 
     companion object {
         private const val CLIENT_ID = "test-google-client-id"
