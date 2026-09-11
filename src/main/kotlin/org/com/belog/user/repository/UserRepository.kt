@@ -16,9 +16,10 @@ interface UserRepository : JpaRepository<User, Long> {
     ): User?
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("""
-        SELECT user 
-        FROM User user 
+    @Query(
+        """
+        SELECT user
+        FROM User user
         WHERE user.id = :userId
         """,
     )

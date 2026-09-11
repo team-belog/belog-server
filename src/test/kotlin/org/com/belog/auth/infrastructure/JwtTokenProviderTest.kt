@@ -21,6 +21,7 @@ class JwtTokenProviderTest {
             accessTokenExpiration = Duration.ofMinutes(30),
             refreshTokenExpiration = Duration.ofDays(14),
             refreshCookieSecure = false,
+            refreshCookieSameSite = "Lax",
         )
     private val config = JwtTokenConfig()
     private val jwtEncoder = config.jwtEncoder(properties)

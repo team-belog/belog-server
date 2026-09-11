@@ -32,3 +32,18 @@ management:
   endpoint:
     health:
       show-details: never
+
+auth:
+  jwt:
+    refresh-cookie-secure: true
+    refresh-cookie-same-site: None
+
+app:
+  cors:
+    allowed-origins:
+      - https://belog.co.kr
+      - https://www.belog.co.kr
+      - https://api-dev.belog.co.kr
+    allowed-origin-patterns:
+      - "http://localhost:*"
+      - "http://127.0.0.1:*"

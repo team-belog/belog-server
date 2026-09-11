@@ -31,3 +31,4 @@ auth:
     access-token-expiration: 30m
     refresh-token-expiration: 14d
     refresh-cookie-secure: "${REFRESH_COOKIE_SECURE:true}"
+    refresh-cookie-same-site: "${REFRESH_COOKIE_SAME_SITE:Lax}"

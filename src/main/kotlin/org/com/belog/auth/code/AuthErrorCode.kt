@@ -13,4 +13,5 @@ enum class AuthErrorCode(
     GOOGLE_AUTH_SERVER_ERROR(HttpStatus.BAD_GATEWAY, "AUTH-E003", "Google 인증 서버와 통신할 수 없습니다."),
     INVALID_GOOGLE_REDIRECT_URI(HttpStatus.BAD_REQUEST, "AUTH-E004", "허용되지 않은 Google 리디렉션 URI입니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH-E005", "유효하지 않거나 만료된 Refresh Token입니다."),
+    INVALID_REQUEST_ORIGIN(HttpStatus.FORBIDDEN, "AUTH-E006", "허용되지 않은 요청 출처입니다."),
 }

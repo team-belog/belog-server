@@ -35,3 +35,9 @@ auth:
     access-token-expiration: 30m
     refresh-token-expiration: 14d
     refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000

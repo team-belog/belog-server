@@ -26,3 +26,10 @@ server:
 auth:
   jwt:
     refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax
+
+app:
+  cors:
+    allowed-origin-patterns:
+      - "http://localhost:*"
+      - "http://127.0.0.1:*"

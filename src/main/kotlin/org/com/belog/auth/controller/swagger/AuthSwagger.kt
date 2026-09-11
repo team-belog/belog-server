@@ -1,6 +1,7 @@
 package org.com.belog.auth.controller.swagger
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.headers.Header
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.ExampleObject
@@ -193,9 +194,22 @@ interface AuthSwagger {
                     ),
                 ],
             ),
+            ApiResponse(
+                responseCode = "403",
+                description = "허용되지 않은 요청 출처",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_REQUEST_ORIGIN_EXAMPLE)],
+                    ),
+                ],
+            ),
         ],
     )
-    fun reissueTokens(refreshToken: String): ResponseEntity<CommonResponse<TokenReissueResponse>>
+    fun reissueTokens(
+        @Parameter(hidden = true) refreshToken: String,
+    ): ResponseEntity<CommonResponse<TokenReissueResponse>>
 }
 
 private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
@@ -203,7 +217,7 @@ private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
 
 private const val REFRESH_COOKIE_EXAMPLE =
     "refresh_token=eyJ...; Path=/api/v1/auth/refresh; Max-Age=1209600; " +
-        "Secure; HttpOnly; SameSite=Lax"
+        "Secure; HttpOnly; SameSite=None"
 
 private const val TOKEN_REISSUE_SUCCESS_EXAMPLE =
     """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800}}"""
@@ -213,6 +227,9 @@ private const val MISSING_REFRESH_TOKEN_EXAMPLE =
 
 private const val INVALID_REFRESH_TOKEN_EXAMPLE =
     """{"code":"AUTH-E005","message":"유효하지 않거나 만료된 Refresh Token입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
+
+private const val INVALID_REQUEST_ORIGIN_EXAMPLE =
+    """{"code":"AUTH-E006","message":"허용되지 않은 요청 출처입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
 
 private const val INVALID_INPUT_EXAMPLE =
     """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"authorizationCode","reason":"Google 인가 코드는 필수입니다."}],"timestamp":"2026-09-10T08:00:00Z"}}"""

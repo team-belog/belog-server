@@ -66,14 +66,13 @@ class AuthController(
             .from(REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken)
             .httpOnly(true)
             .secure(jwtProperties.refreshCookieSecure)
-            .sameSite(REFRESH_TOKEN_COOKIE_SAME_SITE)
+            .sameSite(jwtProperties.refreshCookieSameSite)
             .path(REFRESH_TOKEN_COOKIE_PATH)
             .maxAge(tokens.refreshTokenExpiration)
             .build()
 
     companion object {
         private const val REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
-        private const val REFRESH_TOKEN_COOKIE_SAME_SITE = "Lax"
         private const val REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth/refresh"
     }
 }
