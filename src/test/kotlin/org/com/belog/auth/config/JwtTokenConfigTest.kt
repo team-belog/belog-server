@@ -18,8 +18,14 @@ class JwtTokenConfigTest {
             refreshCookieSecure = false,
         )
     private val config = JwtTokenConfig()
-    private val tokenProvider = JwtTokenProvider(config.jwtEncoder(properties), properties, Clock.systemUTC())
     private val refreshTokenDecoder = config.refreshTokenJwtDecoder(properties)
+    private val tokenProvider =
+        JwtTokenProvider(
+            config.jwtEncoder(properties),
+            properties,
+            Clock.systemUTC(),
+            refreshTokenDecoder,
+        )
 
     @Test
     fun `Refresh Token 전용 검증기는 Refresh Token을 검증한다`() {
