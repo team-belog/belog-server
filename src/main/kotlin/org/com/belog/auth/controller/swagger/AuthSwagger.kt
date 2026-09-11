@@ -14,7 +14,7 @@ import org.com.belog.global.response.CommonResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 
-@Tag(name = "인증", description = "로그인과 토큰 관련 API")
+@Tag(name = "Auth", description = "인증 관련 API")
 interface AuthSwagger {
     @Operation(
         summary = "Google 로그인",
