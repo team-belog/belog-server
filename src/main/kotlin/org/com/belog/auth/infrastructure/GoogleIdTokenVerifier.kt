@@ -10,6 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.JwtException
 import org.springframework.stereotype.Component
+import org.springframework.web.client.RestClientException
 import java.time.Instant
 
 @Component
@@ -39,9 +40,20 @@ class GoogleIdTokenVerifier(
     private fun decode(idToken: String): Jwt =
         try {
             jwtDecoder.decode(idToken)
+        } catch (exception: RestClientException) {
+            throw BusinessException(AuthErrorCode.GOOGLE_AUTH_SERVER_ERROR, exception)
         } catch (exception: JwtException) {
-            throw BusinessException(AuthErrorCode.INVALID_GOOGLE_ID_TOKEN, exception)
+            val errorCode =
+                if (exception.hasCause<RestClientException>()) {
+                    AuthErrorCode.GOOGLE_AUTH_SERVER_ERROR
+                } else {
+                    AuthErrorCode.INVALID_GOOGLE_ID_TOKEN
+                }
+            throw BusinessException(errorCode, exception)
         }
+
+    private inline fun <reified T : Throwable> Throwable.hasCause(): Boolean =
+        generateSequence(cause) { throwable -> throwable.cause }.any { throwable -> throwable is T }
 
     private fun validateClaims(jwt: Jwt) {
         val issuer = jwt.issuer?.toString()
