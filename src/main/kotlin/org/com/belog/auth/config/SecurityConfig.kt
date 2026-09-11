@@ -22,6 +22,7 @@ class SecurityConfig {
                 requests
                     .requestMatchers(
                         "/api/v1/auth/google",
+                        "/api/v1/auth/refresh",
                         "/actuator/health",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",

@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.com.belog.auth.controller.dto.GoogleLoginRequest
 import org.com.belog.auth.controller.dto.GoogleLoginResponse
+import org.com.belog.auth.controller.dto.TokenReissueResponse
 import org.com.belog.global.response.CommonResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -145,6 +146,56 @@ interface AuthSwagger {
         ],
     )
     fun loginWithGoogle(request: GoogleLoginRequest): ResponseEntity<CommonResponse<GoogleLoginResponse>>
+
+    @Operation(
+        summary = "토큰 재발급",
+        description = "Refresh Token 쿠키를 검증하고 새로운 Access Token과 Refresh Token을 발급합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "토큰 재발급 성공",
+                useReturnTypeSchema = true,
+                headers = [
+                    Header(
+                        name = "Set-Cookie",
+                        description = "새로운 HttpOnly Refresh Token 쿠키",
+                        schema = Schema(type = "string", example = REFRESH_COOKIE_EXAMPLE),
+                    ),
+                ],
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = TOKEN_REISSUE_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "Refresh Token 쿠키 누락",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MISSING_REFRESH_TOKEN_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "유효하지 않거나 만료된 Refresh Token",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_REFRESH_TOKEN_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun reissueTokens(refreshToken: String): ResponseEntity<CommonResponse<TokenReissueResponse>>
 }
 
 private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
@@ -153,6 +204,15 @@ private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
 private const val REFRESH_COOKIE_EXAMPLE =
     "refresh_token=eyJ...; Path=/api/v1/auth/refresh; Max-Age=1209600; " +
         "Secure; HttpOnly; SameSite=Lax"
+
+private const val TOKEN_REISSUE_SUCCESS_EXAMPLE =
+    """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800}}"""
+
+private const val MISSING_REFRESH_TOKEN_EXAMPLE =
+    """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
+
+private const val INVALID_REFRESH_TOKEN_EXAMPLE =
+    """{"code":"AUTH-E005","message":"유효하지 않거나 만료된 Refresh Token입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
 
 private const val INVALID_INPUT_EXAMPLE =
     """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"authorizationCode","reason":"Google 인가 코드는 필수입니다."}],"timestamp":"2026-09-10T08:00:00Z"}}"""
