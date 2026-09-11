@@ -37,6 +37,7 @@ class UserService(
             provider = provider.name,
             providerUserId = providerUserId,
         )
+        val isNewUser = userRepository.findLastInsertId() > 0
         val user =
             checkNotNull(
                 userRepository.findByProviderAndProviderUserIdForUpdate(
@@ -49,7 +50,7 @@ class UserService(
 
         return SocialUserResult(
             userId = requireNotNull(user.id),
-            isNewUser = true,
+            isNewUser = isNewUser,
         )
     }
 }

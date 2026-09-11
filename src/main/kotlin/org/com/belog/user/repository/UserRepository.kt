@@ -29,6 +29,7 @@ interface UserRepository : JpaRepository<User, Long> {
         providerUserId: String,
     ): User?
 
+    // 중복 경로는 현재 트랜잭션 연결의 LAST_INSERT_ID를 0으로 설정해 실제 INSERT와 구분한다.
     @Modifying
     @Query(
         value =
@@ -50,7 +51,7 @@ interface UserRepository : JpaRepository<User, Long> {
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )
-            ON DUPLICATE KEY UPDATE id = id
+            ON DUPLICATE KEY UPDATE id = id + LAST_INSERT_ID(0)
             """,
         nativeQuery = true,
     )
@@ -61,4 +62,7 @@ interface UserRepository : JpaRepository<User, Long> {
         @Param("provider") provider: String,
         @Param("providerUserId") providerUserId: String,
     ): Int
+
+    @Query(value = "SELECT LAST_INSERT_ID()", nativeQuery = true)
+    fun findLastInsertId(): Long
 }

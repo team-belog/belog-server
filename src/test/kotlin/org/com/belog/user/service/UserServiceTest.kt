@@ -61,6 +61,7 @@ class UserServiceTest {
             val results = loginResults.map { it.get(10, TimeUnit.SECONDS) }
 
             assertEquals(1, results.map(SocialUserResult::userId).distinct().size)
+            assertEquals(1, results.count(SocialUserResult::isNewUser))
             assertEquals(1, userRepository.count())
         } finally {
             executor.shutdownNow()
