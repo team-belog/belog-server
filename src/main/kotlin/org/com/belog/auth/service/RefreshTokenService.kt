@@ -26,9 +26,13 @@ class RefreshTokenService(
         refreshToken: String,
         expiration: Duration,
     ) {
+        val user =
+            checkNotNull(userRepository.findByIdForUpdate(userId)) {
+                "Refresh Token을 저장할 사용자를 찾을 수 없습니다."
+            }
         val tokenHash = hash(refreshToken)
         val expiresAt = Instant.now(clock).plus(expiration)
-        val savedToken = refreshTokenRepository.findByUserId(userId)
+        val savedToken = refreshTokenRepository.findByUserIdForUpdate(userId)
 
         if (savedToken != null) {
             savedToken.rotate(tokenHash, expiresAt)
@@ -37,7 +41,7 @@ class RefreshTokenService(
 
         refreshTokenRepository.save(
             RefreshToken.issue(
-                user = userRepository.getReferenceById(userId),
+                user = user,
                 tokenHash = tokenHash,
                 expiresAt = expiresAt,
             ),

@@ -16,6 +16,17 @@ interface UserRepository : JpaRepository<User, Long> {
     ): User?
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+        SELECT user 
+        FROM User user 
+        WHERE user.id = :userId
+        """,
+    )
+    fun findByIdForUpdate(
+        @Param("userId") userId: Long,
+    ): User?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
         SELECT user
