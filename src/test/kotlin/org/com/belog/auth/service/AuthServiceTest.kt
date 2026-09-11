@@ -21,12 +21,14 @@ class AuthServiceTest {
     private val googleIdTokenVerifier = mock(GoogleIdTokenVerifier::class.java)
     private val userService = mock(UserService::class.java)
     private val jwtTokenProvider = mock(JwtTokenProvider::class.java)
+    private val refreshTokenService = mock(RefreshTokenService::class.java)
     private val authService =
         AuthService(
             googleAuthorizationCodeClient,
             googleIdTokenVerifier,
             userService,
             jwtTokenProvider,
+            refreshTokenService,
         )
 
     @Test
@@ -73,5 +75,6 @@ class AuthServiceTest {
         assertTrue(result.isNewUser)
         verify(googleIdTokenVerifier).verify("google-id-token")
         verify(jwtTokenProvider).createTokens(1L)
+        verify(refreshTokenService).saveOrUpdate(1L, "refresh-token", Duration.ofDays(14))
     }
 }

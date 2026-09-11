@@ -14,6 +14,7 @@ class AuthService(
     private val googleIdTokenVerifier: GoogleIdTokenVerifier,
     private val userService: UserService,
     private val jwtTokenProvider: JwtTokenProvider,
+    private val refreshTokenService: RefreshTokenService,
 ) {
     fun loginWithGoogle(
         authorizationCode: String,
@@ -30,6 +31,11 @@ class AuthService(
                 profileImageUrl = googleUserInfo.profileImageUrl,
             )
         val tokens = jwtTokenProvider.createTokens(socialUser.userId)
+        refreshTokenService.saveOrUpdate(
+            userId = socialUser.userId,
+            refreshToken = tokens.refreshToken,
+            expiration = tokens.refreshTokenExpiration,
+        )
 
         return GoogleLoginResult(
             tokens = tokens,
