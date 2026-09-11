@@ -9,6 +9,7 @@ docs/
 .env
 .env.*
 !.env.example
+*.htpasswd
 
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/

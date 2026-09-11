@@ -2,15 +2,19 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 4 ]]; then
-  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <cleanup-script>" >&2
+if [[ $# -ne 8 ]]; then
+  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <nginx-bootstrap-config> <cleanup-script> <renewal-script> <image-prune-script> <maintenance-config-script>" >&2
   exit 1
 fi
 
 IMAGE_REF="$1"
 COMPOSE_FILE_SOURCE="$2"
 NGINX_CONFIG_SOURCE="$3"
-CLEANUP_SCRIPT_SOURCE="$4"
+NGINX_BOOTSTRAP_CONFIG_SOURCE="$4"
+CLEANUP_SCRIPT_SOURCE="$5"
+RENEWAL_SCRIPT_SOURCE="$6"
+IMAGE_PRUNE_SCRIPT_SOURCE="$7"
+MAINTENANCE_CONFIG_SCRIPT_SOURCE="$8"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
 COMPOSE_FILE="${DEPLOY_DIR}/compose.yaml"
 NGINX_DIR="${DEPLOY_DIR}/nginx"
@@ -21,11 +25,14 @@ HEALTH_CHECK_INTERVAL_SECONDS="${BELOG_HEALTH_CHECK_INTERVAL_SECONDS:-2}"
 HEALTH_CHECK_TIMEOUT_SECONDS="${BELOG_HEALTH_CHECK_TIMEOUT_SECONDS:-3}"
 ROLLBACK_WINDOW_SECONDS="${BELOG_ROLLBACK_WINDOW_SECONDS:-600}"
 SPRING_PROFILE="${BELOG_SPRING_PROFILE:-prod}"
+DOMAIN="${BELOG_DOMAIN:-}"
+CERTBOT_EMAIL="${BELOG_CERTBOT_EMAIL:-}"
 ENV_FILE="${DEPLOY_DIR}/.env.${SPRING_PROFILE}"
 ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
 CANDIDATE_IMAGE_FILE="${DEPLOY_DIR}/candidate-image"
+CERTIFICATE_DIR="/etc/letsencrypt/live/${DOMAIN}"
 
 for command_name in docker curl; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -44,7 +51,21 @@ if [[ ! "$SPRING_PROFILE" =~ ^[a-zA-Z0-9_-]+$ ]]; then
   exit 1
 fi
 
-for required_file in "$ENV_FILE" "$COMPOSE_FILE_SOURCE" "$NGINX_CONFIG_SOURCE" "$CLEANUP_SCRIPT_SOURCE"; do
+if [[ ! "$DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ]] || [[ "$DOMAIN" != *.* ]]; then
+  echo "BELOG_DOMAIN must be a valid domain name." >&2
+  exit 1
+fi
+
+for required_file in \
+  "$ENV_FILE" \
+  "$COMPOSE_FILE_SOURCE" \
+  "$NGINX_CONFIG_SOURCE" \
+  "$NGINX_BOOTSTRAP_CONFIG_SOURCE" \
+  "$CLEANUP_SCRIPT_SOURCE" \
+  "$RENEWAL_SCRIPT_SOURCE" \
+  "$IMAGE_PRUNE_SCRIPT_SOURCE" \
+  "$MAINTENANCE_CONFIG_SCRIPT_SOURCE" \
+  "${NGINX_DIR}/swagger.htpasswd"; do
   if [[ ! -r "$required_file" ]]; then
     echo "Required deployment file is missing: $required_file" >&2
     exit 1
@@ -59,7 +80,11 @@ if [[ ! "$HEALTH_CHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
   exit 1
 fi
 
-mkdir -p "$DEPLOY_DIR" "$NGINX_DIR"
+mkdir -p \
+  "$DEPLOY_DIR" \
+  "$NGINX_DIR" \
+  "${DEPLOY_DIR}/certbot/conf" \
+  "${DEPLOY_DIR}/certbot/www"
 install -m 600 "$COMPOSE_FILE_SOURCE" "$COMPOSE_FILE"
 
 active_color=""
@@ -216,7 +241,80 @@ if [[ -f "$NGINX_UPSTREAM_PATH" ]]; then
   cp "$NGINX_UPSTREAM_PATH" "${nginx_backup_dir}/belog-upstream.inc"
 fi
 
-install -m 644 "$NGINX_CONFIG_SOURCE" "$NGINX_CONFIG_PATH"
+render_nginx_config() {
+  local source_path="$1"
+  local target_path="$2"
+
+  sed "s/__BELOG_DOMAIN__/${DOMAIN}/g" "$source_path" > "$target_path"
+  if grep -q '__BELOG_DOMAIN__' "$target_path"; then
+    echo "Nginx domain placeholder was not fully rendered." >&2
+    return 1
+  fi
+}
+
+certificate_exists() {
+  if [[ "$(docker inspect --format '{{.State.Running}}' belog-nginx 2>/dev/null)" == true ]]; then
+    docker exec belog-nginx /bin/sh \
+      -c 'test -s "$1/fullchain.pem" && test -s "$1/privkey.pem"' \
+      certificate-check "$CERTIFICATE_DIR"
+    return
+  fi
+
+  compose run --rm --no-deps --entrypoint /bin/sh certbot \
+    -c 'test -s "$1/fullchain.pem" && test -s "$1/privkey.pem"' \
+    certificate-check "$CERTIFICATE_DIR"
+}
+
+if ! certificate_exists; then
+  if [[ -z "$CERTBOT_EMAIL" || "$CERTBOT_EMAIL" != *@*.* ]]; then
+    echo "BELOG_CERTBOT_EMAIL must be set to issue the initial certificate." >&2
+    exit 1
+  fi
+
+  bootstrap_config="${nginx_backup_dir}/belog-bootstrap.conf.rendered"
+  render_nginx_config "$NGINX_BOOTSTRAP_CONFIG_SOURCE" "$bootstrap_config"
+  install -m 644 "$bootstrap_config" "$NGINX_CONFIG_PATH"
+  nginx_changes_staged=true
+
+  if ! compose run --rm --no-deps nginx nginx -t; then
+    echo "Bootstrap Nginx configuration validation failed." >&2
+    exit 1
+  fi
+
+  if ! compose up --detach --no-deps nginx; then
+    echo "Bootstrap Nginx container failed to start." >&2
+    exit 1
+  fi
+
+  if ! docker exec belog-nginx nginx -t \
+    || ! docker exec belog-nginx nginx -s reload; then
+    echo "Bootstrap Nginx configuration activation failed." >&2
+    exit 1
+  fi
+
+  if ! compose run --rm --no-deps certbot \
+    certonly \
+    --webroot \
+    --webroot-path /var/www/certbot \
+    --domain "$DOMAIN" \
+    --cert-name "$DOMAIN" \
+    --email "$CERTBOT_EMAIL" \
+    --agree-tos \
+    --no-eff-email \
+    --non-interactive; then
+    echo "Initial certificate issuance failed for: $DOMAIN" >&2
+    exit 1
+  fi
+
+  if ! certificate_exists; then
+    echo "Certificate files are missing after initial issuance: $CERTIFICATE_DIR" >&2
+    exit 1
+  fi
+fi
+
+rendered_nginx_config="${nginx_backup_dir}/belog.conf.rendered"
+render_nginx_config "$NGINX_CONFIG_SOURCE" "$rendered_nginx_config"
+install -m 644 "$rendered_nginx_config" "$NGINX_CONFIG_PATH"
 printf 'server belog-%s:8080 max_fails=3 fail_timeout=10s;\n' "$target_color" \
   > "$NGINX_UPSTREAM_PATH"
 nginx_changes_staged=true
@@ -266,5 +364,15 @@ mv "${ACTIVE_IMAGE_FILE}.tmp" "$ACTIVE_IMAGE_FILE"
 
 rm -f "$CANDIDATE_COLOR_FILE" "$CANDIDATE_IMAGE_FILE"
 
+installed_renewal_script="${DEPLOY_DIR}/renew-certificate.sh"
+installed_image_prune_script="${DEPLOY_DIR}/prune-images.sh"
+installed_maintenance_config_script="${DEPLOY_DIR}/configure-maintenance.sh"
+install -m 700 "$RENEWAL_SCRIPT_SOURCE" "$installed_renewal_script"
+install -m 700 "$IMAGE_PRUNE_SCRIPT_SOURCE" "$installed_image_prune_script"
+install -m 700 "$MAINTENANCE_CONFIG_SCRIPT_SOURCE" "$installed_maintenance_config_script"
+
 deployment_succeeded=true
 echo "Activated $IMAGE_REF on $target_color through the Nginx container"
+
+BELOG_DOMAIN="$DOMAIN" "$installed_maintenance_config_script"
+echo "Configured certificate renewal and image cleanup schedules"

@@ -14,6 +14,8 @@ RUN ./gradlew bootJar --no-daemon
 
 FROM eclipse-temurin:21-jre-jammy
 
+LABEL org.com.belog.application="belog-server"
+
 WORKDIR /app
 
 RUN groupadd --system spring \
