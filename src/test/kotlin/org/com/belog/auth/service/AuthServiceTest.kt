@@ -77,4 +77,27 @@ class AuthServiceTest {
         verify(jwtTokenProvider).createTokens(1L)
         verify(refreshTokenService).saveOrUpdate(1L, "refresh-token", Duration.ofDays(14))
     }
+
+    @Test
+    fun `유효한 Refresh Token으로 새로운 토큰을 발급한다`() {
+        val tokens =
+            AuthTokens(
+                accessToken = "new-access-token",
+                refreshToken = "new-refresh-token",
+                accessTokenExpiration = Duration.ofMinutes(30),
+                refreshTokenExpiration = Duration.ofDays(14),
+            )
+        `when`(jwtTokenProvider.extractUserIdFromRefreshToken("current-refresh-token")).thenReturn(1L)
+        `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
+
+        val result = authService.reissueTokens("current-refresh-token")
+
+        assertEquals(tokens, result)
+        verify(refreshTokenService).validateAndRotate(
+            userId = 1L,
+            currentRefreshToken = "current-refresh-token",
+            newRefreshToken = "new-refresh-token",
+            expiration = Duration.ofDays(14),
+        )
+    }
 }
