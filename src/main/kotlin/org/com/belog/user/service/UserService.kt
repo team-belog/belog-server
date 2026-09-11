@@ -1,7 +1,6 @@
 package org.com.belog.user.service
 
 import org.com.belog.user.domain.SocialProvider
-import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -31,19 +30,25 @@ class UserService(
             )
         }
 
-        val newUser =
-            userRepository.save(
-                User.createSocialUser(
-                    email = email,
-                    nickname = nickname,
-                    profileImageUrl = profileImageUrl,
+        userRepository.upsertSocialUser(
+            email = email,
+            nickname = nickname,
+            profileImageUrl = profileImageUrl,
+            provider = provider.name,
+            providerUserId = providerUserId,
+        )
+        val user =
+            checkNotNull(
+                userRepository.findByProviderAndProviderUserIdForUpdate(
                     provider = provider,
                     providerUserId = providerUserId,
                 ),
-            )
+            ) {
+                "Upsert된 소셜 사용자를 조회할 수 없습니다."
+            }
 
         return SocialUserResult(
-            userId = requireNotNull(newUser.id),
+            userId = requireNotNull(user.id),
             isNewUser = true,
         )
     }
