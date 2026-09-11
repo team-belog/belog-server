@@ -1,5 +1,6 @@
 package org.com.belog.auth.config
 
+import org.com.belog.auth.infrastructure.JwtIdGenerator
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -17,6 +18,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import java.nio.charset.StandardCharsets
 import java.time.Clock
+import java.util.UUID
 import javax.crypto.spec.SecretKeySpec
 
 @Configuration
@@ -24,6 +26,9 @@ import javax.crypto.spec.SecretKeySpec
 class JwtTokenConfig {
     @Bean
     fun jwtClock(): Clock = Clock.systemUTC()
+
+    @Bean
+    fun jwtIdGenerator(): JwtIdGenerator = JwtIdGenerator { UUID.randomUUID().toString() }
 
     @Bean
     fun jwtEncoder(properties: JwtProperties): JwtEncoder {

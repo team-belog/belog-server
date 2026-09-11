@@ -21,13 +21,20 @@ class JwtTokenProvider(
     private val jwtEncoder: JwtEncoder,
     private val properties: JwtProperties,
     private val clock: Clock,
+    private val jwtIdGenerator: JwtIdGenerator,
     @Qualifier(JwtTokenConfig.REFRESH_TOKEN_JWT_DECODER)
     private val refreshTokenJwtDecoder: JwtDecoder,
 ) {
     fun createTokens(userId: Long): AuthTokens =
         AuthTokens(
             accessToken = createToken(userId, JwtTokenConfig.ACCESS_TOKEN_TYPE, properties.accessTokenExpiration),
-            refreshToken = createToken(userId, JwtTokenConfig.REFRESH_TOKEN_TYPE, properties.refreshTokenExpiration),
+            refreshToken =
+                createToken(
+                    userId = userId,
+                    tokenType = JwtTokenConfig.REFRESH_TOKEN_TYPE,
+                    expiration = properties.refreshTokenExpiration,
+                    jwtId = jwtIdGenerator.generate(),
+                ),
             accessTokenExpiration = properties.accessTokenExpiration,
             refreshTokenExpiration = properties.refreshTokenExpiration,
         )
@@ -54,9 +61,10 @@ class JwtTokenProvider(
         userId: Long,
         tokenType: String,
         expiration: Duration,
+        jwtId: String? = null,
     ): String {
         val issuedAt = Instant.now(clock)
-        val claims =
+        val claimsBuilder =
             JwtClaimsSet
                 .builder()
                 .issuer(properties.issuer)
@@ -64,8 +72,11 @@ class JwtTokenProvider(
                 .issuedAt(issuedAt)
                 .expiresAt(issuedAt.plus(expiration))
                 .claim(JwtTokenConfig.TOKEN_TYPE_CLAIM, tokenType)
-                .build()
 
-        return jwtEncoder.encode(JwtEncoderParameters.from(claims)).tokenValue
+        if (jwtId != null) {
+            claimsBuilder.id(jwtId)
+        }
+
+        return jwtEncoder.encode(JwtEncoderParameters.from(claimsBuilder.build())).tokenValue
     }
 }

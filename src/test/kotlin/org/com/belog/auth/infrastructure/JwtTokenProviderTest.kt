@@ -10,8 +10,11 @@ import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNull
 
 class JwtTokenProviderTest {
     private val properties =
@@ -25,13 +28,33 @@ class JwtTokenProviderTest {
         )
     private val config = JwtTokenConfig()
     private val jwtEncoder = config.jwtEncoder(properties)
+    private val clock = Clock.fixed(Instant.now(), ZoneOffset.UTC)
+    private var jwtIdSequence = 0
     private val tokenProvider =
         JwtTokenProvider(
             jwtEncoder = jwtEncoder,
             properties = properties,
-            clock = Clock.systemUTC(),
+            clock = clock,
+            jwtIdGenerator = JwtIdGenerator { "refresh-token-id-${++jwtIdSequence}" },
             refreshTokenJwtDecoder = config.refreshTokenJwtDecoder(properties),
         )
+
+    @Test
+    fun `같은 시각에 발급한 Refresh Token은 jti로 구분한다`() {
+        val firstTokens = tokenProvider.createTokens(1L)
+        val secondTokens = tokenProvider.createTokens(1L)
+
+        assertNotEquals(firstTokens.refreshToken, secondTokens.refreshToken)
+    }
+
+    @Test
+    fun `Access Token에는 jti를 추가하지 않는다`() {
+        val accessToken = tokenProvider.createTokens(1L).accessToken
+
+        val jwt = config.accessTokenJwtDecoder(properties).decode(accessToken)
+
+        assertNull(jwt.id)
+    }
 
     @Test
     fun `Refresh Token에서 사용자 ID를 추출한다`() {

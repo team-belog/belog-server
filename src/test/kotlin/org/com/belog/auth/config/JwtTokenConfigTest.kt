@@ -25,6 +25,7 @@ class JwtTokenConfigTest {
             config.jwtEncoder(properties),
             properties,
             Clock.systemUTC(),
+            { "refresh-token-id" },
             refreshTokenDecoder,
         )
 
@@ -35,6 +36,7 @@ class JwtTokenConfigTest {
         val jwt = refreshTokenDecoder.decode(refreshToken)
 
         assertEquals("1", jwt.subject)
+        assertEquals("refresh-token-id", jwt.id)
         assertEquals(JwtTokenConfig.REFRESH_TOKEN_TYPE, jwt.getClaimAsString(JwtTokenConfig.TOKEN_TYPE_CLAIM))
     }
 
