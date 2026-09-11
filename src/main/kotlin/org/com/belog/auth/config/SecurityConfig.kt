@@ -13,7 +13,7 @@ class SecurityConfig {
     @Bean
     fun securityFilterChain(
         http: HttpSecurity,
-        @Qualifier(JwtTokenConfig.SERVICE_JWT_DECODER) serviceJwtDecoder: JwtDecoder,
+        @Qualifier(JwtTokenConfig.ACCESS_TOKEN_JWT_DECODER) accessTokenJwtDecoder: JwtDecoder,
     ): SecurityFilterChain =
         http
             .csrf { csrf -> csrf.disable() }
@@ -30,6 +30,6 @@ class SecurityConfig {
                     .anyRequest()
                     .authenticated()
             }.oauth2ResourceServer { resourceServer ->
-                resourceServer.jwt { jwt -> jwt.decoder(serviceJwtDecoder) }
+                resourceServer.jwt { jwt -> jwt.decoder(accessTokenJwtDecoder) }
             }.build()
 }
