@@ -78,6 +78,18 @@ class UserServiceTest {
         assertEquals(1, userRepository.count())
     }
 
+    @Test
+    fun `등록되지 않은 닉네임은 사용할 수 있다`() {
+        assertTrue(userService.isNicknameAvailable("새닉네임"))
+    }
+
+    @Test
+    fun `등록된 닉네임은 사용할 수 없다`() {
+        login()
+
+        assertFalse(userService.isNicknameAvailable("belog"))
+    }
+
     private fun login(): SocialUserResult =
         userService.findOrCreateSocialUser(
             provider = SocialProvider.GOOGLE,

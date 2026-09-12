@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param
 interface UserRepository :
     JpaRepository<User, Long>,
     UserRepositoryCustom {
+    fun existsByNickname(nickname: String): Boolean
+
     fun findByProviderAndProviderUserId(
         provider: SocialProvider,
         providerUserId: String,

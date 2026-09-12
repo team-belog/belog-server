@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional
 class UserService(
     private val userRepository: UserRepository,
 ) {
+    @Transactional(readOnly = true)
+    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNickname(nickname)
+
     @Transactional
     fun findOrCreateSocialUser(
         provider: SocialProvider,

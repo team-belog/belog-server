@@ -1,6 +1,8 @@
 package org.com.belog.global.error
 
+import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -18,6 +20,7 @@ import org.springframework.validation.MapBindingResult
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -56,6 +59,18 @@ class GlobalExceptionHandlerMvcTest {
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
             .andExpect(jsonPath("$.data.fieldErrors").isArray)
+    }
+
+    @Test
+    @DisplayName("중첩된 요청 필드 검증에 실패하면 전체 필드 경로를 반환한다")
+    fun nestedRequestValidationFailureReturnsFullFieldPath() {
+        mockMvc
+            .perform(
+                post("/test/nested")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"profile":{"nickname":""}}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("profile.nickname"))
     }
 
     @Test
@@ -124,7 +139,22 @@ class GlobalExceptionHandlerMvcTest {
         @PostMapping(value = ["/json"], consumes = [MediaType.APPLICATION_JSON_VALUE])
         fun consumeJson() = Unit
 
+        @PostMapping("/nested")
+        fun nested(
+            @Valid @RequestBody request: NestedRequest,
+        ) = Unit
+
         @GetMapping(value = ["/json"], produces = [MediaType.APPLICATION_JSON_VALUE])
         fun produceJson() = Unit
     }
+
+    data class NestedRequest(
+        @field:Valid
+        val profile: ProfileRequest,
+    )
+
+    data class ProfileRequest(
+        @field:NotBlank
+        val nickname: String,
+    )
 }
