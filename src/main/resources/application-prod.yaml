@@ -34,10 +34,3 @@ auth:
   jwt:
     refresh-cookie-secure: true
     refresh-cookie-same-site: Lax
-
-app:
-  cors:
-    allowed-origins:
-      - https://belog.co.kr
-      - https://www.belog.co.kr
-      - https://api.belog.co.kr
