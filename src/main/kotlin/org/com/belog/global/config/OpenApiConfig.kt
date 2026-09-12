@@ -9,6 +9,8 @@ import io.swagger.v3.oas.models.media.MediaType
 import io.swagger.v3.oas.models.media.Schema
 import io.swagger.v3.oas.models.responses.ApiResponse
 import io.swagger.v3.oas.models.responses.ApiResponses
+import io.swagger.v3.oas.models.security.SecurityRequirement
+import io.swagger.v3.oas.models.security.SecurityScheme
 import org.com.belog.global.response.code.CommonErrorCode
 import org.springdoc.core.customizers.OpenApiCustomizer
 import org.springframework.context.annotation.Bean
@@ -26,6 +28,7 @@ class OpenApiConfig {
                     .description("BELOG 서비스 API 문서")
                     .version("v1"),
             ).components(commonComponents())
+            .addSecurityItem(SecurityRequirement().addList(ACCESS_TOKEN_SECURITY_SCHEME))
 
     @Bean
     fun commonErrorResponseCustomizer(): OpenApiCustomizer =
@@ -43,7 +46,14 @@ class OpenApiConfig {
 
     private fun commonComponents(): Components =
         Components()
-            .addExamples(
+            .addSecuritySchemes(
+                ACCESS_TOKEN_SECURITY_SCHEME,
+                SecurityScheme()
+                    .type(SecurityScheme.Type.HTTP)
+                    .scheme("bearer")
+                    .bearerFormat("JWT")
+                    .description("BELOG Access Token을 입력해 주세요."),
+            ).addExamples(
                 CommonOpenApiExample.INVALID_INPUT_NAME,
                 Example().value(
                     errorExample(
@@ -164,6 +174,7 @@ class OpenApiConfig {
 
     companion object {
         private const val COMMON_RESPONSE_SCHEMA_REF = "#/components/schemas/CommonResponse"
+        private const val ACCESS_TOKEN_SECURITY_SCHEME = "AccessToken"
         private const val EXAMPLE_TIMESTAMP = "2026-09-13T00:00:00Z"
         private val GLOBAL_RESPONSES =
             mapOf(

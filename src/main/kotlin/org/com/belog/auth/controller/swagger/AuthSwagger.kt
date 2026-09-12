@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject
 import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.security.SecurityRequirements
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.com.belog.auth.controller.dto.GoogleLoginRequest
 import org.com.belog.auth.controller.dto.GoogleLoginResponse
@@ -103,6 +104,7 @@ interface AuthSwagger {
             ),
         ],
     )
+    @SecurityRequirements
     fun loginWithGoogle(request: GoogleLoginRequest): ResponseEntity<CommonResponse<GoogleLoginResponse>>
 
     @Operation(
@@ -157,6 +159,7 @@ interface AuthSwagger {
             ),
         ],
     )
+    @SecurityRequirements
     fun reissueTokens(
         @Parameter(hidden = true) refreshToken: String,
     ): ResponseEntity<CommonResponse<TokenReissueResponse>>
