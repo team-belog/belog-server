@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.com.belog.auth.controller.dto.GoogleLoginRequest
 import org.com.belog.auth.controller.dto.GoogleLoginResponse
 import org.com.belog.auth.controller.dto.TokenReissueResponse
+import org.com.belog.global.config.CommonOpenApiExample
+import org.com.belog.global.config.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -39,17 +41,6 @@ interface AuthSwagger {
                             ),
                     ),
                 ],
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [
-                            ExampleObject(
-                                name = "로그인 성공",
-                                value = GOOGLE_LOGIN_SUCCESS_EXAMPLE,
-                            ),
-                        ],
-                    ),
-                ],
             ),
             ApiResponse(
                 responseCode = "400",
@@ -61,11 +52,11 @@ interface AuthSwagger {
                         examples = [
                             ExampleObject(
                                 name = "요청값 검증 실패",
-                                value = INVALID_INPUT_EXAMPLE,
+                                ref = CommonOpenApiExample.INVALID_INPUT,
                             ),
                             ExampleObject(
                                 name = "요청 본문 파싱 실패",
-                                value = INVALID_REQUEST_BODY_EXAMPLE,
+                                ref = CommonOpenApiExample.INVALID_REQUEST_BODY,
                             ),
                             ExampleObject(
                                 name = "허용되지 않은 리디렉션 URI",
@@ -96,42 +87,8 @@ interface AuthSwagger {
                 ],
             ),
             ApiResponse(
-                responseCode = "405",
-                description = "지원하지 않는 HTTP 메서드",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = METHOD_NOT_ALLOWED_EXAMPLE)],
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "406",
-                description = "지원하지 않는 응답 형식 요청 — 응답 본문 없음",
-                content = [Content()],
-            ),
-            ApiResponse(
                 responseCode = "415",
-                description = "지원하지 않는 Content-Type",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = UNSUPPORTED_MEDIA_TYPE_EXAMPLE)],
-                    ),
-                ],
-            ),
-            ApiResponse(
-                responseCode = "500",
-                description = "서버 내부 오류",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = INTERNAL_SERVER_ERROR_EXAMPLE)],
-                    ),
-                ],
+                ref = CommonOpenApiResponse.UNSUPPORTED_MEDIA_TYPE,
             ),
             ApiResponse(
                 responseCode = "502",
@@ -174,14 +131,7 @@ interface AuthSwagger {
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "Refresh Token 쿠키 누락",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = MISSING_REFRESH_TOKEN_EXAMPLE)],
-                    ),
-                ],
+                ref = CommonOpenApiResponse.MISSING_REQUEST_VALUE,
             ),
             ApiResponse(
                 responseCode = "401",
@@ -212,9 +162,6 @@ interface AuthSwagger {
     ): ResponseEntity<CommonResponse<TokenReissueResponse>>
 }
 
-private const val GOOGLE_LOGIN_SUCCESS_EXAMPLE =
-    """{"code":"AUTH-S001","message":"Google 로그인에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800,"onboardingRequired":true}}"""
-
 private const val REFRESH_COOKIE_EXAMPLE =
     "refresh_token=eyJ...; Path=/api/v1/auth/refresh; Max-Age=1209600; " +
         "Secure; HttpOnly; SameSite=None"
@@ -222,20 +169,11 @@ private const val REFRESH_COOKIE_EXAMPLE =
 private const val TOKEN_REISSUE_SUCCESS_EXAMPLE =
     """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800}}"""
 
-private const val MISSING_REFRESH_TOKEN_EXAMPLE =
-    """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
-
 private const val INVALID_REFRESH_TOKEN_EXAMPLE =
     """{"code":"AUTH-E005","message":"유효하지 않거나 만료된 Refresh Token입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
 
 private const val INVALID_REQUEST_ORIGIN_EXAMPLE =
     """{"code":"AUTH-E006","message":"허용되지 않은 요청 출처입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""
-
-private const val INVALID_INPUT_EXAMPLE =
-    """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"authorizationCode","reason":"Google 인가 코드는 필수입니다."}],"timestamp":"2026-09-10T08:00:00Z"}}"""
-
-private const val INVALID_REQUEST_BODY_EXAMPLE =
-    """{"code":"CMN-E002","message":"요청 본문을 읽을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
 
 private const val INVALID_REDIRECT_URI_EXAMPLE =
     """{"code":"AUTH-E004","message":"허용되지 않은 Google 리디렉션 URI입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
@@ -248,12 +186,3 @@ private const val INVALID_GOOGLE_AUTHORIZATION_CODE_EXAMPLE =
 
 private const val GOOGLE_AUTH_SERVER_ERROR_EXAMPLE =
     """{"code":"AUTH-E003","message":"Google 인증 서버와 통신할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
-
-private const val METHOD_NOT_ALLOWED_EXAMPLE =
-    """{"code":"CMN-E004","message":"지원하지 않는 HTTP 메서드입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
-
-private const val UNSUPPORTED_MEDIA_TYPE_EXAMPLE =
-    """{"code":"CMN-E007","message":"지원하지 않는 Content-Type입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
-
-private const val INTERNAL_SERVER_ERROR_EXAMPLE =
-    """{"code":"CMN-E999","message":"서버 내부 오류가 발생했습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-10T08:00:00Z"}}"""
