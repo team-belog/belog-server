@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.constraints.Size
+import org.com.belog.global.config.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
 import org.springframework.http.MediaType
@@ -37,6 +38,10 @@ interface UserSwagger {
                         examples = [ExampleObject(value = INVALID_NICKNAME_LENGTH_EXAMPLE)],
                     ),
                 ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED,
             ),
         ],
     )

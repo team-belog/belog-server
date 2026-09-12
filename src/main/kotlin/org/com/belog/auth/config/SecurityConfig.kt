@@ -14,6 +14,7 @@ class SecurityConfig {
     fun securityFilterChain(
         http: HttpSecurity,
         @Qualifier(JwtTokenConfig.ACCESS_TOKEN_JWT_DECODER) accessTokenJwtDecoder: JwtDecoder,
+        bearerAuthenticationEntryPoint: BearerAuthenticationEntryPoint,
     ): SecurityFilterChain =
         http
             .csrf { csrf -> csrf.disable() }
@@ -31,7 +32,11 @@ class SecurityConfig {
                     ).permitAll()
                     .anyRequest()
                     .authenticated()
+            }.exceptionHandling { exceptions ->
+                exceptions.authenticationEntryPoint(bearerAuthenticationEntryPoint)
             }.oauth2ResourceServer { resourceServer ->
-                resourceServer.jwt { jwt -> jwt.decoder(accessTokenJwtDecoder) }
+                resourceServer
+                    .authenticationEntryPoint(bearerAuthenticationEntryPoint)
+                    .jwt { jwt -> jwt.decoder(accessTokenJwtDecoder) }
             }.build()
 }
