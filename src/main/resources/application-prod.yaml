@@ -29,3 +29,8 @@ management:
   endpoint:
     health:
       show-details: never
+
+auth:
+  jwt:
+    refresh-cookie-secure: true
+    refresh-cookie-same-site: Lax

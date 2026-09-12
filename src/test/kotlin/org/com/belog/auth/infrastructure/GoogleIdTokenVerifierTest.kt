@@ -6,6 +6,8 @@ import org.com.belog.global.error.BusinessException
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.JwtException
+import org.springframework.web.client.ResourceAccessException
+import java.net.SocketTimeoutException
 import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,6 +78,27 @@ class GoogleIdTokenVerifierTest {
         val verifier = GoogleIdTokenVerifier(decoder, properties)
 
         assertInvalidToken(verifier)
+    }
+
+    @Test
+    fun `Google 공개 키 조회에 실패하면 인증 서버 장애로 처리한다`() {
+        val cause = ResourceAccessException("JWK read timed out", SocketTimeoutException())
+        val decoder = JwtDecoder { throw JwtException("failed to retrieve JWK set", cause) }
+        val verifier = GoogleIdTokenVerifier(decoder, properties)
+
+        val exception = assertFailsWith<BusinessException> { verifier.verify("google-id-token") }
+
+        assertEquals(AuthErrorCode.GOOGLE_AUTH_SERVER_ERROR, exception.errorCode)
+    }
+
+    @Test
+    fun `Google 공개 키 클라이언트 예외가 직접 발생해도 인증 서버 장애로 처리한다`() {
+        val decoder = JwtDecoder { throw ResourceAccessException("JWK connection failed") }
+        val verifier = GoogleIdTokenVerifier(decoder, properties)
+
+        val exception = assertFailsWith<BusinessException> { verifier.verify("google-id-token") }
+
+        assertEquals(AuthErrorCode.GOOGLE_AUTH_SERVER_ERROR, exception.errorCode)
     }
 
     private fun assertInvalidToken(verifier: GoogleIdTokenVerifier) {

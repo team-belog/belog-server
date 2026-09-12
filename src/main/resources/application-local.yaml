@@ -26,3 +26,4 @@ server:
 auth:
   jwt:
     refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax

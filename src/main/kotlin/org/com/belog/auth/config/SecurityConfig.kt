@@ -13,15 +13,17 @@ class SecurityConfig {
     @Bean
     fun securityFilterChain(
         http: HttpSecurity,
-        @Qualifier(JwtTokenConfig.SERVICE_JWT_DECODER) serviceJwtDecoder: JwtDecoder,
+        @Qualifier(JwtTokenConfig.ACCESS_TOKEN_JWT_DECODER) accessTokenJwtDecoder: JwtDecoder,
     ): SecurityFilterChain =
         http
             .csrf { csrf -> csrf.disable() }
+            .cors { }
             .sessionManagement { session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { requests ->
                 requests
                     .requestMatchers(
                         "/api/v1/auth/google",
+                        "/api/v1/auth/refresh",
                         "/actuator/health",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
@@ -30,6 +32,6 @@ class SecurityConfig {
                     .anyRequest()
                     .authenticated()
             }.oauth2ResourceServer { resourceServer ->
-                resourceServer.jwt { jwt -> jwt.decoder(serviceJwtDecoder) }
+                resourceServer.jwt { jwt -> jwt.decoder(accessTokenJwtDecoder) }
             }.build()
 }

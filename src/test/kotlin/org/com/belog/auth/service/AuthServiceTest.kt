@@ -1,13 +1,11 @@
 package org.com.belog.auth.service
 
 import org.com.belog.auth.domain.AuthTokens
+import org.com.belog.auth.domain.GoogleLoginResult
 import org.com.belog.auth.domain.GoogleUserInfo
 import org.com.belog.auth.infrastructure.GoogleAuthorizationCodeClient
 import org.com.belog.auth.infrastructure.GoogleIdTokenVerifier
 import org.com.belog.auth.infrastructure.JwtTokenProvider
-import org.com.belog.user.domain.SocialProvider
-import org.com.belog.user.service.SocialUserResult
-import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -19,14 +17,16 @@ import kotlin.test.assertTrue
 class AuthServiceTest {
     private val googleAuthorizationCodeClient = mock(GoogleAuthorizationCodeClient::class.java)
     private val googleIdTokenVerifier = mock(GoogleIdTokenVerifier::class.java)
-    private val userService = mock(UserService::class.java)
+    private val loginTransactionService = mock(LoginTransactionService::class.java)
     private val jwtTokenProvider = mock(JwtTokenProvider::class.java)
+    private val refreshTokenService = mock(RefreshTokenService::class.java)
     private val authService =
         AuthService(
             googleAuthorizationCodeClient,
             googleIdTokenVerifier,
-            userService,
+            loginTransactionService,
             jwtTokenProvider,
+            refreshTokenService,
         )
 
     @Test
@@ -52,16 +52,8 @@ class AuthServiceTest {
             ),
         ).thenReturn("google-id-token")
         `when`(googleIdTokenVerifier.verify("google-id-token")).thenReturn(googleUserInfo)
-        `when`(
-            userService.findOrCreateSocialUser(
-                SocialProvider.GOOGLE,
-                "google-subject",
-                "user@example.com",
-                "belog",
-                "https://example.com/profile.png",
-            ),
-        ).thenReturn(SocialUserResult(userId = 1L, isNewUser = true))
-        `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
+        val loginResult = GoogleLoginResult(tokens = tokens, isNewUser = true)
+        `when`(loginTransactionService.login(googleUserInfo)).thenReturn(loginResult)
 
         val result =
             authService.loginWithGoogle(
@@ -72,6 +64,29 @@ class AuthServiceTest {
         assertEquals(tokens, result.tokens)
         assertTrue(result.isNewUser)
         verify(googleIdTokenVerifier).verify("google-id-token")
-        verify(jwtTokenProvider).createTokens(1L)
+        verify(loginTransactionService).login(googleUserInfo)
+    }
+
+    @Test
+    fun `유효한 Refresh Token으로 새로운 토큰을 발급한다`() {
+        val tokens =
+            AuthTokens(
+                accessToken = "new-access-token",
+                refreshToken = "new-refresh-token",
+                accessTokenExpiration = Duration.ofMinutes(30),
+                refreshTokenExpiration = Duration.ofDays(14),
+            )
+        `when`(jwtTokenProvider.extractUserIdFromRefreshToken("current-refresh-token")).thenReturn(1L)
+        `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
+
+        val result = authService.reissueTokens("current-refresh-token")
+
+        assertEquals(tokens, result)
+        verify(refreshTokenService).validateAndRotate(
+            userId = 1L,
+            currentRefreshToken = "current-refresh-token",
+            newRefreshToken = "new-refresh-token",
+            expiration = Duration.ofDays(14),
+        )
     }
 }

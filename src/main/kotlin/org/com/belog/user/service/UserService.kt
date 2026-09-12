@@ -30,27 +30,18 @@ class UserService(
             )
         }
 
-        userRepository.upsertSocialUser(
-            email = email,
-            nickname = nickname,
-            profileImageUrl = profileImageUrl,
-            provider = provider.name,
-            providerUserId = providerUserId,
-        )
-        val isNewUser = userRepository.findLastInsertId() > 0
-        val user =
-            checkNotNull(
-                userRepository.findByProviderAndProviderUserIdForUpdate(
-                    provider = provider,
-                    providerUserId = providerUserId,
-                ),
-            ) {
-                "Upsert된 소셜 사용자를 조회할 수 없습니다."
-            }
+        val upsertResult =
+            userRepository.upsertSocialUser(
+                email = email,
+                nickname = nickname,
+                profileImageUrl = profileImageUrl,
+                provider = provider,
+                providerUserId = providerUserId,
+            )
 
         return SocialUserResult(
-            userId = requireNotNull(user.id),
-            isNewUser = isNewUser,
+            userId = upsertResult.userId,
+            isNewUser = upsertResult.isNewUser,
         )
     }
 }

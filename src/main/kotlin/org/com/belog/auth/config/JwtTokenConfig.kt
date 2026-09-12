@@ -1,5 +1,6 @@
 package org.com.belog.auth.config
 
+import org.com.belog.auth.infrastructure.JwtIdGenerator
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -17,6 +18,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import java.nio.charset.StandardCharsets
 import java.time.Clock
+import java.util.UUID
 import javax.crypto.spec.SecretKeySpec
 
 @Configuration
@@ -24,6 +26,9 @@ import javax.crypto.spec.SecretKeySpec
 class JwtTokenConfig {
     @Bean
     fun jwtClock(): Clock = Clock.systemUTC()
+
+    @Bean
+    fun jwtIdGenerator(): JwtIdGenerator = JwtIdGenerator { UUID.randomUUID().toString() }
 
     @Bean
     fun jwtEncoder(properties: JwtProperties): JwtEncoder {
@@ -35,27 +40,47 @@ class JwtTokenConfig {
     }
 
     @Bean
-    @Qualifier(SERVICE_JWT_DECODER)
-    fun serviceJwtDecoder(properties: JwtProperties): JwtDecoder {
+    @Qualifier(ACCESS_TOKEN_JWT_DECODER)
+    fun accessTokenJwtDecoder(properties: JwtProperties): JwtDecoder =
+        createDecoder(
+            properties = properties,
+            tokenType = ACCESS_TOKEN_TYPE,
+            invalidTokenMessage = "Access Token이 아닙니다.",
+        )
+
+    @Bean
+    @Qualifier(REFRESH_TOKEN_JWT_DECODER)
+    fun refreshTokenJwtDecoder(properties: JwtProperties): JwtDecoder =
+        createDecoder(
+            properties = properties,
+            tokenType = REFRESH_TOKEN_TYPE,
+            invalidTokenMessage = "Refresh Token이 아닙니다.",
+        )
+
+    private fun createDecoder(
+        properties: JwtProperties,
+        tokenType: String,
+        invalidTokenMessage: String,
+    ): JwtDecoder {
         val decoder =
             NimbusJwtDecoder
                 .withSecretKey(secretKey(properties))
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build()
-        val accessTokenValidator =
+        val tokenTypeValidator =
             OAuth2TokenValidator<Jwt> { jwt ->
-                if (jwt.getClaimAsString(TOKEN_TYPE_CLAIM) == ACCESS_TOKEN_TYPE) {
+                if (jwt.getClaimAsString(TOKEN_TYPE_CLAIM) == tokenType) {
                     OAuth2TokenValidatorResult.success()
                 } else {
                     OAuth2TokenValidatorResult.failure(
-                        OAuth2Error("invalid_token", "Access Token이 아닙니다.", null),
+                        OAuth2Error("invalid_token", invalidTokenMessage, null),
                     )
                 }
             }
         decoder.setJwtValidator(
             DelegatingOAuth2TokenValidator(
                 JwtValidators.createDefaultWithIssuer(properties.issuer),
-                accessTokenValidator,
+                tokenTypeValidator,
             ),
         )
         return decoder
@@ -68,7 +93,8 @@ class JwtTokenConfig {
         )
 
     companion object {
-        const val SERVICE_JWT_DECODER = "serviceJwtDecoder"
+        const val ACCESS_TOKEN_JWT_DECODER = "accessTokenJwtDecoder"
+        const val REFRESH_TOKEN_JWT_DECODER = "refreshTokenJwtDecoder"
         const val TOKEN_TYPE_CLAIM = "token_type"
         const val ACCESS_TOKEN_TYPE = "access"
         const val REFRESH_TOKEN_TYPE = "refresh"
