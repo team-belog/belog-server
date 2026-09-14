@@ -22,7 +22,11 @@ data class ProfileImageUploadUrlResponse(
                 objectKey = upload.objectKey,
                 uploadUrl = upload.uploadUrl,
                 method = "PUT",
-                requiredHeaders = mapOf("Content-Type" to upload.contentType),
+                requiredHeaders =
+                    mapOf(
+                        "Content-Type" to upload.contentType,
+                        "Content-Length" to upload.contentLength.toString(),
+                    ),
                 expiresAt = upload.expiresAt,
             )
     }

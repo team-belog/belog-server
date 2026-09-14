@@ -30,6 +30,6 @@ class ProfileImageService(
             throw BusinessException(UserErrorCode.USER_NOT_FOUND)
         }
 
-        return profileImageUploadUrlProvider.issueUploadUrl(userId, format)
+        return profileImageUploadUrlProvider.issueUploadUrl(userId, format, fileSize)
     }
 }

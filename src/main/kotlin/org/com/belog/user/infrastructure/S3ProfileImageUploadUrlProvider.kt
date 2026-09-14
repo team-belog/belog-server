@@ -17,6 +17,7 @@ class S3ProfileImageUploadUrlProvider(
     fun issueUploadUrl(
         userId: Long,
         format: ProfileImageFormat,
+        fileSize: Long,
     ): ProfileImageUpload {
         val objectKey = createObjectKey(userId, format.extension)
         val putObjectRequest =
@@ -25,6 +26,7 @@ class S3ProfileImageUploadUrlProvider(
                 .bucket(properties.bucket)
                 .key(objectKey)
                 .contentType(format.contentType)
+                .contentLength(fileSize)
                 .build()
         val presignedRequest =
             s3Presigner.presignPutObject(
@@ -39,6 +41,7 @@ class S3ProfileImageUploadUrlProvider(
             objectKey = objectKey,
             uploadUrl = presignedRequest.url().toExternalForm(),
             contentType = format.contentType,
+            contentLength = fileSize,
             expiresAt = presignedRequest.expiration(),
         )
     }

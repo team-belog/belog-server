@@ -27,15 +27,16 @@ class ProfileImageServiceTest {
                 objectKey = "users/15/profile/image-id.webp",
                 uploadUrl = "https://example.com/upload",
                 contentType = "image/webp",
+                contentLength = 1024L,
                 expiresAt = Instant.parse("2026-09-14T14:05:00Z"),
             )
         `when`(userRepository.existsById(15L)).thenReturn(true)
-        `when`(profileImageUploadUrlProvider.issueUploadUrl(15L, ProfileImageFormat.WEBP)).thenReturn(expected)
+        `when`(profileImageUploadUrlProvider.issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)).thenReturn(expected)
 
         val result = service.issueUploadUrl(15L, "IMAGE/WEBP", 1024L)
 
         assertEquals(expected, result)
-        verify(profileImageUploadUrlProvider).issueUploadUrl(15L, ProfileImageFormat.WEBP)
+        verify(profileImageUploadUrlProvider).issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)
     }
 
     @Test

@@ -94,6 +94,7 @@ class UserControllerTest {
                 objectKey = "users/15/profile/image-id.webp",
                 uploadUrl = "https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/upload",
                 contentType = "image/webp",
+                contentLength = 524_288L,
                 expiresAt = Instant.parse("2026-09-14T14:05:00Z"),
             )
         `when`(profileImageService.issueUploadUrl(15L, "image/webp", 524_288L)).thenReturn(upload)
@@ -116,6 +117,7 @@ class UserControllerTest {
             .andExpect(jsonPath("$.data.objectKey").value("users/15/profile/image-id.webp"))
             .andExpect(jsonPath("$.data.method").value("PUT"))
             .andExpect(jsonPath("$.data.requiredHeaders.Content-Type").value("image/webp"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Length").value("524288"))
             .andExpect(jsonPath("$.data.expiresAt").value("2026-09-14T14:05:00Z"))
     }
 

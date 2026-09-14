@@ -41,15 +41,16 @@ class S3ProfileImageUploadUrlProviderTest {
     @Test
     fun `사용자 경로에 5분 동안 유효한 PUT URL을 발급한다`() {
         val earliestExpiration = Instant.now().plus(properties.presignExpiration).minusSeconds(1)
-        val result = provider.issueUploadUrl(15L, ProfileImageFormat.WEBP)
+        val result = provider.issueUploadUrl(15L, ProfileImageFormat.WEBP, 524_288L)
         val latestExpiration = Instant.now().plus(properties.presignExpiration).plusSeconds(1)
         val decodedQuery = URLDecoder.decode(result.uploadUrl, StandardCharsets.UTF_8)
 
         assertTrue(result.objectKey.matches(Regex("users/15/profile/[0-9a-f-]{36}\\.webp")))
         assertTrue(result.uploadUrl.startsWith("https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/"))
         assertTrue(decodedQuery.contains("X-Amz-Expires=300"))
-        assertTrue(decodedQuery.contains("X-Amz-SignedHeaders=content-type;host"))
+        assertTrue(decodedQuery.contains("X-Amz-SignedHeaders=content-length;content-type;host"))
         assertEquals("image/webp", result.contentType)
+        assertEquals(524_288L, result.contentLength)
         assertTrue(result.expiresAt.isAfter(earliestExpiration))
         assertTrue(result.expiresAt.isBefore(latestExpiration))
     }
