@@ -7,6 +7,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.result.SocialUserResult
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired

@@ -13,8 +13,8 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import org.com.belog.auth.controller.dto.GoogleLoginRequest
 import org.com.belog.auth.controller.dto.GoogleLoginResponse
 import org.com.belog.auth.controller.dto.TokenReissueResponse
-import org.com.belog.global.config.CommonOpenApiExample
-import org.com.belog.global.config.CommonOpenApiResponse
+import org.com.belog.global.openapi.CommonOpenApiExample
+import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity

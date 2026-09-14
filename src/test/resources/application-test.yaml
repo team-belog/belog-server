@@ -44,3 +44,9 @@ app:
   security:
     account-number:
       encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+
+storage:
+  s3:
+    bucket: belog-test-storage
+    region: ap-northeast-2
+    presign-expiration: 5m

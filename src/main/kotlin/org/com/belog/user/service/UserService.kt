@@ -8,6 +8,7 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.USER_NICKNAME_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.result.SocialUserResult
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
