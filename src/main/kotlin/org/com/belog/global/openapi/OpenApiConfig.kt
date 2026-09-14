@@ -1,4 +1,4 @@
-package org.com.belog.global.config
+package org.com.belog.global.openapi
 
 import io.swagger.v3.oas.models.Components
 import io.swagger.v3.oas.models.OpenAPI
