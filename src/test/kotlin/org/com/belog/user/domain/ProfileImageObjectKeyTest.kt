@@ -32,4 +32,18 @@ class ProfileImageObjectKeyTest {
             ProfileImageObjectKey.create(1L, "users/1/profile/../image.webp")
         }
     }
+
+    @Test
+    fun `object key가 비어 있으면 허용하지 않는다`() {
+        assertFailsWith<IllegalArgumentException> {
+            ProfileImageObjectKey.create(1L, " ")
+        }
+    }
+
+    @Test
+    fun `object key가 최대 길이를 초과하면 허용하지 않는다`() {
+        assertFailsWith<IllegalArgumentException> {
+            ProfileImageObjectKey.create(1L, "users/1/profile/${"a".repeat(ProfileImageObjectKey.MAX_LENGTH)}")
+        }
+    }
 }

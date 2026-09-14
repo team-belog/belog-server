@@ -8,12 +8,16 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
 import org.com.belog.global.config.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
+import org.com.belog.user.controller.dto.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
 import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
@@ -50,6 +54,23 @@ interface UserSwagger {
         @ValidNickname(message = NICKNAME_LENGTH_MESSAGE)
         nickname: String,
     ): ResponseEntity<CommonResponse<NicknameAvailabilityResponse>>
+
+    @Operation(
+        summary = "온보딩 완료",
+        description = "프로필과 정산 계좌 정보를 저장하고 온보딩을 완료합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "온보딩 완료", useReturnTypeSchema = true),
+            ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(responseCode = "409", description = "닉네임 중복 또는 이미 완료된 온보딩"),
+        ],
+    )
+    fun completeOnboarding(
+        @Parameter(hidden = true) authentication: JwtAuthenticationToken,
+        @Valid @RequestBody request: CompleteOnboardingRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
 }
 
 const val NICKNAME_LENGTH_MESSAGE = "닉네임은 1자 이상 8자 이하여야 합니다."

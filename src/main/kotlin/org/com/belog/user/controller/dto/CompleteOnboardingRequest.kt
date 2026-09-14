@@ -1,5 +1,6 @@
 package org.com.belog.user.controller.dto
 
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
@@ -8,6 +9,7 @@ import org.com.belog.user.controller.validation.ValidNickname
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
+import org.com.belog.user.domain.User
 
 data class CompleteOnboardingRequest(
     @field:NotBlank(message = "프로필 이미지 object key는 비어 있을 수 없습니다.")
@@ -17,6 +19,11 @@ data class CompleteOnboardingRequest(
     )
     @field:Pattern(regexp = "^\\S+$", message = "프로필 이미지 object key에는 공백을 포함할 수 없습니다.")
     val profileImageObjectKey: String,
+    @field:Schema(
+        requiredMode = Schema.RequiredMode.REQUIRED,
+        minLength = User.NICKNAME_MIN_LENGTH,
+        maxLength = User.NICKNAME_MAX_LENGTH,
+    )
     @field:ValidNickname
     val nickname: String,
     @field:NotNull(message = "은행 코드는 필수입니다.")
