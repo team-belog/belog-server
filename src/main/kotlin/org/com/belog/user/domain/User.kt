@@ -1,5 +1,6 @@
 package org.com.belog.user.domain
 
+import jakarta.persistence.CheckConstraint
 import jakarta.persistence.Column
 import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
@@ -13,6 +14,8 @@ import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import java.time.Instant
 
+const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
+
 @Entity
 @Table(
     name = "users",
@@ -22,8 +25,21 @@ import java.time.Instant
             columnNames = ["provider", "provider_user_id"],
         ),
         UniqueConstraint(
-            name = "uk_users_nickname",
+            name = USER_NICKNAME_UNIQUE_CONSTRAINT_NAME,
             columnNames = ["nickname"],
+        ),
+    ],
+    check = [
+        CheckConstraint(
+            name = "chk_users_onboarding_state",
+            constraint =
+                "(" +
+                    "onboarding_completed_at IS NULL AND nickname IS NULL AND profile_image_object_key IS NULL " +
+                    "AND bank IS NULL AND account_number IS NULL AND account_holder_name IS NULL" +
+                    ") OR (" +
+                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND profile_image_object_key IS NOT NULL " +
+                    "AND bank IS NOT NULL AND account_number IS NOT NULL AND account_holder_name IS NOT NULL" +
+                    ")",
         ),
     ],
 )
