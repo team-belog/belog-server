@@ -17,8 +17,6 @@ class UserService(
         provider: SocialProvider,
         providerUserId: String,
         email: String,
-        nickname: String?,
-        profileImageUrl: String?,
     ): SocialUserResult {
         val existingUser =
             userRepository.findByProviderAndProviderUserId(
@@ -36,8 +34,6 @@ class UserService(
         val upsertResult =
             userRepository.upsertSocialUser(
                 email = email,
-                nickname = nickname,
-                profileImageUrl = profileImageUrl,
                 provider = provider,
                 providerUserId = providerUserId,
             )

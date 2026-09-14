@@ -46,8 +46,6 @@ class LoginTransactionServiceTest {
                 SocialProvider.GOOGLE,
                 "google-subject",
                 "user@example.com",
-                "belog",
-                "https://example.com/profile.png",
             ),
         ).thenReturn(SocialUserResult(userId = 1L, isNewUser = true))
         `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)

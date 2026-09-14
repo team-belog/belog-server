@@ -5,8 +5,6 @@ import org.com.belog.user.domain.SocialProvider
 interface UserRepositoryCustom {
     fun upsertSocialUser(
         email: String,
-        nickname: String?,
-        profileImageUrl: String?,
         provider: SocialProvider,
         providerUserId: String,
     ): SocialUserUpsertResult

@@ -30,8 +30,6 @@ class RefreshTokenRepositoryTest {
             userRepository.save(
                 User.createSocialUser(
                     email = "user@example.com",
-                    nickname = "belog",
-                    profileImageUrl = null,
                     provider = SocialProvider.GOOGLE,
                     providerUserId = "google-subject",
                 ),

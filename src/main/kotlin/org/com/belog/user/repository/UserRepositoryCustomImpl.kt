@@ -13,16 +13,12 @@ open class UserRepositoryCustomImpl(
     @Transactional(propagation = Propagation.MANDATORY)
     override fun upsertSocialUser(
         email: String,
-        nickname: String?,
-        profileImageUrl: String?,
         provider: SocialProvider,
         providerUserId: String,
     ): SocialUserUpsertResult {
         entityManager
             .createNativeQuery(UPSERT_SOCIAL_USER_SQL)
             .setParameter("email", email)
-            .setParameter("nickname", nickname)
-            .setParameter("profileImageUrl", profileImageUrl)
             .setParameter("provider", provider.name)
             .setParameter("providerUserId", providerUserId)
             .executeUpdate()
@@ -64,16 +60,12 @@ open class UserRepositoryCustomImpl(
             """
             INSERT INTO users (
                 email,
-                nickname,
-                profile_image_url,
                 provider,
                 provider_user_id,
                 created_at,
                 updated_at
             ) VALUES (
                 :email,
-                :nickname,
-                :profileImageUrl,
                 :provider,
                 :providerUserId,
                 CURRENT_TIMESTAMP(6),

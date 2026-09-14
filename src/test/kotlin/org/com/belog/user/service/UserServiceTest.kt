@@ -1,5 +1,7 @@
 package org.com.belog.user.service
 
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.AfterEach
@@ -12,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -86,6 +89,19 @@ class UserServiceTest {
     @Test
     fun `등록된 닉네임은 사용할 수 없다`() {
         login()
+        val user = userRepository.findAll().single()
+        user.completeOnboarding(
+            profileImageObjectKey = "users/profile/image.webp",
+            nickname = "belog",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                    accountHolderName = "홍길동",
+                ),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+        userRepository.saveAndFlush(user)
 
         assertFalse(userService.isNicknameAvailable("belog"))
     }
@@ -95,8 +111,6 @@ class UserServiceTest {
             provider = SocialProvider.GOOGLE,
             providerUserId = "google-subject",
             email = "user@example.com",
-            nickname = "belog",
-            profileImageUrl = "https://example.com/profile.png",
         )
 
     companion object {
