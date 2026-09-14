@@ -21,10 +21,11 @@ class UserController(
         @RequestParam
         nickname: String,
     ): ResponseEntity<CommonResponse<NicknameAvailabilityResponse>> {
+        val normalizedNickname = nickname.trim()
         val response =
             NicknameAvailabilityResponse(
-                nickname = nickname,
-                available = userService.isNicknameAvailable(nickname),
+                nickname = normalizedNickname,
+                available = userService.isNicknameAvailable(normalizedNickname),
             )
 
         return ResponseEntity

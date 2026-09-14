@@ -2,6 +2,7 @@ package org.com.belog.user.service
 
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.AfterEach
@@ -106,8 +107,9 @@ class UserServiceTest {
 
     private fun completeOnboarding() {
         val user = userRepository.findAll().single()
+        val userId = requireNotNull(user.id)
         user.completeOnboarding(
-            profileImageObjectKey = "users/profile/image.webp",
+            profileImageObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp"),
             nickname = "belog",
             bankAccount =
                 BankAccount.create(

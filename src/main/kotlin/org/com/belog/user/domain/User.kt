@@ -45,7 +45,7 @@ class User protected constructor(
     var nickname: String? = null
         protected set
 
-    @Column(name = "profile_image_object_key", length = PROFILE_IMAGE_OBJECT_KEY_MAX_LENGTH)
+    @Column(name = "profile_image_object_key", length = ProfileImageObjectKey.MAX_LENGTH)
     var profileImageObjectKey: String? = null
         protected set
 
@@ -61,7 +61,7 @@ class User protected constructor(
         get() = onboardingCompletedAt != null
 
     fun completeOnboarding(
-        profileImageObjectKey: String,
+        profileImageObjectKey: ProfileImageObjectKey,
         nickname: String,
         bankAccount: BankAccount,
         completedAt: Instant,
@@ -69,17 +69,12 @@ class User protected constructor(
         check(!isOnboardingCompleted) { "이미 온보딩을 완료한 사용자입니다." }
 
         val normalizedNickname = nickname.trim()
-        val normalizedProfileImageObjectKey = profileImageObjectKey.trim()
 
         require(normalizedNickname.length in NICKNAME_MIN_LENGTH..NICKNAME_MAX_LENGTH) {
             "닉네임은 ${NICKNAME_MIN_LENGTH}자 이상 ${NICKNAME_MAX_LENGTH}자 이하여야 합니다."
         }
-        require(normalizedProfileImageObjectKey.isNotEmpty()) { "프로필 이미지 object key는 비어 있을 수 없습니다." }
-        require(normalizedProfileImageObjectKey.length <= PROFILE_IMAGE_OBJECT_KEY_MAX_LENGTH) {
-            "프로필 이미지 object key는 ${PROFILE_IMAGE_OBJECT_KEY_MAX_LENGTH}자를 초과할 수 없습니다."
-        }
 
-        this.profileImageObjectKey = normalizedProfileImageObjectKey
+        this.profileImageObjectKey = profileImageObjectKey.value
         this.nickname = normalizedNickname
         this.bankAccount = bankAccount
         this.onboardingCompletedAt = completedAt
@@ -88,7 +83,6 @@ class User protected constructor(
     companion object {
         const val NICKNAME_MIN_LENGTH = 1
         const val NICKNAME_MAX_LENGTH = 8
-        const val PROFILE_IMAGE_OBJECT_KEY_MAX_LENGTH = 1024
 
         fun createSocialUser(
             email: String,

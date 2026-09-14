@@ -2,6 +2,7 @@ package org.com.belog.user.controller
 
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -48,6 +49,21 @@ class UserControllerTest {
                     .param("nickname", "김빌로"),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.data.available").value(false))
+    }
+
+    @Test
+    fun `닉네임 앞뒤 공백을 제거한 값으로 중복을 확인한다`() {
+        `when`(userService.isNicknameAvailable("김빌로")).thenReturn(true)
+
+        mockMvc
+            .perform(
+                get("/api/v1/users/nickname/availability")
+                    .param("nickname", " 김빌로 "),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.nickname").value("김빌로"))
+            .andExpect(jsonPath("$.data.available").value(true))
+
+        verify(userService).isNicknameAvailable("김빌로")
     }
 
     @Test

@@ -60,13 +60,13 @@ class UserTest {
         val completedAt = Instant.parse("2026-09-15T00:00:00Z")
 
         user.completeOnboarding(
-            profileImageObjectKey = " users/profile/image.webp ",
+            profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
             nickname = " 빌로그 ",
             bankAccount = bankAccount,
             completedAt = completedAt,
         )
 
-        assertEquals("users/profile/image.webp", user.profileImageObjectKey)
+        assertEquals("users/1/profile/image.webp", user.profileImageObjectKey)
         assertEquals("빌로그", user.nickname)
         assertEquals(Bank.KB_KOOKMIN, user.bankAccount?.bank)
         assertEquals("123456789012", user.bankAccount?.accountNumber)
@@ -81,7 +81,7 @@ class UserTest {
 
         assertFailsWith<IllegalArgumentException> {
             user.completeOnboarding(
-                profileImageObjectKey = "users/profile/image.webp",
+                profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
                 nickname = "123456789",
                 bankAccount = createBankAccount(),
                 completedAt = Instant.parse("2026-09-15T00:00:00Z"),
@@ -97,7 +97,7 @@ class UserTest {
         val completedAt = Instant.parse("2026-09-15T00:00:00Z")
 
         user.completeOnboarding(
-            profileImageObjectKey = "users/profile/image.webp",
+            profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
             nickname = "빌로그",
             bankAccount = createBankAccount(),
             completedAt = completedAt,
@@ -105,7 +105,7 @@ class UserTest {
 
         assertFailsWith<IllegalStateException> {
             user.completeOnboarding(
-                profileImageObjectKey = "users/profile/other.webp",
+                profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/other.webp"),
                 nickname = "새닉네임",
                 bankAccount = createBankAccount(),
                 completedAt = completedAt.plusSeconds(1),

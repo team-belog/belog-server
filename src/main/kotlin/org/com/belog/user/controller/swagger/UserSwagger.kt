@@ -8,10 +8,10 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
-import jakarta.validation.constraints.Size
 import org.com.belog.global.config.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
+import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 
@@ -47,13 +47,11 @@ interface UserSwagger {
     )
     fun checkNicknameAvailability(
         @Parameter(description = "확인할 닉네임", example = "빌로그")
-        @Size(min = NICKNAME_MIN_LENGTH, max = NICKNAME_MAX_LENGTH, message = NICKNAME_LENGTH_MESSAGE)
+        @ValidNickname(message = NICKNAME_LENGTH_MESSAGE)
         nickname: String,
     ): ResponseEntity<CommonResponse<NicknameAvailabilityResponse>>
 }
 
-const val NICKNAME_MIN_LENGTH = 1
-const val NICKNAME_MAX_LENGTH = 8
 const val NICKNAME_LENGTH_MESSAGE = "닉네임은 1자 이상 8자 이하여야 합니다."
 
 private const val INVALID_NICKNAME_LENGTH_EXAMPLE =
