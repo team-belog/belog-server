@@ -41,6 +41,9 @@ app:
   cors:
     allowed-origins:
       - http://localhost:3000
+  security:
+    account-number:
+      encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
 
 storage:
   s3:

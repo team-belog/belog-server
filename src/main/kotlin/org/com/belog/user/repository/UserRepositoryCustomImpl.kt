@@ -13,32 +13,22 @@ open class UserRepositoryCustomImpl(
     @Transactional(propagation = Propagation.MANDATORY)
     override fun upsertSocialUser(
         email: String,
-        nickname: String?,
-        profileImageUrl: String?,
         provider: SocialProvider,
         providerUserId: String,
     ): SocialUserUpsertResult {
         entityManager
             .createNativeQuery(UPSERT_SOCIAL_USER_SQL)
             .setParameter("email", email)
-            .setParameter("nickname", nickname)
-            .setParameter("profileImageUrl", profileImageUrl)
             .setParameter("provider", provider.name)
             .setParameter("providerUserId", providerUserId)
             .executeUpdate()
 
-        val isNewUser = findLastInsertId() > 0
         val user = findSocialUserForUpdate(provider, providerUserId)
 
         return SocialUserUpsertResult(
             userId = requireNotNull(user.id),
-            isNewUser = isNewUser,
+            onboardingRequired = !user.isOnboardingCompleted,
         )
-    }
-
-    private fun findLastInsertId(): Long {
-        val result = entityManager.createNativeQuery("SELECT LAST_INSERT_ID()").singleResult
-        return (result as Number).toLong()
     }
 
     private fun findSocialUserForUpdate(
@@ -64,22 +54,18 @@ open class UserRepositoryCustomImpl(
             """
             INSERT INTO users (
                 email,
-                nickname,
-                profile_image_url,
                 provider,
                 provider_user_id,
                 created_at,
                 updated_at
             ) VALUES (
                 :email,
-                :nickname,
-                :profileImageUrl,
                 :provider,
                 :providerUserId,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )
-            ON DUPLICATE KEY UPDATE id = id + LAST_INSERT_ID(0)
+            ON DUPLICATE KEY UPDATE id = id
             """
     }
 }

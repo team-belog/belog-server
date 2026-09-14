@@ -22,8 +22,6 @@ class GoogleIdTokenVerifierTest {
 
         assertEquals("google-subject", userInfo.providerUserId)
         assertEquals("user@example.com", userInfo.email)
-        assertEquals("belog", userInfo.name)
-        assertEquals("https://example.com/profile.png", userInfo.profileImageUrl)
     }
 
     @Test
@@ -128,8 +126,6 @@ class GoogleIdTokenVerifierTest {
                 .expiresAt(Instant.now().plusSeconds(300))
                 .claim("email", "user@example.com")
                 .claim("email_verified", emailVerified)
-                .claim("name", "belog")
-                .claim("picture", "https://example.com/profile.png")
 
         if (authorizedParty != null) {
             builder.claim("azp", authorizedParty)

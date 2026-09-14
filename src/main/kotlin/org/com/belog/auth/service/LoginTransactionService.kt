@@ -21,8 +21,6 @@ class LoginTransactionService(
                 provider = SocialProvider.GOOGLE,
                 providerUserId = googleUserInfo.providerUserId,
                 email = googleUserInfo.email,
-                nickname = googleUserInfo.name,
-                profileImageUrl = googleUserInfo.profileImageUrl,
             )
         val tokens = jwtTokenProvider.createTokens(socialUser.userId)
         refreshTokenService.saveOrUpdate(
@@ -33,7 +31,7 @@ class LoginTransactionService(
 
         return GoogleLoginResult(
             tokens = tokens,
-            isNewUser = socialUser.isNewUser,
+            onboardingRequired = socialUser.onboardingRequired,
         )
     }
 }

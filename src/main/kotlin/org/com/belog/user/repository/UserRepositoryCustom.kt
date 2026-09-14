@@ -5,8 +5,6 @@ import org.com.belog.user.domain.SocialProvider
 interface UserRepositoryCustom {
     fun upsertSocialUser(
         email: String,
-        nickname: String?,
-        profileImageUrl: String?,
         provider: SocialProvider,
         providerUserId: String,
     ): SocialUserUpsertResult
@@ -14,5 +12,5 @@ interface UserRepositoryCustom {
 
 data class SocialUserUpsertResult(
     val userId: Long,
-    val isNewUser: Boolean,
+    val onboardingRequired: Boolean,
 )

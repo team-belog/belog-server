@@ -20,6 +20,11 @@ springdoc:
 server:
   shutdown: graceful
 
+app:
+  security:
+    account-number:
+      encryption-key: "${ACCOUNT_NUMBER_ENCRYPTION_KEY}"
+
 auth:
   google:
     client-id: "${GOOGLE_CLIENT_ID}"

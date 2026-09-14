@@ -17,16 +17,12 @@ import org.springframework.security.oauth2.jwt.JwtValidators
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import java.nio.charset.StandardCharsets
-import java.time.Clock
 import java.util.UUID
 import javax.crypto.spec.SecretKeySpec
 
 @Configuration
 @EnableConfigurationProperties(JwtProperties::class)
 class JwtTokenConfig {
-    @Bean
-    fun jwtClock(): Clock = Clock.systemUTC()
-
     @Bean
     fun jwtIdGenerator(): JwtIdGenerator = JwtIdGenerator { UUID.randomUUID().toString() }
 

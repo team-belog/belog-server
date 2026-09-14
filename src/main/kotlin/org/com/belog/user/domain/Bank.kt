@@ -1,0 +1,30 @@
+package org.com.belog.user.domain
+
+enum class Bank(
+    val displayName: String,
+) {
+    KDB("한국산업은행"),
+    IBK("IBK기업은행"),
+    KB_KOOKMIN("KB국민은행"),
+    SUHYUP("Sh수협은행"),
+    NH_NONGHYUP_BANK("NH농협은행"),
+    LOCAL_NONGHYUP("지역 농·축협"),
+    WOORI("우리은행"),
+    SC_JEIL("SC제일은행"),
+    CITI("한국씨티은행"),
+    IM_BANK("iM뱅크"),
+    BUSAN("부산은행"),
+    GWANGJU("광주은행"),
+    JEJU("제주은행"),
+    JEONBUK("전북은행"),
+    GYEONGNAM("경남은행"),
+    SAEMAUL("새마을금고"),
+    SHINHYUP("신협"),
+    SAVINGS_BANK("저축은행"),
+    POST_OFFICE("우체국"),
+    HANA("하나은행"),
+    SHINHAN("신한은행"),
+    K_BANK("케이뱅크"),
+    KAKAO_BANK("카카오뱅크"),
+    TOSS_BANK("토스뱅크"),
+}
