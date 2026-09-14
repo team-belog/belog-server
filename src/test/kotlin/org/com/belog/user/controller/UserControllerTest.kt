@@ -38,7 +38,7 @@ class UserControllerTest {
     fun `다른 사용자의 object key로 온보딩을 요청하면 400 응답을 반환한다`() {
         mockMvc
             .perform(
-                post("/api/v1/users/onboarding")
+                post("/api/v1/users/me/onboarding")
                     .principal(authenticationFor(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/2/profile/image-key")),
@@ -52,7 +52,7 @@ class UserControllerTest {
     fun `상위 경로 이동이 포함된 object key로 온보딩을 요청하면 400 응답을 반환한다`() {
         mockMvc
             .perform(
-                post("/api/v1/users/onboarding")
+                post("/api/v1/users/me/onboarding")
                     .principal(authenticationFor(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/1/profile/../image-key")),
@@ -66,7 +66,7 @@ class UserControllerTest {
     fun `현재 사용자의 object key로 온보딩 정보를 저장한다`() {
         mockMvc
             .perform(
-                post("/api/v1/users/onboarding")
+                post("/api/v1/users/me/onboarding")
                     .principal(authenticationFor(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/1/profile/image-key")),

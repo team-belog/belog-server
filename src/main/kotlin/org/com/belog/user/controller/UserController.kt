@@ -43,7 +43,7 @@ class UserController(
             .body(CommonResponse.success(CommonSuccessCode.OK, response))
     }
 
-    @PostMapping("/onboarding")
+    @PostMapping("/me/onboarding")
     override fun completeOnboarding(
         authentication: JwtAuthenticationToken,
         @RequestBody request: CompleteOnboardingRequest,
