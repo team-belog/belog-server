@@ -2,8 +2,10 @@ package org.com.belog.auth.repository
 
 import org.com.belog.auth.domain.RefreshToken
 import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
+import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,7 +18,11 @@ import kotlin.test.assertNotNull
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import(JpaAuditingConfig::class)
+@Import(
+    JpaAuditingConfig::class,
+    AccountNumberEncryptionConfig::class,
+    AccountNumberAttributeConverter::class,
+)
 class RefreshTokenRepositoryTest {
     @Autowired
     private lateinit var refreshTokenRepository: RefreshTokenRepository

@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.junit.jupiter.Container
@@ -24,6 +25,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -36,6 +39,9 @@ class UserServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
 
     @AfterEach
     fun cleanUp() {
@@ -106,6 +112,23 @@ class UserServiceTest {
         completeOnboarding()
 
         assertFalse(userService.isNicknameAvailable("belog"))
+    }
+
+    @Test
+    fun `계좌번호는 데이터베이스에 암호화해서 저장한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+
+        completeOnboarding(userId, "belog")
+
+        val encryptedAccountNumber =
+            jdbcTemplate.queryForObject(
+                "SELECT encrypted_account_number FROM users WHERE id = ?",
+                String::class.java,
+                userId,
+            )
+        assertNotNull(encryptedAccountNumber)
+        assertNotEquals("123456789012", encryptedAccountNumber)
+        assertTrue(encryptedAccountNumber.startsWith("v1."))
     }
 
     @Test

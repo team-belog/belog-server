@@ -35,10 +35,10 @@ const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
             constraint =
                 "(" +
                     "onboarding_completed_at IS NULL AND nickname IS NULL AND profile_image_object_key IS NULL " +
-                    "AND bank IS NULL AND account_number IS NULL AND account_holder_name IS NULL" +
+                    "AND bank IS NULL AND encrypted_account_number IS NULL AND account_holder_name IS NULL" +
                     ") OR (" +
                     "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND profile_image_object_key IS NOT NULL " +
-                    "AND bank IS NOT NULL AND account_number IS NOT NULL AND account_holder_name IS NOT NULL" +
+                    "AND bank IS NOT NULL AND encrypted_account_number IS NOT NULL AND account_holder_name IS NOT NULL" +
                     ")",
         ),
     ],
