@@ -69,6 +69,12 @@ interface UserSwagger {
                 responseCode = "200",
                 description = "프로필 이미지 업로드 URL 발급 성공",
                 useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = PROFILE_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE)],
+                    ),
+                ],
             ),
             ApiResponse(
                 responseCode = "400",
@@ -105,7 +111,19 @@ interface UserSwagger {
     fun issueProfileImageUploadUrl(
         @Parameter(hidden = true)
         authentication: Authentication,
-        @Valid @RequestBody request: ProfileImageUploadUrlRequest,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = ProfileImageUploadUrlRequest::class),
+                    examples = [ExampleObject(value = PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: ProfileImageUploadUrlRequest,
     ): ResponseEntity<CommonResponse<ProfileImageUploadUrlResponse>>
 
     @Operation(
@@ -114,7 +132,11 @@ interface UserSwagger {
     )
     @ApiResponses(
         value = [
-            ApiResponse(responseCode = "200", description = "온보딩 완료", useReturnTypeSchema = true),
+            ApiResponse(
+                responseCode = "200",
+                description = "온보딩 완료",
+                useReturnTypeSchema = true,
+            ),
             ApiResponse(
                 responseCode = "400",
                 description = "요청값 또는 프로필 이미지 object key 검증 실패",
@@ -159,11 +181,32 @@ interface UserSwagger {
     )
     fun completeOnboarding(
         @Parameter(hidden = true) authentication: JwtAuthenticationToken,
-        @Valid @RequestBody request: CompleteOnboardingRequest,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = CompleteOnboardingRequest::class),
+                    examples = [ExampleObject(value = ONBOARDING_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: CompleteOnboardingRequest,
     ): ResponseEntity<CommonResponse<Nothing>>
 }
 
 const val NICKNAME_LENGTH_MESSAGE = "닉네임은 1자 이상 8자 이하여야 합니다."
+
+private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
+    """{"contentType":"image/webp","fileSize":524288}"""
+
+private const val PROFILE_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE =
+    """{"code":"USER-S001","message":"프로필 이미지 업로드 URL이 발급되었습니다.","data":{"objectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","uploadUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp?...","method":"PUT","requiredHeaders":{"Content-Type":"image/webp","Content-Length":"524288"},"expiresAt":"2026-09-14T14:05:00Z"}}"""
+
+private const val ONBOARDING_REQUEST_EXAMPLE =
+    """{"profileImageObjectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 
 private const val INVALID_NICKNAME_LENGTH_EXAMPLE =
     """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"nickname","reason":"닉네임은 1자 이상 8자 이하여야 합니다."}],"timestamp":"2026-09-13T00:00:00Z"}}"""
