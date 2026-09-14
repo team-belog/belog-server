@@ -31,7 +31,11 @@ class AccountNumberAttributeConverterTest {
     @Test
     fun `변조된 암호문은 복호화할 수 없다`() {
         val encryptedAccountNumber = requireNotNull(converter.convertToDatabaseColumn(ACCOUNT_NUMBER))
-        val tamperedEncryptedAccountNumber = encryptedAccountNumber.dropLast(1) + "A"
+        val encryptedParts = encryptedAccountNumber.split('.').toMutableList()
+        val encryptedPayload = encryptedParts.last()
+        val replacement = if (encryptedPayload.first() == 'A') 'B' else 'A'
+        encryptedParts[encryptedParts.lastIndex] = replacement + encryptedPayload.drop(1)
+        val tamperedEncryptedAccountNumber = encryptedParts.joinToString(".")
 
         assertFailsWith<IllegalStateException> {
             converter.convertToEntityAttribute(tamperedEncryptedAccountNumber)
