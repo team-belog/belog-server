@@ -1,12 +1,22 @@
 package org.com.belog.user.controller
 
+import jakarta.validation.Valid
+import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
+import org.com.belog.global.response.code.CommonErrorCode
 import org.com.belog.global.response.code.CommonSuccessCode
+import org.com.belog.user.code.UserSuccessCode
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
+import org.com.belog.user.controller.dto.ProfileImageUploadUrlRequest
+import org.com.belog.user.controller.dto.ProfileImageUploadUrlResponse
 import org.com.belog.user.controller.swagger.UserSwagger
+import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -15,6 +25,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userService: UserService,
+    private val profileImageService: ProfileImageService,
 ) : UserSwagger {
     @GetMapping("/nickname/availability")
     override fun checkNicknameAvailability(
@@ -31,4 +42,30 @@ class UserController(
             .status(CommonSuccessCode.OK.status)
             .body(CommonResponse.success(CommonSuccessCode.OK, response))
     }
+
+    @PostMapping("/me/profile-image/upload-url")
+    override fun issueProfileImageUploadUrl(
+        authentication: Authentication,
+        @Valid @RequestBody request: ProfileImageUploadUrlRequest,
+    ): ResponseEntity<CommonResponse<ProfileImageUploadUrlResponse>> {
+        val upload =
+            profileImageService.issueUploadUrl(
+                userId = authenticatedUserId(authentication),
+                contentType = request.contentType,
+                fileSize = request.fileSize,
+            )
+
+        return ResponseEntity
+            .status(UserSuccessCode.PROFILE_IMAGE_UPLOAD_URL_ISSUED.status)
+            .body(
+                CommonResponse.success(
+                    UserSuccessCode.PROFILE_IMAGE_UPLOAD_URL_ISSUED,
+                    ProfileImageUploadUrlResponse.from(upload),
+                ),
+            )
+    }
+
+    private fun authenticatedUserId(authentication: Authentication): Long =
+        authentication.name.toLongOrNull()
+            ?: throw BusinessException(CommonErrorCode.AUTHENTICATION_REQUIRED)
 }

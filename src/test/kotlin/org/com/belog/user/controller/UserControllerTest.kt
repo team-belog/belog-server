@@ -1,5 +1,7 @@
 package org.com.belog.user.controller
 
+import org.com.belog.user.domain.ProfileImageUpload
+import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verifyNoInteractions
@@ -7,12 +9,16 @@ import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
 
 @WebMvcTest(UserController::class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -23,6 +29,9 @@ class UserControllerTest {
 
     @MockitoBean
     private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var profileImageService: ProfileImageService
 
     @Test
     fun `사용 가능한 닉네임이면 true를 반환한다`() {
@@ -77,4 +86,43 @@ class UserControllerTest {
 
         verifyNoInteractions(userService)
     }
+
+    @Test
+    fun `프로필 이미지 업로드 URL을 발급한다`() {
+        val upload =
+            ProfileImageUpload(
+                objectKey = "users/15/profile/image-id.webp",
+                uploadUrl = "https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/upload",
+                contentType = "image/webp",
+                expiresAt = Instant.parse("2026-09-14T14:05:00Z"),
+            )
+        `when`(profileImageService.issueUploadUrl(15L, "image/webp", 524_288L)).thenReturn(upload)
+
+        mockMvc
+            .perform(
+                post("/api/v1/users/me/profile-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "contentType": "image/webp",
+                          "fileSize": 524288
+                        }
+                        """.trimIndent(),
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("USER-S001"))
+            .andExpect(jsonPath("$.data.objectKey").value("users/15/profile/image-id.webp"))
+            .andExpect(jsonPath("$.data.method").value("PUT"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Type").value("image/webp"))
+            .andExpect(jsonPath("$.data.expiresAt").value("2026-09-14T14:05:00Z"))
+    }
+
+    private fun authenticatedUser() =
+        UsernamePasswordAuthenticationToken.authenticated(
+            "15",
+            "access-token",
+            emptyList(),
+        )
 }
