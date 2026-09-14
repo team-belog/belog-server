@@ -41,3 +41,9 @@ app:
   cors:
     allowed-origins:
       - http://localhost:3000
+
+storage:
+  s3:
+    bucket: belog-test-storage
+    region: ap-northeast-2
+    presign-expiration: 5m

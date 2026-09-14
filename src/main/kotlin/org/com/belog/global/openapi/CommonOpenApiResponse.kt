@@ -1,4 +1,4 @@
-package org.com.belog.global.config
+package org.com.belog.global.openapi
 
 object CommonOpenApiResponse {
     private const val COMPONENT_RESPONSE_PREFIX = "#/components/responses"

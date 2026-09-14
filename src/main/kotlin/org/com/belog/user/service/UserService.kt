@@ -2,6 +2,7 @@ package org.com.belog.user.service
 
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.result.SocialUserResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 

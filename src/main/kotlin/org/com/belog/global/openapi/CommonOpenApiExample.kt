@@ -1,4 +1,4 @@
-package org.com.belog.global.config
+package org.com.belog.global.openapi
 
 object CommonOpenApiExample {
     private const val COMPONENT_EXAMPLE_PREFIX = "#/components/examples"
