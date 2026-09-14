@@ -9,7 +9,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import org.com.belog.global.config.CommonOpenApiResponse
+import org.com.belog.global.openapi.CommonOpenApiExample
+import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.user.controller.dto.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
@@ -19,8 +20,8 @@ import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.Authentication
-import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
+import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
@@ -77,6 +78,7 @@ interface UserSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "지원하지 않는 이미지 형식", value = UNSUPPORTED_PROFILE_IMAGE_TYPE_EXAMPLE),
                             ExampleObject(name = "이미지 크기 초과", value = INVALID_PROFILE_IMAGE_SIZE_EXAMPLE),
                         ],
@@ -113,9 +115,46 @@ interface UserSwagger {
     @ApiResponses(
         value = [
             ApiResponse(responseCode = "200", description = "온보딩 완료", useReturnTypeSchema = true),
-            ApiResponse(responseCode = "400", description = "요청값 검증 실패"),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 또는 프로필 이미지 object key 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 프로필 이미지 object key", value = INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
-            ApiResponse(responseCode = "409", description = "닉네임 중복 또는 이미 완료된 온보딩"),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = USER_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "닉네임 중복 또는 이미 완료된 온보딩",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "닉네임 중복", value = NICKNAME_ALREADY_EXISTS_EXAMPLE),
+                            ExampleObject(name = "이미 완료된 온보딩", value = ONBOARDING_ALREADY_COMPLETED_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
         ],
     )
     fun completeOnboarding(
@@ -130,10 +169,19 @@ private const val INVALID_NICKNAME_LENGTH_EXAMPLE =
     """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"nickname","reason":"닉네임은 1자 이상 8자 이하여야 합니다."}],"timestamp":"2026-09-13T00:00:00Z"}}"""
 
 private const val UNSUPPORTED_PROFILE_IMAGE_TYPE_EXAMPLE =
-    """{"code":"USER-E002","message":"지원하지 않는 프로필 이미지 형식입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-14T00:00:00Z"}}"""
+    """{"code":"USER-E005","message":"지원하지 않는 프로필 이미지 형식입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-14T00:00:00Z"}}"""
 
 private const val INVALID_PROFILE_IMAGE_SIZE_EXAMPLE =
-    """{"code":"USER-E003","message":"프로필 이미지는 5MB 이하여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-14T00:00:00Z"}}"""
+    """{"code":"USER-E006","message":"프로필 이미지는 5MB 이하여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-14T00:00:00Z"}}"""
 
 private const val USER_NOT_FOUND_EXAMPLE =
     """{"code":"USER-E001","message":"사용자를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-14T00:00:00Z"}}"""
+
+private const val INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE =
+    """{"code":"USER-E004","message":"프로필 이미지 object key가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val NICKNAME_ALREADY_EXISTS_EXAMPLE =
+    """{"code":"USER-E002","message":"이미 사용 중인 닉네임입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val ONBOARDING_ALREADY_COMPLETED_EXAMPLE =
+    """{"code":"USER-E003","message":"이미 온보딩을 완료했습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""

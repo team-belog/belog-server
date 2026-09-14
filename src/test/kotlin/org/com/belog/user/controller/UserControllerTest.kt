@@ -1,9 +1,9 @@
 package org.com.belog.user.controller
 
-import org.com.belog.user.domain.ProfileImageUpload
-import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.ProfileImageUpload
+import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
@@ -15,7 +15,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.http.MediaType
 import org.springframework.security.oauth2.jwt.Jwt
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.test.context.ActiveProfiles
@@ -25,7 +24,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import java.time.Instant
 import java.time.Instant
 import kotlin.test.assertEquals
 
