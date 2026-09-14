@@ -42,7 +42,7 @@ class UserServiceTest {
     fun `처음 로그인한 소셜 사용자를 생성한다`() {
         val result = login()
 
-        assertTrue(result.isNewUser)
+        assertTrue(result.onboardingRequired)
         assertEquals(1, userRepository.count())
     }
 
@@ -64,7 +64,7 @@ class UserServiceTest {
             val results = loginResults.map { it.get(10, TimeUnit.SECONDS) }
 
             assertEquals(1, results.map(SocialUserResult::userId).distinct().size)
-            assertEquals(1, results.count(SocialUserResult::isNewUser))
+            assertTrue(results.all(SocialUserResult::onboardingRequired))
             assertEquals(1, userRepository.count())
         } finally {
             executor.shutdownNow()
@@ -72,13 +72,23 @@ class UserServiceTest {
     }
 
     @Test
-    fun `이미 가입한 소셜 사용자는 다시 생성하지 않는다`() {
+    fun `온보딩을 완료하지 않은 소셜 사용자는 재로그인해도 온보딩이 필요하다`() {
         val firstLogin = login()
         val secondLogin = login()
 
-        assertFalse(secondLogin.isNewUser)
+        assertTrue(secondLogin.onboardingRequired)
         assertEquals(firstLogin.userId, secondLogin.userId)
         assertEquals(1, userRepository.count())
+    }
+
+    @Test
+    fun `온보딩을 완료한 소셜 사용자는 재로그인할 때 온보딩이 필요하지 않다`() {
+        login()
+        completeOnboarding()
+
+        val result = login()
+
+        assertFalse(result.onboardingRequired)
     }
 
     @Test
@@ -89,6 +99,12 @@ class UserServiceTest {
     @Test
     fun `등록된 닉네임은 사용할 수 없다`() {
         login()
+        completeOnboarding()
+
+        assertFalse(userService.isNicknameAvailable("belog"))
+    }
+
+    private fun completeOnboarding() {
         val user = userRepository.findAll().single()
         user.completeOnboarding(
             profileImageObjectKey = "users/profile/image.webp",
@@ -102,8 +118,6 @@ class UserServiceTest {
             completedAt = Instant.parse("2026-09-15T00:00:00Z"),
         )
         userRepository.saveAndFlush(user)
-
-        assertFalse(userService.isNicknameAvailable("belog"))
     }
 
     private fun login(): SocialUserResult =

@@ -27,7 +27,7 @@ class UserService(
         if (existingUser != null) {
             return SocialUserResult(
                 userId = requireNotNull(existingUser.id),
-                isNewUser = false,
+                onboardingRequired = !existingUser.isOnboardingCompleted,
             )
         }
 
@@ -40,7 +40,7 @@ class UserService(
 
         return SocialUserResult(
             userId = upsertResult.userId,
-            isNewUser = upsertResult.isNewUser,
+            onboardingRequired = upsertResult.onboardingRequired,
         )
     }
 }

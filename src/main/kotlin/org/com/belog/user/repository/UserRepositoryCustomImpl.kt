@@ -23,18 +23,12 @@ open class UserRepositoryCustomImpl(
             .setParameter("providerUserId", providerUserId)
             .executeUpdate()
 
-        val isNewUser = findLastInsertId() > 0
         val user = findSocialUserForUpdate(provider, providerUserId)
 
         return SocialUserUpsertResult(
             userId = requireNotNull(user.id),
-            isNewUser = isNewUser,
+            onboardingRequired = !user.isOnboardingCompleted,
         )
-    }
-
-    private fun findLastInsertId(): Long {
-        val result = entityManager.createNativeQuery("SELECT LAST_INSERT_ID()").singleResult
-        return (result as Number).toLong()
     }
 
     private fun findSocialUserForUpdate(
@@ -71,7 +65,7 @@ open class UserRepositoryCustomImpl(
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )
-            ON DUPLICATE KEY UPDATE id = id + LAST_INSERT_ID(0)
+            ON DUPLICATE KEY UPDATE id = id
             """
     }
 }

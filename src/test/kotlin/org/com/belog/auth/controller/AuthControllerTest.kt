@@ -58,7 +58,7 @@ class AuthControllerTest {
                         accessTokenExpiration = Duration.ofMinutes(30),
                         refreshTokenExpiration = Duration.ofDays(14),
                     ),
-                isNewUser = true,
+                onboardingRequired = true,
             ),
         )
 

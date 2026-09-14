@@ -12,5 +12,5 @@ interface UserRepositoryCustom {
 
 data class SocialUserUpsertResult(
     val userId: Long,
-    val isNewUser: Boolean,
+    val onboardingRequired: Boolean,
 )

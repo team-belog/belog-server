@@ -45,13 +45,13 @@ class LoginTransactionServiceTest {
                 "google-subject",
                 "user@example.com",
             ),
-        ).thenReturn(SocialUserResult(userId = 1L, isNewUser = true))
+        ).thenReturn(SocialUserResult(userId = 1L, onboardingRequired = true))
         `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
 
         val result = loginTransactionService.login(googleUserInfo)
 
         assertEquals(tokens, result.tokens)
-        assertTrue(result.isNewUser)
+        assertTrue(result.onboardingRequired)
         verify(refreshTokenService).saveOrUpdate(1L, "refresh-token", Duration.ofDays(14))
     }
 }

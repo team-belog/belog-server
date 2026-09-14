@@ -31,7 +31,7 @@ class LoginTransactionService(
 
         return GoogleLoginResult(
             tokens = tokens,
-            isNewUser = socialUser.isNewUser,
+            onboardingRequired = socialUser.onboardingRequired,
         )
     }
 }

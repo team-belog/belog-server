@@ -50,7 +50,7 @@ class AuthServiceTest {
             ),
         ).thenReturn("google-id-token")
         `when`(googleIdTokenVerifier.verify("google-id-token")).thenReturn(googleUserInfo)
-        val loginResult = GoogleLoginResult(tokens = tokens, isNewUser = true)
+        val loginResult = GoogleLoginResult(tokens = tokens, onboardingRequired = true)
         `when`(loginTransactionService.login(googleUserInfo)).thenReturn(loginResult)
 
         val result =
@@ -60,7 +60,7 @@ class AuthServiceTest {
             )
 
         assertEquals(tokens, result.tokens)
-        assertTrue(result.isNewUser)
+        assertTrue(result.onboardingRequired)
         verify(googleIdTokenVerifier).verify("google-id-token")
         verify(loginTransactionService).login(googleUserInfo)
     }

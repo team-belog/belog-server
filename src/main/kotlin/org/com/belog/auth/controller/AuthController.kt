@@ -34,7 +34,7 @@ class AuthController(
             GoogleLoginResponse(
                 accessToken = result.tokens.accessToken,
                 expiresIn = result.tokens.accessTokenExpiration.seconds,
-                onboardingRequired = result.isNewUser,
+                onboardingRequired = result.onboardingRequired,
             )
         val refreshTokenCookie = createRefreshTokenCookie(result.tokens)
 
