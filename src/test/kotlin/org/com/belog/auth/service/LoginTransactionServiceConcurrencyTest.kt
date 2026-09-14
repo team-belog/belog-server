@@ -71,8 +71,6 @@ class LoginTransactionServiceConcurrencyTest {
             GoogleUserInfo(
                 providerUserId = "google-subject",
                 email = "user@example.com",
-                name = "belog",
-                profileImageUrl = null,
             )
         val executor = Executors.newFixedThreadPool(CONCURRENT_LOGIN_COUNT)
         val startSignal = CountDownLatch(1)
@@ -112,8 +110,6 @@ class LoginTransactionServiceConcurrencyTest {
             GoogleUserInfo(
                 providerUserId = "google-subject",
                 email = "user@example.com",
-                name = "belog",
-                profileImageUrl = null,
             )
 
         assertFailsWith<IllegalStateException> {

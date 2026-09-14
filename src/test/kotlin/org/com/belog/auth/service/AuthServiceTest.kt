@@ -35,8 +35,6 @@ class AuthServiceTest {
             GoogleUserInfo(
                 providerUserId = "google-subject",
                 email = "user@example.com",
-                name = "belog",
-                profileImageUrl = "https://example.com/profile.png",
             )
         val tokens =
             AuthTokens(

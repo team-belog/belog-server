@@ -32,8 +32,6 @@ class GoogleIdTokenVerifier(
         return GoogleUserInfo(
             providerUserId = requiredClaim(jwt.subject),
             email = requiredClaim(jwt.getClaimAsString(EMAIL_CLAIM)),
-            name = jwt.getClaimAsString(NAME_CLAIM),
-            profileImageUrl = jwt.getClaimAsString(PICTURE_CLAIM),
         )
     }
 
@@ -88,8 +86,6 @@ class GoogleIdTokenVerifier(
         private val GOOGLE_ISSUERS = setOf("accounts.google.com", "https://accounts.google.com")
         private const val EMAIL_CLAIM = "email"
         private const val EMAIL_VERIFIED_CLAIM = "email_verified"
-        private const val NAME_CLAIM = "name"
-        private const val PICTURE_CLAIM = "picture"
         private const val AUTHORIZED_PARTY_CLAIM = "azp"
     }
 }
