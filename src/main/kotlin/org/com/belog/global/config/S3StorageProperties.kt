@@ -15,12 +15,5 @@ data class S3StorageProperties(
         require(!presignExpiration.isZero && !presignExpiration.isNegative) {
             "Presigned URL 만료 시간은 0보다 커야 합니다."
         }
-        require(presignExpiration <= MAX_PRESIGN_EXPIRATION) {
-            "Presigned URL 만료 시간은 15분 이하여야 합니다."
-        }
-    }
-
-    companion object {
-        private val MAX_PRESIGN_EXPIRATION: Duration = Duration.ofMinutes(15)
     }
 }

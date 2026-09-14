@@ -4,8 +4,8 @@ import org.com.belog.auth.domain.AuthTokens
 import org.com.belog.auth.domain.GoogleUserInfo
 import org.com.belog.auth.infrastructure.JwtTokenProvider
 import org.com.belog.user.domain.SocialProvider
-import org.com.belog.user.service.SocialUserResult
 import org.com.belog.user.service.UserService
+import org.com.belog.user.service.result.SocialUserResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
