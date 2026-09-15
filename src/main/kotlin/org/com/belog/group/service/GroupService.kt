@@ -37,7 +37,6 @@ class GroupService(
                 return CreatedGroup(
                     groupId = requireNotNull(group.id),
                     name = group.name,
-                    coverImageObjectKey = group.coverImageObjectKey,
                     currentMemberCount = INITIAL_MEMBER_COUNT,
                     inviteCode = group.inviteCode,
                     inviteLink = inviteLinkGenerator.generate(inviteCode),

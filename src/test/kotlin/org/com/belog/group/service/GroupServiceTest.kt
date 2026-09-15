@@ -35,7 +35,6 @@ import org.testcontainers.mysql.MySQLContainer
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -78,7 +77,6 @@ class GroupServiceTest {
 
         val member = groupMemberRepository.findAll().single()
         assertEquals("주말 러닝 모임", result.name)
-        assertNull(result.coverImageObjectKey)
         assertEquals(1, result.currentMemberCount)
         assertEquals("AB12CD", result.inviteCode)
         assertEquals("https://belog.example/invitations/AB12CD", result.inviteLink)
