@@ -43,3 +43,7 @@ storage:
     bucket: "${AWS_S3_BUCKET}"
     region: "${AWS_REGION:ap-northeast-2}"
     presign-expiration: 5m
+
+group:
+  invite:
+    base-url: "${GROUP_INVITE_BASE_URL}"

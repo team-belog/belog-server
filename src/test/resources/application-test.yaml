@@ -50,3 +50,7 @@ storage:
     bucket: belog-test-storage
     region: ap-northeast-2
     presign-expiration: 5m
+
+group:
+  invite:
+    base-url: https://belog.example/invitations
