@@ -16,7 +16,7 @@ private const val GROUP_NAME_MAX_LENGTH = 20
 
 @Entity
 @Table(
-    name = "groups",
+    name = "belog_groups",
     uniqueConstraints = [
         UniqueConstraint(
             name = GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME,
