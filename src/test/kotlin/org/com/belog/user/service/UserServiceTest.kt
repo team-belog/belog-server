@@ -103,6 +103,53 @@ class UserServiceTest {
     }
 
     @Test
+    fun `Google 프로필 이미지 URL을 저장하고 재로그인할 때 최신 값으로 갱신한다`() {
+        val userId =
+            userService
+                .findOrCreateSocialUser(
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = "google-subject",
+                    email = "user@example.com",
+                    socialProfileImageUrl = "https://lh3.googleusercontent.com/old-profile",
+                ).userId
+
+        val result =
+            userService.findOrCreateSocialUser(
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-subject",
+                email = "user@example.com",
+                socialProfileImageUrl = "https://lh3.googleusercontent.com/new-profile",
+            )
+
+        assertEquals("https://lh3.googleusercontent.com/new-profile", result.socialProfileImageUrl)
+        assertEquals(
+            "https://lh3.googleusercontent.com/new-profile",
+            userRepository.findById(userId).orElseThrow().socialProfileImageUrl,
+        )
+    }
+
+    @Test
+    fun `프로필 이미지를 직접 등록하지 않아도 온보딩을 완료한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+
+        userService.completeOnboarding(
+            userId = userId,
+            profileImageObjectKey = null,
+            nickname = "belog",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                    accountHolderName = "홍길동",
+                ),
+        )
+
+        val user = userRepository.findById(userId).orElseThrow()
+        assertEquals(null, user.profileImageObjectKey)
+        assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
     fun `등록되지 않은 닉네임은 사용할 수 있다`() {
         assertTrue(userService.isNicknameAvailable("새닉네임"))
     }

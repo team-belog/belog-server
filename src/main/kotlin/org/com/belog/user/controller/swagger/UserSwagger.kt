@@ -187,7 +187,10 @@ interface UserSwagger {
                 Content(
                     mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = Schema(implementation = CompleteOnboardingRequest::class),
-                    examples = [ExampleObject(value = ONBOARDING_REQUEST_EXAMPLE)],
+                    examples = [
+                        ExampleObject(name = "Google 프로필 이미지 사용", value = ONBOARDING_WITH_GOOGLE_IMAGE_REQUEST_EXAMPLE),
+                        ExampleObject(name = "직접 업로드한 이미지 사용", value = ONBOARDING_WITH_CUSTOM_IMAGE_REQUEST_EXAMPLE),
+                    ],
                 ),
             ],
         )
@@ -205,7 +208,10 @@ private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
 private const val PROFILE_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE =
     """{"code":"USER-S001","message":"프로필 이미지 업로드 URL이 발급되었습니다.","data":{"objectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","uploadUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp?...","method":"PUT","requiredHeaders":{"Content-Type":"image/webp","Content-Length":"524288"},"expiresAt":"2026-09-14T14:05:00Z"}}"""
 
-private const val ONBOARDING_REQUEST_EXAMPLE =
+private const val ONBOARDING_WITH_GOOGLE_IMAGE_REQUEST_EXAMPLE =
+    """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
+
+private const val ONBOARDING_WITH_CUSTOM_IMAGE_REQUEST_EXAMPLE =
     """{"profileImageObjectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 
 private const val INVALID_NICKNAME_LENGTH_EXAMPLE =

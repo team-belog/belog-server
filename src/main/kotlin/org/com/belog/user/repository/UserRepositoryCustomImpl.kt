@@ -15,19 +15,23 @@ open class UserRepositoryCustomImpl(
         email: String,
         provider: SocialProvider,
         providerUserId: String,
+        socialProfileImageUrl: String?,
     ): SocialUserUpsertResult {
         entityManager
             .createNativeQuery(UPSERT_SOCIAL_USER_SQL)
             .setParameter("email", email)
             .setParameter("provider", provider.name)
             .setParameter("providerUserId", providerUserId)
+            .setParameter("socialProfileImageUrl", socialProfileImageUrl)
             .executeUpdate()
 
         val user = findSocialUserForUpdate(provider, providerUserId)
+        user.updateSocialProfileImageUrl(socialProfileImageUrl)
 
         return SocialUserUpsertResult(
             userId = requireNotNull(user.id),
             onboardingRequired = !user.isOnboardingCompleted,
+            socialProfileImageUrl = user.socialProfileImageUrl,
         )
     }
 
@@ -56,12 +60,14 @@ open class UserRepositoryCustomImpl(
                 email,
                 provider,
                 provider_user_id,
+                social_profile_image_url,
                 created_at,
                 updated_at
             ) VALUES (
                 :email,
                 :provider,
                 :providerUserId,
+                :socialProfileImageUrl,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )

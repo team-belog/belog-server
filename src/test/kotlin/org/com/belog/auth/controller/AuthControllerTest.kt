@@ -59,6 +59,7 @@ class AuthControllerTest {
                         refreshTokenExpiration = Duration.ofDays(14),
                     ),
                 onboardingRequired = true,
+                socialProfileImageUrl = "https://lh3.googleusercontent.com/profile",
             ),
         )
 
@@ -75,6 +76,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.tokenType").doesNotExist())
             .andExpect(jsonPath("$.data.expiresIn").value(1800))
             .andExpect(jsonPath("$.data.onboardingRequired").value(true))
+            .andExpect(jsonPath("$.data.socialProfileImageUrl").value("https://lh3.googleusercontent.com/profile"))
             .andExpect(jsonPath("$.data.isNewUser").doesNotExist())
             .andExpect(cookie().value("refresh_token", "refresh-token"))
             .andExpect(cookie().httpOnly("refresh_token", true))

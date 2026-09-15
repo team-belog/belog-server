@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder
 import org.springframework.security.oauth2.jwt.JwtException
 import org.springframework.stereotype.Component
 import org.springframework.web.client.RestClientException
+import java.net.URI
 import java.time.Instant
 
 @Component
@@ -32,6 +33,7 @@ class GoogleIdTokenVerifier(
         return GoogleUserInfo(
             providerUserId = requiredClaim(jwt.subject),
             email = requiredClaim(jwt.getClaimAsString(EMAIL_CLAIM)),
+            profileImageUrl = optionalProfileImageUrl(jwt),
         )
     }
 
@@ -82,10 +84,22 @@ class GoogleIdTokenVerifier(
 
     private fun requiredClaim(value: String?): String = value ?: throw BusinessException(AuthErrorCode.INVALID_GOOGLE_ID_TOKEN)
 
+    private fun optionalProfileImageUrl(jwt: Jwt): String? {
+        val value = jwt.getClaimAsString(PICTURE_CLAIM)?.trim() ?: return null
+        if (value.length > PROFILE_IMAGE_URL_MAX_LENGTH) {
+            return null
+        }
+
+        val uri = runCatching { URI.create(value) }.getOrNull() ?: return null
+        return value.takeIf { uri.scheme == "https" && !uri.host.isNullOrBlank() }
+    }
+
     companion object {
         private val GOOGLE_ISSUERS = setOf("accounts.google.com", "https://accounts.google.com")
         private const val EMAIL_CLAIM = "email"
         private const val EMAIL_VERIFIED_CLAIM = "email_verified"
+        private const val PICTURE_CLAIM = "picture"
+        private const val PROFILE_IMAGE_URL_MAX_LENGTH = 2048
         private const val AUTHORIZED_PARTY_CLAIM = "azp"
     }
 }

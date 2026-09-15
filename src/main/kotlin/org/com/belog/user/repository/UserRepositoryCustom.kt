@@ -7,10 +7,12 @@ interface UserRepositoryCustom {
         email: String,
         provider: SocialProvider,
         providerUserId: String,
+        socialProfileImageUrl: String?,
     ): SocialUserUpsertResult
 }
 
 data class SocialUserUpsertResult(
     val userId: Long,
     val onboardingRequired: Boolean,
+    val socialProfileImageUrl: String?,
 )

@@ -92,6 +92,25 @@ class UserControllerTest {
     }
 
     @Test
+    fun `프로필 이미지 object key 없이 온보딩 정보를 저장한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/users/me/onboarding")
+                    .principal(authenticationFor(1L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
+                    ),
+            ).andExpect(status().isOk)
+
+        val invocation =
+            mockingDetails(userService).invocations.single { invocation ->
+                invocation.method.name.startsWith("completeOnboarding")
+            }
+        assertEquals(null, invocation.arguments[1])
+    }
+
+    @Test
     fun `사용 가능한 닉네임이면 true를 반환한다`() {
         `when`(userService.isNicknameAvailable("김빌로")).thenReturn(true)
 

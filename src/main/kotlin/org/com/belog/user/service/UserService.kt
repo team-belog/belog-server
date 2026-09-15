@@ -27,7 +27,7 @@ class UserService(
     @Transactional
     fun completeOnboarding(
         userId: Long,
-        profileImageObjectKey: ProfileImageObjectKey,
+        profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
         bankAccount: BankAccount,
     ) {
@@ -59,6 +59,7 @@ class UserService(
         provider: SocialProvider,
         providerUserId: String,
         email: String,
+        socialProfileImageUrl: String? = null,
     ): SocialUserResult {
         val existingUser =
             userRepository.findByProviderAndProviderUserId(
@@ -67,9 +68,11 @@ class UserService(
             )
 
         if (existingUser != null) {
+            existingUser.updateSocialProfileImageUrl(socialProfileImageUrl)
             return SocialUserResult(
                 userId = requireNotNull(existingUser.id),
                 onboardingRequired = !existingUser.isOnboardingCompleted,
+                socialProfileImageUrl = existingUser.socialProfileImageUrl,
             )
         }
 
@@ -78,11 +81,13 @@ class UserService(
                 email = email,
                 provider = provider,
                 providerUserId = providerUserId,
+                socialProfileImageUrl = socialProfileImageUrl,
             )
 
         return SocialUserResult(
             userId = upsertResult.userId,
             onboardingRequired = upsertResult.onboardingRequired,
+            socialProfileImageUrl = upsertResult.socialProfileImageUrl,
         )
     }
 
