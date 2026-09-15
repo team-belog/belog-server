@@ -27,3 +27,7 @@ auth:
   jwt:
     refresh-cookie-secure: false
     refresh-cookie-same-site: Lax
+
+group:
+  invite:
+    base-url: "${GROUP_INVITE_BASE_URL:http://localhost:3000/invitations}"
