@@ -22,6 +22,7 @@ class GoogleIdTokenVerifierTest {
 
         assertEquals("google-subject", userInfo.providerUserId)
         assertEquals("user@example.com", userInfo.email)
+        assertEquals("https://lh3.googleusercontent.com/profile", userInfo.profileImageUrl)
     }
 
     @Test
@@ -43,6 +44,24 @@ class GoogleIdTokenVerifierTest {
         val userInfo = verifier.verify("google-id-token")
 
         assertEquals("google-subject", userInfo.providerUserId)
+    }
+
+    @Test
+    fun `Google 프로필 이미지가 없으면 사용자 정보에 null을 반환한다`() {
+        val verifier = verifierReturning(validJwt(profileImageUrl = null))
+
+        val userInfo = verifier.verify("google-id-token")
+
+        assertEquals(null, userInfo.profileImageUrl)
+    }
+
+    @Test
+    fun `Google 프로필 이미지가 HTTPS URL이 아니면 사용하지 않는다`() {
+        val verifier = verifierReturning(validJwt(profileImageUrl = "http://example.com/profile"))
+
+        val userInfo = verifier.verify("google-id-token")
+
+        assertEquals(null, userInfo.profileImageUrl)
     }
 
     @Test
@@ -114,6 +133,7 @@ class GoogleIdTokenVerifierTest {
         audience: List<String> = listOf(CLIENT_ID),
         authorizedParty: String? = null,
         emailVerified: Boolean = true,
+        profileImageUrl: String? = "https://lh3.googleusercontent.com/profile",
     ): Jwt {
         val builder =
             Jwt
@@ -126,6 +146,10 @@ class GoogleIdTokenVerifierTest {
                 .expiresAt(Instant.now().plusSeconds(300))
                 .claim("email", "user@example.com")
                 .claim("email_verified", emailVerified)
+
+        if (profileImageUrl != null) {
+            builder.claim("picture", profileImageUrl)
+        }
 
         if (authorizedParty != null) {
             builder.claim("azp", authorizedParty)

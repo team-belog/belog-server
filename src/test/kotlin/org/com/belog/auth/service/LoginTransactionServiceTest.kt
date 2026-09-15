@@ -31,6 +31,7 @@ class LoginTransactionServiceTest {
             GoogleUserInfo(
                 providerUserId = "google-subject",
                 email = "user@example.com",
+                profileImageUrl = "https://lh3.googleusercontent.com/profile",
             )
         val tokens =
             AuthTokens(
@@ -44,14 +45,22 @@ class LoginTransactionServiceTest {
                 SocialProvider.GOOGLE,
                 "google-subject",
                 "user@example.com",
+                "https://lh3.googleusercontent.com/profile",
             ),
-        ).thenReturn(SocialUserResult(userId = 1L, onboardingRequired = true))
+        ).thenReturn(
+            SocialUserResult(
+                userId = 1L,
+                onboardingRequired = true,
+                socialProfileImageUrl = "https://lh3.googleusercontent.com/profile",
+            ),
+        )
         `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
 
         val result = loginTransactionService.login(googleUserInfo)
 
         assertEquals(tokens, result.tokens)
         assertTrue(result.onboardingRequired)
+        assertEquals("https://lh3.googleusercontent.com/profile", result.socialProfileImageUrl)
         verify(refreshTokenService).saveOrUpdate(1L, "refresh-token", Duration.ofDays(14))
     }
 }

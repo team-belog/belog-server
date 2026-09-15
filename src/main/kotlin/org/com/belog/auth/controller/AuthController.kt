@@ -35,6 +35,7 @@ class AuthController(
                 accessToken = result.tokens.accessToken,
                 expiresIn = result.tokens.accessTokenExpiration.seconds,
                 onboardingRequired = result.onboardingRequired,
+                socialProfileImageUrl = result.socialProfileImageUrl,
             )
         val refreshTokenCookie = createRefreshTokenCookie(result.tokens)
 

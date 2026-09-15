@@ -9,7 +9,7 @@ class CompleteOnboardingRequestTest {
     private val validator = Validation.buildDefaultValidatorFactory().validator
 
     @Test
-    fun `프로필 이미지 object key가 비어 있으면 검증에 실패한다`() {
+    fun `프로필 이미지 object key가 공백이면 검증에 실패한다`() {
         val request = validRequest().copy(profileImageObjectKey = " ")
 
         assertInvalidField(request, "profileImageObjectKey")

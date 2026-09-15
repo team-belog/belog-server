@@ -12,6 +12,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
+import java.net.URI
 import java.time.Instant
 
 const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
@@ -37,7 +38,7 @@ const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
                     "onboarding_completed_at IS NULL AND nickname IS NULL AND profile_image_object_key IS NULL " +
                     "AND bank IS NULL AND encrypted_account_number IS NULL AND account_holder_name IS NULL" +
                     ") OR (" +
-                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND profile_image_object_key IS NOT NULL " +
+                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL " +
                     "AND bank IS NOT NULL AND encrypted_account_number IS NOT NULL AND account_holder_name IS NOT NULL" +
                     ")",
         ),
@@ -65,6 +66,10 @@ class User protected constructor(
     var profileImageObjectKey: String? = null
         protected set
 
+    @Column(name = "social_profile_image_url", length = SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH)
+    var socialProfileImageUrl: String? = null
+        protected set
+
     @Embedded
     var bankAccount: BankAccount? = null
         protected set
@@ -77,7 +82,7 @@ class User protected constructor(
         get() = onboardingCompletedAt != null
 
     fun completeOnboarding(
-        profileImageObjectKey: ProfileImageObjectKey,
+        profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
         bankAccount: BankAccount,
         completedAt: Instant,
@@ -90,20 +95,28 @@ class User protected constructor(
             "닉네임은 ${NICKNAME_MIN_LENGTH}자 이상 ${NICKNAME_MAX_LENGTH}자 이하여야 합니다."
         }
 
-        this.profileImageObjectKey = profileImageObjectKey.value
+        this.profileImageObjectKey = profileImageObjectKey?.value
         this.nickname = normalizedNickname
         this.bankAccount = bankAccount
         this.onboardingCompletedAt = completedAt
     }
 
+    fun updateSocialProfileImageUrl(socialProfileImageUrl: String?) {
+        if (socialProfileImageUrl != null) {
+            this.socialProfileImageUrl = normalizeSocialProfileImageUrl(socialProfileImageUrl)
+        }
+    }
+
     companion object {
         const val NICKNAME_MIN_LENGTH = 1
         const val NICKNAME_MAX_LENGTH = 8
+        const val SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH = 2048
 
         fun createSocialUser(
             email: String,
             provider: SocialProvider,
             providerUserId: String,
+            socialProfileImageUrl: String? = null,
         ): User {
             require(email.isNotBlank()) { "이메일은 비어 있을 수 없습니다." }
             require(providerUserId.isNotBlank()) { "소셜 사용자 식별자는 비어 있을 수 없습니다." }
@@ -112,7 +125,19 @@ class User protected constructor(
                 email = email,
                 provider = provider,
                 providerUserId = providerUserId,
-            )
+            ).apply { updateSocialProfileImageUrl(socialProfileImageUrl) }
+        }
+
+        private fun normalizeSocialProfileImageUrl(value: String): String {
+            val normalizedValue = value.trim()
+            require(normalizedValue.length <= SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH) {
+                "소셜 프로필 이미지 URL은 ${SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH}자를 초과할 수 없습니다."
+            }
+            val uri = URI.create(normalizedValue)
+            require(uri.scheme == "https" && !uri.host.isNullOrBlank()) {
+                "소셜 프로필 이미지 URL은 유효한 HTTPS URL이어야 합니다."
+            }
+            return normalizedValue
         }
     }
 }

@@ -102,12 +102,14 @@ class UserController(
 
     private fun createProfileImageObjectKey(
         userId: Long,
-        value: String,
-    ): ProfileImageObjectKey =
-        try {
-            ProfileImageObjectKey.create(userId, value)
-        } catch (exception: IllegalArgumentException) {
-            throw BusinessException(UserErrorCode.INVALID_PROFILE_IMAGE_OBJECT_KEY, exception)
+        value: String?,
+    ): ProfileImageObjectKey? =
+        value?.let {
+            try {
+                ProfileImageObjectKey.create(userId, it)
+            } catch (exception: IllegalArgumentException) {
+                throw BusinessException(UserErrorCode.INVALID_PROFILE_IMAGE_OBJECT_KEY, exception)
+            }
         }
 
     private fun Jwt.userId(): Long =

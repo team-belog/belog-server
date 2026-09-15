@@ -20,6 +20,7 @@ class UserTest {
         assertEquals("user@example.com", user.email)
         assertEquals(null, user.nickname)
         assertEquals(null, user.profileImageObjectKey)
+        assertEquals(null, user.socialProfileImageUrl)
         assertEquals(null, user.bankAccount)
         assertFalse(user.isOnboardingCompleted)
         assertEquals(SocialProvider.GOOGLE, user.provider)

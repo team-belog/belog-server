@@ -12,13 +12,16 @@ import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.User
 
 data class CompleteOnboardingRequest(
-    @field:NotBlank(message = "프로필 이미지 object key는 비어 있을 수 없습니다.")
+    @field:Schema(
+        description = "사용자가 직접 업로드한 프로필 이미지의 S3 object key. Google 프로필 이미지를 사용하면 생략합니다.",
+        requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+    )
     @field:Size(
         max = ProfileImageObjectKey.MAX_LENGTH,
         message = "프로필 이미지 object key는 ${ProfileImageObjectKey.MAX_LENGTH}자를 초과할 수 없습니다.",
     )
     @field:Pattern(regexp = "^\\S+$", message = "프로필 이미지 object key에는 공백을 포함할 수 없습니다.")
-    val profileImageObjectKey: String,
+    val profileImageObjectKey: String? = null,
     @field:Schema(
         requiredMode = Schema.RequiredMode.REQUIRED,
         minLength = User.NICKNAME_MIN_LENGTH,
