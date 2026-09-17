@@ -117,7 +117,7 @@ private const val INVALID_COVER_IMAGE_OBJECT_KEY_EXAMPLE =
     """{"code":"GROUP-E003","message":"그룹 커버 이미지 object key가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
 
 private const val ONBOARDING_REQUIRED_EXAMPLE =
-    """{"code":"GROUP-E001","message":"온보딩을 완료한 사용자만 그룹을 생성할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+    """{"code":"GROUP-E001","message":"온보딩을 완료한 사용자만 그룹 기능을 이용할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
 
 private const val USER_NOT_FOUND_EXAMPLE =
     """{"code":"USER-E001","message":"사용자를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
