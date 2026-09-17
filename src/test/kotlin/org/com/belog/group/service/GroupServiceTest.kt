@@ -3,6 +3,7 @@ package org.com.belog.group.service
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupCoverImageObjectKey
 import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
@@ -83,6 +84,25 @@ class GroupServiceTest {
         assertEquals(result.groupId, member.group.id)
         assertEquals(creator.id, member.user.id)
         assertEquals(GroupRole.OWNER, member.role)
+    }
+
+    @Test
+    fun `업로드한 커버 이미지 Object Key를 그룹에 저장한다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        val creatorId = requireNotNull(creator.id)
+        val objectKeyValue = "group-covers/$creatorId/550e8400-e29b-41d4-a716-446655440000.webp"
+        val coverImageObjectKey = GroupCoverImageObjectKey.create(creatorId, objectKeyValue)
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val result =
+            groupService.createGroup(
+                creatorId = creatorId,
+                name = "주말 러닝 모임",
+                coverImageObjectKey = coverImageObjectKey,
+            )
+
+        val savedGroup = groupRepository.findById(result.groupId).orElseThrow()
+        assertEquals(objectKeyValue, savedGroup.coverImageObjectKey)
     }
 
     @Test

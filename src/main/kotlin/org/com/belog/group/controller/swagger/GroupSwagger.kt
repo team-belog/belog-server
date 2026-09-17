@@ -100,7 +100,9 @@ interface GroupSwagger {
 
     @Operation(
         summary = "그룹 생성",
-        description = "그룹을 생성하고 요청한 사용자를 최초 멤버이자 OWNER로 등록한 뒤 초대 정보를 발급합니다.",
+        description =
+            "그룹을 생성하고 요청한 사용자를 최초 멤버이자 OWNER로 등록한 뒤 초대 정보를 발급합니다. " +
+                "커버 이미지는 업로드 URL API로 S3에 업로드한 후 반환된 objectKey를 전달합니다.",
     )
     @ApiResponses(
         value = [

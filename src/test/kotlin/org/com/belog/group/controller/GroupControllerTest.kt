@@ -127,7 +127,7 @@ class GroupControllerTest {
 
     @Test
     fun `현재 사용자의 커버 이미지 Object Key로 그룹을 생성한다`() {
-        val objectKey = "group-covers/15/image.webp"
+        val objectKey = "group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp"
         val coverImage = GroupCoverImageObjectKey.create(15L, objectKey)
         `when`(groupService.createGroup(15L, "주말 러닝 모임", coverImage))
             .thenReturn(createdGroup())
