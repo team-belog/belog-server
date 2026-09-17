@@ -3,6 +3,8 @@ package org.com.belog.group.controller
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupCoverImageObjectKey
+import org.com.belog.group.domain.GroupCoverImageUpload
+import org.com.belog.group.service.GroupCoverImageService
 import org.com.belog.group.service.GroupService
 import org.com.belog.group.service.result.CreatedGroup
 import org.junit.jupiter.api.Test
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
 import kotlin.test.assertEquals
 
 @WebMvcTest(GroupController::class)
@@ -31,6 +34,74 @@ class GroupControllerTest {
 
     @MockitoBean
     private lateinit var groupService: GroupService
+
+    @MockitoBean
+    private lateinit var groupCoverImageService: GroupCoverImageService
+
+    @Test
+    fun `그룹 커버 이미지 업로드 URL을 발급한다`() {
+        val upload =
+            GroupCoverImageUpload(
+                objectKey = "group-covers/15/image-id.webp",
+                uploadUrl = "https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/upload",
+                contentType = "image/webp",
+                contentLength = 524_288L,
+                expiresAt = Instant.parse("2026-09-17T03:05:00Z"),
+            )
+        `when`(groupCoverImageService.issueUploadUrl(15L, "image/webp", 524_288L)).thenReturn(upload)
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "contentType": "image/webp",
+                          "fileSize": 524288
+                        }
+                        """.trimIndent(),
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S002"))
+            .andExpect(jsonPath("$.message").value("그룹 커버 이미지 업로드 URL이 발급되었습니다."))
+            .andExpect(jsonPath("$.data.objectKey").value("group-covers/15/image-id.webp"))
+            .andExpect(jsonPath("$.data.uploadUrl").value(upload.uploadUrl))
+            .andExpect(jsonPath("$.data.method").value("PUT"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Type").value("image/webp"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Length").value("524288"))
+            .andExpect(jsonPath("$.data.expiresAt").value("2026-09-17T03:05:00Z"))
+    }
+
+    @Test
+    fun `그룹 커버 이미지 업로드 요청값이 올바르지 않으면 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"contentType":" ","fileSize":0}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(groupCoverImageService)
+    }
+
+    @Test
+    fun `지원하지 않는 그룹 커버 이미지 형식이면 400 응답을 반환한다`() {
+        `when`(groupCoverImageService.issueUploadUrl(15L, "image/gif", 1024L))
+            .thenThrow(BusinessException(GroupErrorCode.UNSUPPORTED_COVER_IMAGE_TYPE))
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"contentType":"image/gif","fileSize":1024}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("GROUP-E004"))
+    }
 
     @Test
     fun `커버 이미지 없이 그룹을 생성한다`() {
