@@ -13,4 +13,6 @@ enum class GroupErrorCode(
     INVALID_COVER_IMAGE_OBJECT_KEY(HttpStatus.BAD_REQUEST, "GROUP-E003", "그룹 커버 이미지 object key가 올바르지 않습니다."),
     UNSUPPORTED_COVER_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "GROUP-E004", "지원하지 않는 그룹 커버 이미지 형식입니다."),
     INVALID_COVER_IMAGE_SIZE(HttpStatus.BAD_REQUEST, "GROUP-E005", "그룹 커버 이미지는 5MB 이하여야 합니다."),
+    COVER_IMAGE_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP-E006", "업로드된 그룹 커버 이미지를 찾을 수 없습니다."),
+    INVALID_COVER_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "GROUP-E007", "그룹 커버 이미지 정보가 올바르지 않습니다."),
 }

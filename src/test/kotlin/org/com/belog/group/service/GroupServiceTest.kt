@@ -7,6 +7,7 @@ import org.com.belog.group.domain.GroupCoverImageObjectKey
 import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
+import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.user.code.UserErrorCode
@@ -22,6 +23,7 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -56,6 +58,9 @@ class GroupServiceTest {
 
     @MockitoBean
     private lateinit var inviteCodeGenerator: RandomInviteCodeGenerator
+
+    @MockitoBean
+    private lateinit var groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier
 
     @AfterEach
     fun cleanUp() {
@@ -103,6 +108,35 @@ class GroupServiceTest {
 
         val savedGroup = groupRepository.findById(result.groupId).orElseThrow()
         assertEquals(objectKeyValue, savedGroup.coverImageObjectKey)
+        verify(groupCoverImageObjectVerifier).verify(coverImageObjectKey)
+    }
+
+    @Test
+    fun `S3에 커버 이미지가 없으면 그룹을 생성하지 않는다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        val creatorId = requireNotNull(creator.id)
+        val coverImageObjectKey =
+            GroupCoverImageObjectKey.create(
+                creatorId,
+                "group-covers/$creatorId/550e8400-e29b-41d4-a716-446655440000.webp",
+            )
+        doThrow(BusinessException(GroupErrorCode.COVER_IMAGE_NOT_FOUND))
+            .`when`(groupCoverImageObjectVerifier)
+            .verify(coverImageObjectKey)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupService.createGroup(
+                    creatorId = creatorId,
+                    name = "주말 러닝 모임",
+                    coverImageObjectKey = coverImageObjectKey,
+                )
+            }
+
+        assertEquals(GroupErrorCode.COVER_IMAGE_NOT_FOUND, exception.errorCode)
+        assertEquals(0L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+        verifyNoInteractions(inviteCodeGenerator)
     }
 
     @Test

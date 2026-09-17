@@ -6,6 +6,7 @@ import org.com.belog.group.domain.GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.group.domain.GroupCoverImageObjectKey
 import org.com.belog.group.infrastructure.GroupInviteLinkGenerator
 import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
+import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.service.result.CreatedGroup
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
@@ -16,12 +17,15 @@ class GroupService(
     private val groupCreationAttemptService: GroupCreationAttemptService,
     private val inviteCodeGenerator: RandomInviteCodeGenerator,
     private val inviteLinkGenerator: GroupInviteLinkGenerator,
+    private val groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier,
 ) {
     fun createGroup(
         creatorId: Long,
         name: String,
         coverImageObjectKey: GroupCoverImageObjectKey?,
     ): CreatedGroup {
+        coverImageObjectKey?.let(groupCoverImageObjectVerifier::verify)
+
         repeat(MAX_INVITE_CODE_ATTEMPTS) {
             val inviteCode = inviteCodeGenerator.generate()
 

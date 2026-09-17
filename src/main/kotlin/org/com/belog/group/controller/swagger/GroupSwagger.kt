@@ -127,6 +127,8 @@ interface GroupSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 커버 이미지 Object Key", value = INVALID_COVER_IMAGE_OBJECT_KEY_EXAMPLE),
+                            ExampleObject(name = "업로드되지 않은 커버 이미지", value = COVER_IMAGE_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "잘못된 커버 이미지 정보", value = INVALID_COVER_IMAGE_METADATA_EXAMPLE),
                         ],
                     ),
                 ],
@@ -200,6 +202,12 @@ private const val CREATE_GROUP_SUCCESS_EXAMPLE =
 
 private const val INVALID_COVER_IMAGE_OBJECT_KEY_EXAMPLE =
     """{"code":"GROUP-E003","message":"그룹 커버 이미지 object key가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val COVER_IMAGE_NOT_FOUND_EXAMPLE =
+    """{"code":"GROUP-E006","message":"업로드된 그룹 커버 이미지를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-17T00:00:00Z"}}"""
+
+private const val INVALID_COVER_IMAGE_METADATA_EXAMPLE =
+    """{"code":"GROUP-E007","message":"그룹 커버 이미지 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-17T00:00:00Z"}}"""
 
 private const val UNSUPPORTED_COVER_IMAGE_TYPE_EXAMPLE =
     """{"code":"GROUP-E004","message":"지원하지 않는 그룹 커버 이미지 형식입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-17T00:00:00Z"}}"""
