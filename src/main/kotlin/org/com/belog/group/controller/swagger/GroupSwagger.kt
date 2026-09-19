@@ -13,16 +13,69 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
-import org.com.belog.group.controller.dto.CreateGroupRequest
-import org.com.belog.group.controller.dto.CreateGroupResponse
-import org.com.belog.group.controller.dto.GroupCoverImageUploadUrlRequest
-import org.com.belog.group.controller.dto.GroupCoverImageUploadUrlResponse
+import org.com.belog.group.controller.dto.request.CreateGroupRequest
+import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
+import org.com.belog.group.controller.dto.response.CreateGroupResponse
+import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
+import org.com.belog.group.controller.dto.response.GroupMembersResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "Group", description = "그룹 관련 API")
 interface GroupSwagger {
+    @Operation(
+        summary = "그룹 멤버 목록 조회",
+        description = "그룹 멤버를 OWNER 우선, 가입 순으로 조회합니다. 해당 그룹에 참여한 사용자만 조회할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 멤버 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_GROUP_MEMBERS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getGroupMembers(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+    ): ResponseEntity<CommonResponse<GroupMembersResponse>>
+
     @Operation(
         summary = "그룹 커버 이미지 업로드 URL 발급",
         description = "JPEG, PNG 또는 WebP 그룹 커버 이미지를 S3에 직접 업로드할 수 있는 Presigned URL을 발급합니다.",
@@ -225,3 +278,12 @@ private const val USER_NOT_FOUND_EXAMPLE =
 
 private const val INVITE_CODE_ISSUANCE_FAILED_EXAMPLE =
     """{"code":"GROUP-E002","message":"초대 코드를 발급할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val GET_GROUP_MEMBERS_SUCCESS_EXAMPLE =
+    """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER"},{"groupMemberId":22,"nickname":"멤버","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER"}]}}"""
+
+private const val NOT_GROUP_MEMBER_EXAMPLE =
+    """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
+
+private const val GROUP_NOT_FOUND_EXAMPLE =
+    """{"code":"GROUP-E012","message":"그룹을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""

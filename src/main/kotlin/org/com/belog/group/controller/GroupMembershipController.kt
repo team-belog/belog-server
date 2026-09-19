@@ -4,8 +4,8 @@ import jakarta.validation.Valid
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.group.code.GroupSuccessCode
-import org.com.belog.group.controller.dto.JoinGroupRequest
-import org.com.belog.group.controller.dto.JoinGroupResponse
+import org.com.belog.group.controller.dto.request.JoinGroupRequest
+import org.com.belog.group.controller.dto.response.JoinGroupResponse
 import org.com.belog.group.controller.swagger.GroupMembershipSwagger
 import org.com.belog.group.service.GroupMembershipService
 import org.springframework.http.ResponseEntity
