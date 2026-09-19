@@ -28,10 +28,12 @@ class GroupMembershipService(
         inviteCode: String,
     ): JoinedGroup {
         val validatedInviteCode = createInviteCode(inviteCode)
-        val group = groupRepository.findByInviteCodeForUpdate(validatedInviteCode.value)
+        val group =
+            groupRepository.findByInviteCodeForUpdate(validatedInviteCode.value)
                 ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND_BY_INVITE_CODE)
         val groupId = requireNotNull(group.id)
-        val user = userRepository.findById(userId).orElseThrow {
+        val user =
+            userRepository.findById(userId).orElseThrow {
                 BusinessException(UserErrorCode.USER_NOT_FOUND)
             }
 
