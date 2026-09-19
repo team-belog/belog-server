@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
@@ -18,7 +19,6 @@ import org.com.belog.group.controller.dto.GroupCoverImageUploadUrlRequest
 import org.com.belog.group.controller.dto.GroupCoverImageUploadUrlResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "Group", description = "그룹 관련 API")
@@ -82,7 +82,8 @@ interface GroupSwagger {
     )
     fun issueCoverImageUploadUrl(
         @Parameter(hidden = true)
-        authentication: Authentication,
+        @LoginUserId
+        userId: Long,
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = [
@@ -171,7 +172,8 @@ interface GroupSwagger {
     )
     fun createGroup(
         @Parameter(hidden = true)
-        authentication: Authentication,
+        @LoginUserId
+        userId: Long,
         @io.swagger.v3.oas.annotations.parameters.RequestBody(
             required = true,
             content = [

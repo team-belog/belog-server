@@ -123,7 +123,7 @@ class GroupMembershipControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"inviteCode":"AB12CD"}"""),
             ).andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.code").value("AUTH-E007"))
+            .andExpect(jsonPath("$.code").value("CMN-E005"))
 
         verifyNoInteractions(groupMembershipService)
     }

@@ -1,8 +1,7 @@
 package org.com.belog.group.controller
 
 import jakarta.validation.Valid
-import org.com.belog.auth.code.AuthErrorCode
-import org.com.belog.global.error.BusinessException
+import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.group.code.GroupSuccessCode
 import org.com.belog.group.controller.dto.JoinGroupRequest
@@ -10,7 +9,6 @@ import org.com.belog.group.controller.dto.JoinGroupResponse
 import org.com.belog.group.controller.swagger.GroupMembershipSwagger
 import org.com.belog.group.service.GroupMembershipService
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -23,12 +21,12 @@ class GroupMembershipController(
 ) : GroupMembershipSwagger {
     @PostMapping
     override fun joinGroup(
-        authentication: Authentication,
+        @LoginUserId userId: Long,
         @Valid @RequestBody request: JoinGroupRequest,
     ): ResponseEntity<CommonResponse<JoinGroupResponse>> {
         val joinedGroup =
             groupMembershipService.joinGroup(
-                userId = authenticatedUserId(authentication),
+                userId = userId,
                 inviteCode = request.inviteCode,
             )
 
@@ -41,10 +39,4 @@ class GroupMembershipController(
                 ),
             )
     }
-
-    private fun authenticatedUserId(authentication: Authentication): Long =
-        authentication.name
-            .toLongOrNull()
-            ?.takeIf { userId -> userId > 0 }
-            ?: throw BusinessException(AuthErrorCode.INVALID_ACCESS_TOKEN)
 }

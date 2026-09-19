@@ -1,7 +1,7 @@
 package org.com.belog.group.controller
 
 import jakarta.validation.Valid
-import org.com.belog.auth.code.AuthErrorCode
+import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.group.code.GroupErrorCode
@@ -15,7 +15,6 @@ import org.com.belog.group.domain.GroupCoverImageObjectKey
 import org.com.belog.group.service.GroupCoverImageService
 import org.com.belog.group.service.GroupService
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -29,12 +28,12 @@ class GroupController(
 ) : GroupSwagger {
     @PostMapping("/cover-image/upload-url")
     override fun issueCoverImageUploadUrl(
-        authentication: Authentication,
+        @LoginUserId userId: Long,
         @Valid @RequestBody request: GroupCoverImageUploadUrlRequest,
     ): ResponseEntity<CommonResponse<GroupCoverImageUploadUrlResponse>> {
         val upload =
             groupCoverImageService.issueUploadUrl(
-                userId = authenticatedUserId(authentication),
+                userId = userId,
                 contentType = request.contentType,
                 fileSize = request.fileSize,
             )
@@ -51,15 +50,14 @@ class GroupController(
 
     @PostMapping
     override fun createGroup(
-        authentication: Authentication,
+        @LoginUserId userId: Long,
         @Valid @RequestBody request: CreateGroupRequest,
     ): ResponseEntity<CommonResponse<CreateGroupResponse>> {
-        val creatorId = authenticatedUserId(authentication)
         val createdGroup =
             groupService.createGroup(
-                creatorId = creatorId,
+                creatorId = userId,
                 name = request.name,
-                coverImageObjectKey = request.coverImageObjectKey?.let { value -> createCoverImageObjectKey(creatorId, value) },
+                coverImageObjectKey = request.coverImageObjectKey?.let { value -> createCoverImageObjectKey(userId, value) },
             )
 
         return ResponseEntity
@@ -71,12 +69,6 @@ class GroupController(
                 ),
             )
     }
-
-    private fun authenticatedUserId(authentication: Authentication): Long =
-        authentication.name
-            .toLongOrNull()
-            ?.takeIf { userId -> userId > 0 }
-            ?: throw BusinessException(AuthErrorCode.INVALID_ACCESS_TOKEN)
 
     private fun createCoverImageObjectKey(
         userId: Long,

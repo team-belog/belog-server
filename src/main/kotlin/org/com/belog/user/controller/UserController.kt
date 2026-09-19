@@ -1,10 +1,9 @@
 package org.com.belog.user.controller
 
 import jakarta.validation.Valid
-import org.com.belog.auth.code.AuthErrorCode
+import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
-import org.com.belog.global.response.code.CommonErrorCode
 import org.com.belog.global.response.code.CommonSuccessCode
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.code.UserSuccessCode
@@ -18,9 +17,6 @@ import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
 import org.springframework.http.ResponseEntity
-import org.springframework.security.core.Authentication
-import org.springframework.security.oauth2.jwt.Jwt
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -53,12 +49,12 @@ class UserController(
 
     @PostMapping("/me/profile-image/upload-url")
     override fun issueProfileImageUploadUrl(
-        authentication: Authentication,
+        @LoginUserId userId: Long,
         @Valid @RequestBody request: ProfileImageUploadUrlRequest,
     ): ResponseEntity<CommonResponse<ProfileImageUploadUrlResponse>> {
         val upload =
             profileImageService.issueUploadUrl(
-                userId = authenticatedUserId(authentication),
+                userId = userId,
                 contentType = request.contentType,
                 fileSize = request.fileSize,
             )
@@ -73,16 +69,11 @@ class UserController(
             )
     }
 
-    private fun authenticatedUserId(authentication: Authentication): Long =
-        authentication.name.toLongOrNull()
-            ?: throw BusinessException(CommonErrorCode.AUTHENTICATION_REQUIRED)
-
     @PostMapping("/me/onboarding")
     override fun completeOnboarding(
-        authentication: JwtAuthenticationToken,
+        @LoginUserId userId: Long,
         @RequestBody request: CompleteOnboardingRequest,
     ): ResponseEntity<CommonResponse<Nothing>> {
-        val userId = authentication.token.userId()
         userService.completeOnboarding(
             userId = userId,
             profileImageObjectKey = createProfileImageObjectKey(userId, request.profileImageObjectKey),
@@ -111,10 +102,4 @@ class UserController(
                 throw BusinessException(UserErrorCode.INVALID_PROFILE_IMAGE_OBJECT_KEY, exception)
             }
         }
-
-    private fun Jwt.userId(): Long =
-        subject
-            ?.toLongOrNull()
-            ?.takeIf { userId -> userId > 0 }
-            ?: throw BusinessException(AuthErrorCode.INVALID_ACCESS_TOKEN)
 }
