@@ -8,9 +8,11 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.group.service.result.JoinedGroup
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.ProfileImageService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -21,7 +23,31 @@ class GroupMembershipService(
     private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val profileImageService: ProfileImageService,
 ) {
+    @Transactional(readOnly = true)
+    fun getGroupMembers(
+        groupId: Long,
+        userId: Long,
+    ): List<GroupMemberResult> {
+        validateGroupMember(groupId, userId)
+
+        return groupMemberRepository.findAllWithUserByGroupId(groupId).map { member ->
+            val memberUser = member.user
+            val memberUserId = requireNotNull(memberUser.id)
+            GroupMemberResult(
+                groupMemberId = requireNotNull(member.id),
+                nickname = requireNotNull(memberUser.nickname),
+                profileImageUrl =
+                    profileImageService.generateReadUrl(
+                        userId = memberUserId,
+                        profileImageObjectKey = memberUser.profileImageObjectKey,
+                    ) ?: memberUser.socialProfileImageUrl,
+                role = member.role,
+            )
+        }
+    }
+
     @Transactional
     fun joinGroup(
         userId: Long,
@@ -63,6 +89,19 @@ class GroupMembershipService(
             name = group.name,
             currentMemberCount = currentMemberCount.toInt() + 1,
         )
+    }
+
+    private fun validateGroupMember(
+        groupId: Long,
+        userId: Long,
+    ) {
+        if (groupMemberRepository.findByGroupIdAndUserId(groupId, userId) != null) {
+            return
+        }
+        if (!groupRepository.existsById(groupId)) {
+            throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        }
+        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
     private fun createInviteCode(value: String): InviteCode =
