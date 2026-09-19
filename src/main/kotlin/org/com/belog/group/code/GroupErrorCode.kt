@@ -15,4 +15,8 @@ enum class GroupErrorCode(
     INVALID_COVER_IMAGE_SIZE(HttpStatus.BAD_REQUEST, "GROUP-E005", "그룹 커버 이미지는 5MB 이하여야 합니다."),
     COVER_IMAGE_NOT_FOUND(HttpStatus.BAD_REQUEST, "GROUP-E006", "업로드된 그룹 커버 이미지를 찾을 수 없습니다."),
     INVALID_COVER_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "GROUP-E007", "그룹 커버 이미지 정보가 올바르지 않습니다."),
+    INVALID_INVITE_CODE(HttpStatus.BAD_REQUEST, "GROUP-E008", "초대 코드가 올바르지 않습니다."),
+    GROUP_NOT_FOUND_BY_INVITE_CODE(HttpStatus.NOT_FOUND, "GROUP-E009", "초대 코드에 해당하는 그룹을 찾을 수 없습니다."),
+    ALREADY_GROUP_MEMBER(HttpStatus.CONFLICT, "GROUP-E010", "이미 참여한 그룹입니다."),
+    GROUP_MEMBER_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "GROUP-E011", "그룹 최대 인원에 도달했습니다."),
 }

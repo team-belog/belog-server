@@ -69,6 +69,16 @@ class GroupRepositoryTest {
     }
 
     @Test
+    fun `초대 코드로 그룹을 비관적 락 조회한다`() {
+        val savedGroup = groupRepository.saveAndFlush(createGroup("AB12CD"))
+
+        val foundGroup = groupRepository.findByInviteCodeForUpdate("AB12CD")
+
+        assertEquals(savedGroup.id, foundGroup?.id)
+        assertEquals("AB12CD", foundGroup?.inviteCode)
+    }
+
+    @Test
     fun `한 사용자는 같은 그룹에 중복으로 가입할 수 없다`() {
         val user = saveCompletedUser("google-subject", "빌로그")
         val group = groupRepository.save(createGroup("AB12CD"))
