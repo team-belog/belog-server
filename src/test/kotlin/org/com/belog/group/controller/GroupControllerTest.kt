@@ -217,7 +217,7 @@ class GroupControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""{"name":"주말 러닝 모임"}"""),
             ).andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.code").value("AUTH-E007"))
+            .andExpect(jsonPath("$.code").value("CMN-E005"))
 
         verifyNoInteractions(groupService)
     }

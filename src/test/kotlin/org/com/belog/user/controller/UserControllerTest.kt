@@ -15,8 +15,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.oauth2.jwt.Jwt
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
@@ -45,7 +43,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 post("/api/v1/users/me/onboarding")
-                    .principal(authenticationFor(1L))
+                    .principal(authenticatedUser(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/2/profile/image-key")),
             ).andExpect(status().isBadRequest)
@@ -59,7 +57,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 post("/api/v1/users/me/onboarding")
-                    .principal(authenticationFor(1L))
+                    .principal(authenticatedUser(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/1/profile/../image-key")),
             ).andExpect(status().isBadRequest)
@@ -73,7 +71,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 post("/api/v1/users/me/onboarding")
-                    .principal(authenticationFor(1L))
+                    .principal(authenticatedUser(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(validOnboardingRequest("users/1/profile/image-key")),
             ).andExpect(status().isOk)
@@ -96,7 +94,7 @@ class UserControllerTest {
         mockMvc
             .perform(
                 post("/api/v1/users/me/onboarding")
-                    .principal(authenticationFor(1L))
+                    .principal(authenticatedUser(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
                         """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
@@ -213,25 +211,12 @@ class UserControllerTest {
             .andExpect(jsonPath("$.data.expiresAt").value("2026-09-14T14:05:00Z"))
     }
 
-    private fun authenticatedUser() =
+    private fun authenticatedUser(userId: Long = 15L) =
         UsernamePasswordAuthenticationToken.authenticated(
-            "15",
+            userId.toString(),
             "access-token",
             emptyList(),
         )
-
-    private fun authenticationFor(userId: Long): JwtAuthenticationToken {
-        val now = Instant.parse("2026-09-15T00:00:00Z")
-        val jwt =
-            Jwt
-                .withTokenValue("access-token")
-                .header("alg", "HS256")
-                .subject(userId.toString())
-                .issuedAt(now)
-                .expiresAt(now.plusSeconds(1800))
-                .build()
-        return JwtAuthenticationToken(jwt)
-    }
 
     private fun validOnboardingRequest(profileImageObjectKey: String): String =
         """{"profileImageObjectKey":"$profileImageObjectKey","nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
