@@ -13,8 +13,8 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
-import org.com.belog.group.controller.dto.JoinGroupRequest
-import org.com.belog.group.controller.dto.JoinGroupResponse
+import org.com.belog.group.controller.dto.request.JoinGroupRequest
+import org.com.belog.group.controller.dto.response.JoinGroupResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RequestBody

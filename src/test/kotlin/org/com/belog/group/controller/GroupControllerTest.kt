@@ -4,9 +4,12 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupCoverImageObjectKey
 import org.com.belog.group.domain.GroupCoverImageUpload
+import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.service.GroupCoverImageService
+import org.com.belog.group.service.GroupMembershipService
 import org.com.belog.group.service.GroupService
 import org.com.belog.group.service.result.CreatedGroup
+import org.com.belog.group.service.result.GroupMemberResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verifyNoInteractions
@@ -19,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -37,6 +41,72 @@ class GroupControllerTest {
 
     @MockitoBean
     private lateinit var groupCoverImageService: GroupCoverImageService
+
+    @MockitoBean
+    private lateinit var groupMembershipService: GroupMembershipService
+
+    @Test
+    fun `그룹 멤버 목록을 조회한다`() {
+        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+            .thenReturn(
+                listOf(
+                    GroupMemberResult(
+                        groupMemberId = 21L,
+                        nickname = "방장",
+                        profileImageUrl = "https://example.com/owner-profile",
+                        role = GroupRole.OWNER,
+                    ),
+                    GroupMemberResult(
+                        groupMemberId = 22L,
+                        nickname = "멤버",
+                        profileImageUrl = null,
+                        role = GroupRole.MEMBER,
+                    ),
+                ),
+            )
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/1/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S004"))
+            .andExpect(jsonPath("$.message").value("그룹 멤버 목록을 조회했습니다."))
+            .andExpect(jsonPath("$.data.items.length()").value(2))
+            .andExpect(jsonPath("$.data.items[0].groupMemberId").value(21))
+            .andExpect(jsonPath("$.data.items[0].nickname").value("방장"))
+            .andExpect(jsonPath("$.data.items[0].profileImageUrl").value("https://example.com/owner-profile"))
+            .andExpect(jsonPath("$.data.items[0].role").value("OWNER"))
+            .andExpect(jsonPath("$.data.items[1].groupMemberId").value(22))
+            .andExpect(jsonPath("$.data.items[1].profileImageUrl").isEmpty)
+            .andExpect(jsonPath("$.data.items[1].role").value("MEMBER"))
+    }
+
+    @Test
+    fun `그룹에 참여하지 않은 사용자는 멤버 목록을 조회할 수 없다`() {
+        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+            .thenThrow(BusinessException(GroupErrorCode.NOT_GROUP_MEMBER))
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/1/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("GROUP-E013"))
+    }
+
+    @Test
+    fun `존재하지 않는 그룹의 멤버 목록을 조회하면 404 응답을 반환한다`() {
+        `when`(groupMembershipService.getGroupMembers(999L, 15L))
+            .thenThrow(BusinessException(GroupErrorCode.GROUP_NOT_FOUND))
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/999/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("GROUP-E012"))
+    }
 
     @Test
     fun `그룹 커버 이미지 업로드 URL을 발급한다`() {
