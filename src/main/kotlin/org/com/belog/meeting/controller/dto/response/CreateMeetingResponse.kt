@@ -20,8 +20,10 @@ data class CreateMeetingResponse(
     val scheduleType: MeetingScheduleType,
     @field:Schema(description = "만남 상태", example = "CONFIRMED")
     val status: MeetingStatus,
-    @field:Schema(description = "확정 날짜", example = "2026-10-03")
-    val confirmedDate: LocalDate,
+    @field:Schema(description = "일정 시작일", example = "2026-10-03")
+    val startDate: LocalDate,
+    @field:Schema(description = "일정 종료일", example = "2026-10-04")
+    val endDate: LocalDate,
     @field:Schema(description = "날짜 확정 시각", example = "2026-09-21T00:00:00Z")
     val confirmedAt: Instant,
     @field:Schema(description = "생성자를 포함한 참여 인원", example = "3")
@@ -36,7 +38,8 @@ data class CreateMeetingResponse(
                 location = createdMeeting.location,
                 scheduleType = createdMeeting.scheduleType,
                 status = createdMeeting.status,
-                confirmedDate = createdMeeting.confirmedDate,
+                startDate = createdMeeting.startDate,
+                endDate = createdMeeting.endDate,
                 confirmedAt = createdMeeting.confirmedAt,
                 participantCount = createdMeeting.participantCount,
             )

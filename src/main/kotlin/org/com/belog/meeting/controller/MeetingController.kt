@@ -40,7 +40,8 @@ class MeetingController(
                 name = request.name,
                 location = request.location,
                 participantMemberIds = request.participantMemberIds,
-                confirmedDate = request.schedule.date,
+                startDate = request.schedule.startDate,
+                endDate = request.schedule.endDate,
             )
 
         return ResponseEntity

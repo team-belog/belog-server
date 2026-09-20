@@ -30,7 +30,8 @@ class MeetingTest {
                 creator = creator,
                 name = "  광주 1박 2일  ",
                 location = "  서울고속버스터미널  ",
-                confirmedDate = LocalDate.of(2026, 9, 21),
+                startDate = LocalDate.of(2026, 9, 21),
+                endDate = LocalDate.of(2026, 9, 22),
                 confirmedAt = confirmedAt,
                 currentDate = LocalDate.of(2026, 9, 20),
             )
@@ -41,7 +42,8 @@ class MeetingTest {
         assertEquals("서울고속버스터미널", meeting.location)
         assertEquals(MeetingScheduleType.FIXED, meeting.scheduleType)
         assertEquals(MeetingStatus.CONFIRMED, meeting.status)
-        assertEquals(LocalDate.of(2026, 9, 21), meeting.confirmedDate)
+        assertEquals(LocalDate.of(2026, 9, 21), meeting.startDate)
+        assertEquals(LocalDate.of(2026, 9, 22), meeting.endDate)
         assertEquals(confirmedAt, meeting.confirmedAt)
     }
 
@@ -69,8 +71,18 @@ class MeetingTest {
     fun `과거 날짜로 확정 날짜 만남을 생성할 수 없다`() {
         assertFailsWith<IllegalArgumentException> {
             createFixedMeeting(
-                confirmedDate = LocalDate.of(2026, 9, 19),
+                startDate = LocalDate.of(2026, 9, 19),
                 currentDate = LocalDate.of(2026, 9, 20),
+            )
+        }
+    }
+
+    @Test
+    fun `종료일이 시작일보다 빠르면 만남을 생성할 수 없다`() {
+        assertFailsWith<IllegalArgumentException> {
+            createFixedMeeting(
+                startDate = LocalDate.of(2026, 9, 22),
+                endDate = LocalDate.of(2026, 9, 21),
             )
         }
     }
@@ -138,7 +150,8 @@ class MeetingTest {
         creator: GroupMember = GroupMember.createOwner(group, completedUser("owner-subject", "방장")),
         name: String = "광주 여행",
         location: String? = "서울고속버스터미널",
-        confirmedDate: LocalDate = LocalDate.of(2026, 9, 20),
+        startDate: LocalDate = LocalDate.of(2026, 9, 20),
+        endDate: LocalDate = startDate,
         currentDate: LocalDate = LocalDate.of(2026, 9, 20),
     ): Meeting =
         Meeting.createFixed(
@@ -146,7 +159,8 @@ class MeetingTest {
             creator = creator,
             name = name,
             location = location,
-            confirmedDate = confirmedDate,
+            startDate = startDate,
+            endDate = endDate,
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = currentDate,
         )

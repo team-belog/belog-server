@@ -56,6 +56,7 @@ interface MeetingSwagger {
                             ExampleObject(name = "중복 참여자", value = DUPLICATE_PARTICIPANT_EXAMPLE),
                             ExampleObject(name = "생성자를 참여자로 지정", value = CREATOR_INCLUDED_EXAMPLE),
                             ExampleObject(name = "과거 날짜", value = PAST_MEETING_DATE_EXAMPLE),
+                            ExampleObject(name = "잘못된 일정 범위", value = INVALID_MEETING_DATE_RANGE_EXAMPLE),
                             ExampleObject(name = "지원하지 않는 일정 방식", value = UNSUPPORTED_SCHEDULE_TYPE_EXAMPLE),
                         ],
                     ),
@@ -110,10 +111,10 @@ interface MeetingSwagger {
 }
 
 private const val CREATE_MEETING_REQUEST_EXAMPLE =
-    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","date":"2026-10-03"}}"""
+    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}"""
 
 private const val CREATE_MEETING_SUCCESS_EXAMPLE =
-    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1,"groupId":1,"name":"광주 1박 2일","location":"서울고속버스터미널","scheduleType":"FIXED","status":"CONFIRMED","confirmedDate":"2026-10-03","confirmedAt":"2026-09-21T00:00:00Z","participantCount":3}}"""
+    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1,"groupId":1,"name":"광주 1박 2일","location":"서울고속버스터미널","scheduleType":"FIXED","status":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","confirmedAt":"2026-09-21T00:00:00Z","participantCount":3}}"""
 
 private const val INVALID_PARTICIPANT_EXAMPLE =
     """{"code":"MEETING-E001","message":"만남 참여자는 해당 그룹의 멤버여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
@@ -126,6 +127,9 @@ private const val CREATOR_INCLUDED_EXAMPLE =
 
 private const val PAST_MEETING_DATE_EXAMPLE =
     """{"code":"MEETING-E005","message":"과거 날짜로 만남을 생성할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val INVALID_MEETING_DATE_RANGE_EXAMPLE =
+    """{"code":"MEETING-E007","message":"만남 종료일은 시작일보다 빠를 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
 private const val UNSUPPORTED_SCHEDULE_TYPE_EXAMPLE =
     """{"code":"MEETING-E006","message":"지원하지 않는 일정 등록 방식입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

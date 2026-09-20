@@ -66,9 +66,15 @@ data class MeetingScheduleRequest(
     )
     val type: MeetingScheduleType,
     @field:Schema(
-        description = "확정 날짜",
+        description = "일정 시작일",
         example = "2026-10-03",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
-    val date: LocalDate,
+    val startDate: LocalDate,
+    @field:Schema(
+        description = "일정 종료일. 하루 일정이면 시작일과 같은 날짜를 전달합니다.",
+        example = "2026-10-04",
+        requiredMode = Schema.RequiredMode.REQUIRED,
+    )
+    val endDate: LocalDate,
 )

@@ -33,15 +33,19 @@ class MeetingService(
         name: String,
         location: String?,
         participantMemberIds: List<Long>,
-        confirmedDate: LocalDate,
+        startDate: LocalDate,
+        endDate: LocalDate,
     ): CreatedMeeting {
         val creator = findCreator(groupId, creatorUserId)
         val participants = findParticipants(groupId, creator, participantMemberIds)
         val now = Instant.now(clock)
         val currentDate = LocalDate.now(clock)
 
-        if (confirmedDate.isBefore(currentDate)) {
+        if (startDate.isBefore(currentDate)) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE)
+        }
+        if (endDate.isBefore(startDate)) {
+            throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
         }
 
         val meeting =
@@ -51,7 +55,8 @@ class MeetingService(
                     creator = creator,
                     name = name,
                     location = location,
-                    confirmedDate = confirmedDate,
+                    startDate = startDate,
+                    endDate = endDate,
                     confirmedAt = now,
                     currentDate = currentDate,
                 ),
@@ -70,7 +75,8 @@ class MeetingService(
             location = meeting.location,
             scheduleType = meeting.scheduleType,
             status = meeting.status,
-            confirmedDate = requireNotNull(meeting.confirmedDate),
+            startDate = requireNotNull(meeting.startDate),
+            endDate = requireNotNull(meeting.endDate),
             confirmedAt = requireNotNull(meeting.confirmedAt),
             participantCount = participants.size + CREATOR_COUNT,
         )

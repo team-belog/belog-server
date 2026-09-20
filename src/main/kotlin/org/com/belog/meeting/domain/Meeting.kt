@@ -42,13 +42,18 @@ private const val MEETING_LOCATION_MAX_LENGTH = 20
             constraint =
                 "(" +
                     "schedule_type = 'FIXED' AND status = 'CONFIRMED' " +
-                    "AND confirmed_date IS NOT NULL AND confirmed_at IS NOT NULL" +
+                    "AND start_date IS NOT NULL AND end_date IS NOT NULL AND confirmed_at IS NOT NULL" +
                     ") OR (" +
                     "schedule_type = 'POLL' AND (" +
-                    "(status = 'SCHEDULING' AND confirmed_date IS NULL AND confirmed_at IS NULL) OR " +
-                    "(status = 'CONFIRMED' AND confirmed_date IS NOT NULL AND confirmed_at IS NOT NULL)" +
+                    "(status = 'SCHEDULING' AND start_date IS NULL AND end_date IS NULL AND confirmed_at IS NULL) OR " +
+                    "(status = 'CONFIRMED' AND start_date IS NOT NULL AND end_date IS NOT NULL " +
+                    "AND confirmed_at IS NOT NULL)" +
                     ")" +
                     ")",
+        ),
+        CheckConstraint(
+            name = "chk_meetings_date_range",
+            constraint = "start_date IS NULL OR end_date >= start_date",
         ),
     ],
 )
@@ -75,7 +80,8 @@ class Meeting protected constructor(
     @Column(name = "schedule_type", nullable = false, length = 20)
     val scheduleType: MeetingScheduleType,
     status: MeetingStatus,
-    confirmedDate: LocalDate?,
+    startDate: LocalDate?,
+    endDate: LocalDate?,
     confirmedAt: Instant?,
 ) : BaseEntity() {
     @Id
@@ -88,8 +94,12 @@ class Meeting protected constructor(
     var status: MeetingStatus = status
         protected set
 
-    @Column(name = "confirmed_date")
-    var confirmedDate: LocalDate? = confirmedDate
+    @Column(name = "start_date")
+    var startDate: LocalDate? = startDate
+        protected set
+
+    @Column(name = "end_date")
+    var endDate: LocalDate? = endDate
         protected set
 
     @Column(name = "confirmed_at")
@@ -116,7 +126,8 @@ class Meeting protected constructor(
             creator: GroupMember,
             name: String,
             location: String?,
-            confirmedDate: LocalDate,
+            startDate: LocalDate,
+            endDate: LocalDate,
             confirmedAt: Instant,
             currentDate: LocalDate,
         ): Meeting {
@@ -131,7 +142,8 @@ class Meeting protected constructor(
             require(normalizedLocation == null || normalizedLocation.length <= LOCATION_MAX_LENGTH) {
                 "만남 장소는 ${LOCATION_MAX_LENGTH}자를 초과할 수 없습니다."
             }
-            require(!confirmedDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
+            require(!startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
+            require(!endDate.isBefore(startDate)) { "종료일은 시작일보다 빠를 수 없습니다." }
 
             return Meeting(
                 group = group,
@@ -140,7 +152,8 @@ class Meeting protected constructor(
                 location = normalizedLocation,
                 scheduleType = MeetingScheduleType.FIXED,
                 status = MeetingStatus.CONFIRMED,
-                confirmedDate = confirmedDate,
+                startDate = startDate,
+                endDate = endDate,
                 confirmedAt = confirmedAt,
             )
         }

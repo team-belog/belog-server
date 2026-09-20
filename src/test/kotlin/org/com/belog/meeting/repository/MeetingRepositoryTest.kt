@@ -71,7 +71,8 @@ class MeetingRepositoryTest {
         val foundMeeting = meetingRepository.findById(meetingId).orElseThrow()
         assertEquals(MeetingScheduleType.FIXED, foundMeeting.scheduleType)
         assertEquals(MeetingStatus.CONFIRMED, foundMeeting.status)
-        assertEquals(LocalDate.of(2026, 9, 21), foundMeeting.confirmedDate)
+        assertEquals(LocalDate.of(2026, 9, 21), foundMeeting.startDate)
+        assertEquals(LocalDate.of(2026, 9, 22), foundMeeting.endDate)
         assertNotNull(foundMeeting.createdAt)
         assertEquals(2L, meetingParticipantRepository.countByMeetingId(meetingId))
         assertTrue(
@@ -125,7 +126,8 @@ class MeetingRepositoryTest {
             creator = creator,
             name = name,
             location = "서울고속버스터미널",
-            confirmedDate = LocalDate.of(2026, 9, 21),
+            startDate = LocalDate.of(2026, 9, 21),
+            endDate = LocalDate.of(2026, 9, 22),
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = LocalDate.of(2026, 9, 20),
         )

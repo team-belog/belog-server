@@ -76,14 +76,16 @@ class MeetingServiceTest {
                 name = "  광주 여행  ",
                 location = "  서울고속버스터미널  ",
                 participantMemberIds = listOf(requireNotNull(participant.id)),
-                confirmedDate = LocalDate.of(2026, 9, 22),
+                startDate = LocalDate.of(2026, 9, 22),
+                endDate = LocalDate.of(2026, 9, 23),
             )
 
         assertEquals("광주 여행", result.name)
         assertEquals("서울고속버스터미널", result.location)
         assertEquals(MeetingScheduleType.FIXED, result.scheduleType)
         assertEquals(MeetingStatus.CONFIRMED, result.status)
-        assertEquals(LocalDate.of(2026, 9, 22), result.confirmedDate)
+        assertEquals(LocalDate.of(2026, 9, 22), result.startDate)
+        assertEquals(LocalDate.of(2026, 9, 23), result.endDate)
         assertEquals(FIXED_INSTANT, result.confirmedAt)
         assertEquals(2, result.participantCount)
         assertEquals(1L, meetingRepository.count())
@@ -102,7 +104,8 @@ class MeetingServiceTest {
                 name = "광주 여행",
                 location = null,
                 participantMemberIds = emptyList(),
-                confirmedDate = LocalDate.of(2026, 9, 21),
+                startDate = LocalDate.of(2026, 9, 21),
+                endDate = LocalDate.of(2026, 9, 21),
             )
 
         assertEquals(1, result.participantCount)
@@ -122,7 +125,8 @@ class MeetingServiceTest {
                     name = "광주 여행",
                     location = null,
                     participantMemberIds = emptyList(),
-                    confirmedDate = LocalDate.of(2026, 9, 21),
+                    startDate = LocalDate.of(2026, 9, 21),
+                    endDate = LocalDate.of(2026, 9, 21),
                 )
             }
 
@@ -142,7 +146,8 @@ class MeetingServiceTest {
                     name = "광주 여행",
                     location = null,
                     participantMemberIds = emptyList(),
-                    confirmedDate = LocalDate.of(2026, 9, 21),
+                    startDate = LocalDate.of(2026, 9, 21),
+                    endDate = LocalDate.of(2026, 9, 21),
                 )
             }
 
@@ -221,11 +226,34 @@ class MeetingServiceTest {
                     name = "광주 여행",
                     location = null,
                     participantMemberIds = emptyList(),
-                    confirmedDate = LocalDate.of(2026, 9, 20),
+                    startDate = LocalDate.of(2026, 9, 20),
+                    endDate = LocalDate.of(2026, 9, 20),
                 )
             }
 
         assertEquals(MeetingErrorCode.PAST_MEETING_DATE, exception.errorCode)
+        assertEquals(0L, meetingRepository.count())
+    }
+
+    @Test
+    fun `종료일이 시작일보다 빠르면 만남을 생성할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.createFixedMeeting(
+                    groupId = requireNotNull(group.id),
+                    creatorUserId = requireNotNull(creator.user.id),
+                    name = "광주 여행",
+                    location = null,
+                    participantMemberIds = emptyList(),
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 21),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.INVALID_MEETING_DATE_RANGE, exception.errorCode)
         assertEquals(0L, meetingRepository.count())
     }
 
@@ -239,7 +267,8 @@ class MeetingServiceTest {
         name = "광주 여행",
         location = null,
         participantMemberIds = participantMemberIds,
-        confirmedDate = LocalDate.of(2026, 9, 21),
+        startDate = LocalDate.of(2026, 9, 21),
+        endDate = LocalDate.of(2026, 9, 21),
     )
 
     private fun createGroup(inviteCode: String): Group =
