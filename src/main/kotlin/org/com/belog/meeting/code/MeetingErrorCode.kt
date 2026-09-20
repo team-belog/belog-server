@@ -13,4 +13,5 @@ enum class MeetingErrorCode(
     CREATOR_INCLUDED_AS_PARTICIPANT(HttpStatus.BAD_REQUEST, "MEETING-E003", "만남 생성자는 참여자 목록에 포함할 수 없습니다."),
     PARTICIPANT_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "MEETING-E004", "만남 참여 인원이 그룹 최대 인원을 초과했습니다."),
     PAST_MEETING_DATE(HttpStatus.BAD_REQUEST, "MEETING-E005", "과거 날짜로 만남을 생성할 수 없습니다."),
+    UNSUPPORTED_SCHEDULE_TYPE(HttpStatus.BAD_REQUEST, "MEETING-E006", "지원하지 않는 일정 등록 방식입니다."),
 }
