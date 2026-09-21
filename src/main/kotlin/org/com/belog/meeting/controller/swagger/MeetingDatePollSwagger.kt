@@ -24,10 +24,8 @@ import org.springframework.web.bind.annotation.RequestBody
 @Tag(name = "Meeting Date Poll", description = "만남 후보 일정 응답 API")
 interface MeetingDatePollSwagger {
     @Operation(
-        summary = "후보 일정과 내 응답 상태 조회",
-        description =
-            "해당 만남의 참여자가 후보 일정과 자신의 응답 상태를 조회합니다. " +
-                "만남 생성자는 응답 레코드 없이 모든 후보 일정에 참석 가능한 상태로 반환됩니다.",
+        summary = "후보 일정 조회",
+        description = "해당 만남의 참여자가 후보 일정을 조회합니다.",
     )
     @ApiResponses(
         value = [
@@ -261,7 +259,7 @@ private const val NO_AVAILABLE_DATE_REQUEST_EXAMPLE =
     """{"candidateDateRangeIds":[]}"""
 
 private const val DATE_POLL_SUCCESS_EXAMPLE =
-    """{"code":"MEETING-S002","message":"후보 일정과 응답 상태를 조회했습니다.","data":{"meetingId":7,"status":"SCHEDULING","candidateDateRanges":[{"id":101,"startDate":"2026-10-03","endDate":"2026-10-04"},{"id":103,"startDate":"2026-10-10","endDate":"2026-10-11"}],"myResponse":{"responded":true,"respondedAt":"2026-09-22T00:00:00Z","selectedCandidateDateRangeIds":[101,103]}}}"""
+    """{"code":"MEETING-S002","message":"후보 일정을 조회했습니다.","data":{"meetingId":7,"status":"SCHEDULING","candidateDateRanges":[{"id":101,"startDate":"2026-10-03","endDate":"2026-10-04"},{"id":103,"startDate":"2026-10-10","endDate":"2026-10-11"}]}}"""
 
 private const val DATE_POLL_RESULTS_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S004","message":"후보 일정 조율 현황을 조회했습니다.","data":{"meetingId":7,"totalParticipantCount":5,"respondedParticipantCount":4,"candidateDateResults":[{"candidateDateRangeId":101,"startDate":"2026-10-03","endDate":"2026-10-04","rank":1,"availableCount":3,"availableMembers":[{"groupMemberId":21,"nickname":"생성자"},{"groupMemberId":22,"nickname":"참여자1"},{"groupMemberId":23,"nickname":"참여자2"}],"unavailableMembers":[{"groupMemberId":24,"nickname":"모두불가"}]}]}}"""

@@ -37,7 +37,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -77,7 +76,7 @@ class MeetingDatePollServiceTest {
     private lateinit var userRepository: UserRepository
 
     @Test
-    fun `참여자는 후보 일정과 미응답 상태를 조회한다`() {
+    fun `참여자는 후보 일정을 조회한다`() {
         val context = savePollContext()
 
         val result =
@@ -87,29 +86,10 @@ class MeetingDatePollServiceTest {
             )
 
         assertEquals(context.candidates.map { it.id }, result.candidateDateRanges.map { it.id })
-        assertEquals(false, result.myResponse.responded)
-        assertNull(result.myResponse.respondedAt)
-        assertEquals(emptyList(), result.myResponse.selectedCandidateDateRangeIds)
     }
 
     @Test
-    fun `생성자는 모든 후보 일정에 참석 가능한 상태로 조회한다`() {
-        val context = savePollContext()
-
-        val result =
-            meetingDatePollService.getDatePoll(
-                meetingId = requireNotNull(context.meeting.id),
-                userId = requireNotNull(context.creator.user.id),
-            )
-
-        assertEquals(true, result.myResponse.responded)
-        assertNull(result.myResponse.respondedAt)
-        assertEquals(context.candidates.map { it.id }, result.myResponse.selectedCandidateDateRangeIds)
-        assertEquals(0L, meetingScheduleResponseRepository.count())
-    }
-
-    @Test
-    fun `참여자가 복수 후보 일정에 응답하면 완료 정보와 선택 날짜를 조회한다`() {
+    fun `참여자가 복수 후보 일정에 응답하면 완료 정보와 선택 날짜를 저장한다`() {
         val context = savePollContext()
         val selectedCandidateIds = context.candidates.map { requireNotNull(it.id) }
 
@@ -118,15 +98,7 @@ class MeetingDatePollServiceTest {
             userId = requireNotNull(context.member.user.id),
             candidateDateRangeIds = selectedCandidateIds,
         )
-        val result =
-            meetingDatePollService.getDatePoll(
-                meetingId = requireNotNull(context.meeting.id),
-                userId = requireNotNull(context.member.user.id),
-            )
 
-        assertEquals(true, result.myResponse.responded)
-        assertEquals(FIXED_INSTANT, result.myResponse.respondedAt)
-        assertEquals(selectedCandidateIds, result.myResponse.selectedCandidateDateRangeIds)
         assertEquals(1L, meetingScheduleResponseRepository.count())
         assertEquals(2L, meetingAvailableDateRepository.count())
     }
@@ -140,15 +112,7 @@ class MeetingDatePollServiceTest {
             userId = requireNotNull(context.member.user.id),
             candidateDateRangeIds = emptyList(),
         )
-        val result =
-            meetingDatePollService.getDatePoll(
-                meetingId = requireNotNull(context.meeting.id),
-                userId = requireNotNull(context.member.user.id),
-            )
 
-        assertEquals(true, result.myResponse.responded)
-        assertEquals(FIXED_INSTANT, result.myResponse.respondedAt)
-        assertEquals(emptyList(), result.myResponse.selectedCandidateDateRangeIds)
         assertEquals(1L, meetingScheduleResponseRepository.count())
         assertEquals(0L, meetingAvailableDateRepository.count())
     }

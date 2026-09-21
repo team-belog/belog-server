@@ -4,11 +4,9 @@ import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
-import org.com.belog.meeting.service.result.MyDatePollResponseResult
-import java.time.Instant
 import java.time.LocalDate
 
-@Schema(description = "후보 일정과 내 응답 상태")
+@Schema(description = "후보 일정")
 data class MeetingDatePollResponse(
     @field:Schema(description = "만남 ID", example = "7")
     val meetingId: Long,
@@ -16,8 +14,6 @@ data class MeetingDatePollResponse(
     val status: MeetingStatus,
     @field:Schema(description = "후보 일정 목록")
     val candidateDateRanges: List<CandidateDateRangeResponse>,
-    @field:Schema(description = "내 응답 상태")
-    val myResponse: MyDatePollResponse,
 ) {
     companion object {
         fun from(result: MeetingDatePollResult): MeetingDatePollResponse =
@@ -25,7 +21,6 @@ data class MeetingDatePollResponse(
                 meetingId = result.meetingId,
                 status = result.status,
                 candidateDateRanges = result.candidateDateRanges.map(CandidateDateRangeResponse::from),
-                myResponse = MyDatePollResponse.from(result.myResponse),
             )
     }
 }
@@ -45,25 +40,6 @@ data class CandidateDateRangeResponse(
                 id = result.id,
                 startDate = result.startDate,
                 endDate = result.endDate,
-            )
-    }
-}
-
-@Schema(description = "내 후보 일정 응답")
-data class MyDatePollResponse(
-    @field:Schema(description = "응답 완료 여부", example = "true")
-    val responded: Boolean,
-    @field:Schema(description = "응답 완료 시각. 미응답이거나 생성자의 기본 응답이면 null입니다.", nullable = true)
-    val respondedAt: Instant?,
-    @field:Schema(description = "선택한 후보 일정 ID 목록")
-    val selectedCandidateDateRangeIds: List<Long>,
-) {
-    companion object {
-        fun from(result: MyDatePollResponseResult): MyDatePollResponse =
-            MyDatePollResponse(
-                responded = result.responded,
-                respondedAt = result.respondedAt,
-                selectedCandidateDateRangeIds = result.selectedCandidateDateRangeIds,
             )
     }
 }

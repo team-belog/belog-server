@@ -7,7 +7,6 @@ import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
-import org.com.belog.meeting.service.result.MyDatePollResponseResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -24,7 +23,6 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import java.time.Instant
 import java.time.LocalDate
 
 @WebMvcTest(MeetingDatePollController::class)
@@ -38,7 +36,7 @@ class MeetingDatePollControllerTest {
     private lateinit var meetingDatePollService: MeetingDatePollService
 
     @Test
-    fun `후보 일정과 내 응답 상태를 조회한다`() {
+    fun `후보 일정을 조회한다`() {
         `when`(meetingDatePollService.getDatePoll(meetingId = 7L, userId = 15L))
             .thenReturn(
                 MeetingDatePollResult(
@@ -57,12 +55,6 @@ class MeetingDatePollControllerTest {
                                 endDate = LocalDate.of(2026, 10, 11),
                             ),
                         ),
-                    myResponse =
-                        MyDatePollResponseResult(
-                            responded = true,
-                            respondedAt = Instant.parse("2026-09-22T00:00:00Z"),
-                            selectedCandidateDateRangeIds = listOf(101L, 103L),
-                        ),
                 ),
             )
 
@@ -77,9 +69,7 @@ class MeetingDatePollControllerTest {
             .andExpect(jsonPath("$.data.candidateDateRanges[0].id").value(101))
             .andExpect(jsonPath("$.data.candidateDateRanges[0].startDate").value("2026-10-03"))
             .andExpect(jsonPath("$.data.candidateDateRanges[1].id").value(103))
-            .andExpect(jsonPath("$.data.myResponse.responded").value(true))
-            .andExpect(jsonPath("$.data.myResponse.respondedAt").value("2026-09-22T00:00:00Z"))
-            .andExpect(jsonPath("$.data.myResponse.selectedCandidateDateRangeIds[0]").value(101))
+            .andExpect(jsonPath("$.data.myResponse").doesNotExist())
     }
 
     @Test

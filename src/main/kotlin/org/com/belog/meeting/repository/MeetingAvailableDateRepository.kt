@@ -20,17 +20,4 @@ interface MeetingAvailableDateRepository : JpaRepository<MeetingAvailableDate, L
     fun findAllWithResponseParticipantAndCandidateByMeetingId(
         @Param("meetingId") meetingId: Long,
     ): List<MeetingAvailableDate>
-
-    @Query(
-        """
-        SELECT availableDate
-        FROM MeetingAvailableDate availableDate
-        JOIN FETCH availableDate.candidateDateRange candidate
-        WHERE availableDate.response.id = :responseId
-        ORDER BY candidate.startDate ASC, candidate.endDate ASC, candidate.id ASC
-        """,
-    )
-    fun findAllWithCandidateByResponseId(
-        @Param("responseId") responseId: Long,
-    ): List<MeetingAvailableDate>
 }
