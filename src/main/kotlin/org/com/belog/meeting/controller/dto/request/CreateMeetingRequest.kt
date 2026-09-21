@@ -1,5 +1,6 @@
 package org.com.belog.meeting.controller.dto.request
 
+import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
@@ -35,11 +36,15 @@ data class CreateMeetingRequest(
         message = "만남 장소는 ${Meeting.LOCATION_MAX_LENGTH}자를 초과할 수 없습니다.",
     )
     val location: String? = null,
-    @field:Schema(
-        description = "초대할 그룹 멤버 ID 목록. 생성자는 자동으로 참여자에 포함되므로 제외합니다.",
-        example = "[22, 23]",
-        requiredMode = Schema.RequiredMode.NOT_REQUIRED,
-        maxLength = Group.MAX_MEMBER_COUNT - CREATOR_COUNT,
+    @field:ArraySchema(
+        arraySchema =
+            Schema(
+                description = "초대할 그룹 멤버 ID 목록. 생성자는 자동으로 참여자에 포함되므로 제외합니다.",
+                example = "[22, 23]",
+                requiredMode = Schema.RequiredMode.NOT_REQUIRED,
+            ),
+        schema = Schema(implementation = Long::class),
+        maxItems = Group.MAX_MEMBER_COUNT - CREATOR_COUNT,
     )
     @field:Size(
         max = Group.MAX_MEMBER_COUNT - CREATOR_COUNT,
