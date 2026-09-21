@@ -15,7 +15,6 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
-import org.com.belog.meeting.service.result.MyDatePollResponseResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -40,7 +39,6 @@ class MeetingDatePollService(
         validateDatePollMeeting(meeting)
 
         val candidateDateRanges = meetingCandidateDateRangeRepository.findAllByMeetingIdOrderByDate(meetingId)
-        val myResponse = findMyResponse(meeting, participant, candidateDateRanges.map { requireNotNull(it.id) })
 
         return MeetingDatePollResult(
             meetingId = requireNotNull(meeting.id),
@@ -53,7 +51,6 @@ class MeetingDatePollService(
                         endDate = candidate.endDate,
                     )
                 },
-            myResponse = myResponse,
         )
     }
 
@@ -132,39 +129,5 @@ class MeetingDatePollService(
         if (meeting.scheduleType != MeetingScheduleType.POLL) {
             throw BusinessException(MeetingErrorCode.NOT_DATE_POLL_MEETING)
         }
-    }
-
-    private fun findMyResponse(
-        meeting: Meeting,
-        participant: MeetingParticipant,
-        allCandidateIds: List<Long>,
-    ): MyDatePollResponseResult {
-        if (meeting.isCreatedBy(participant.groupMember)) {
-            return MyDatePollResponseResult(
-                responded = true,
-                respondedAt = null,
-                selectedCandidateDateRangeIds = allCandidateIds,
-            )
-        }
-
-        val response =
-            meetingScheduleResponseRepository.findByMeetingIdAndParticipantId(
-                meetingId = requireNotNull(meeting.id),
-                participantId = requireNotNull(participant.id),
-            ) ?: return MyDatePollResponseResult(
-                responded = false,
-                respondedAt = null,
-                selectedCandidateDateRangeIds = emptyList(),
-            )
-        val selectedCandidateIds =
-            meetingAvailableDateRepository
-                .findAllWithCandidateByResponseId(requireNotNull(response.id))
-                .map { availableDate -> requireNotNull(availableDate.candidateDateRange.id) }
-
-        return MyDatePollResponseResult(
-            responded = true,
-            respondedAt = response.respondedAt,
-            selectedCandidateDateRangeIds = selectedCandidateIds,
-        )
     }
 }
