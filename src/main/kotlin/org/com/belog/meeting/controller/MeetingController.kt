@@ -5,6 +5,7 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
+import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.swagger.MeetingSwagger
 import org.com.belog.meeting.domain.MeetingDateRange
@@ -50,10 +51,7 @@ class MeetingController(
                         name = request.name,
                         location = request.location,
                         participantMemberIds = request.participantMemberIds,
-                        candidateDateRanges =
-                            request.schedule.dateRanges.map { dateRange ->
-                                MeetingDateRange(dateRange.startDate, dateRange.endDate)
-                            },
+                        candidateDateRanges = request.schedule.dateRanges.map { it.toDomain() },
                     )
             }
 
@@ -66,4 +64,10 @@ class MeetingController(
                 ),
             )
     }
+
+    private fun MeetingDateRangeRequest.toDomain(): MeetingDateRange =
+        MeetingDateRange(
+            startDate = startDate,
+            endDate = endDate,
+        )
 }

@@ -12,6 +12,7 @@ import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import java.time.LocalDate
 
+@Schema(description = "만남 생성 요청")
 data class CreateMeetingRequest(
     @field:Schema(
         description = "만남명",
@@ -65,10 +66,12 @@ data class CreateMeetingRequest(
     }
 }
 
+@Schema(description = "만남 일정 등록 정보")
 data class MeetingScheduleRequest(
     @field:Schema(
         description = "일정 등록 방식",
         example = "FIXED",
+        allowableValues = ["FIXED", "POLL"],
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val type: MeetingScheduleType,
@@ -82,6 +85,7 @@ data class MeetingScheduleRequest(
         schema = Schema(implementation = MeetingDateRangeRequest::class),
         minItems = FIXED_DATE_RANGE_COUNT,
         maxItems = MAX_DATE_RANGE_COUNT,
+        uniqueItems = true,
     )
     @field:Size(
         min = FIXED_DATE_RANGE_COUNT,
@@ -106,6 +110,7 @@ data class MeetingScheduleRequest(
     }
 }
 
+@Schema(description = "시작일과 종료일로 구성된 일정 범위")
 data class MeetingDateRangeRequest(
     @field:Schema(
         description = "일정 시작일",

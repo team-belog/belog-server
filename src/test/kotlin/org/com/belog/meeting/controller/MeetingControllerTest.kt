@@ -177,6 +177,9 @@ class MeetingControllerTest {
             .andExpect(jsonPath("$.data.meetingId").value(7))
             .andExpect(jsonPath("$.data.scheduleType").value("POLL"))
             .andExpect(jsonPath("$.data.status").value("SCHEDULING"))
+            .andExpect(jsonPath("$.data.startDate").isEmpty)
+            .andExpect(jsonPath("$.data.endDate").isEmpty)
+            .andExpect(jsonPath("$.data.confirmedAt").isEmpty)
             .andExpect(jsonPath("$.data.participantCount").value(1))
     }
 
