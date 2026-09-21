@@ -33,7 +33,7 @@ class UserTest {
         assertFailsWith<IllegalArgumentException> {
             User.createSocialUser(
                 email = " ",
-                provid현er = SocialProvider.GOOGLE,
+                provider = SocialProvider.GOOGLE,
                 providerUserId = "google-subject",
             )
         }
