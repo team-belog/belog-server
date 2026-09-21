@@ -2,8 +2,11 @@ package org.com.belog.meeting.controller
 
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDatePollService
+import org.com.belog.meeting.service.result.CandidateDatePollResult
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
+import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
+import org.com.belog.meeting.service.result.MeetingDatePollResults
 import org.com.belog.meeting.service.result.MyDatePollResponseResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
@@ -77,6 +80,49 @@ class MeetingDatePollControllerTest {
             .andExpect(jsonPath("$.data.myResponse.responded").value(true))
             .andExpect(jsonPath("$.data.myResponse.respondedAt").value("2026-09-22T00:00:00Z"))
             .andExpect(jsonPath("$.data.myResponse.selectedCandidateDateRangeIds[0]").value(101))
+    }
+
+    @Test
+    fun `후보 일정 조율 현황을 조회한다`() {
+        `when`(meetingDatePollService.getDatePollResults(meetingId = 7L, userId = 15L))
+            .thenReturn(
+                MeetingDatePollResults(
+                    meetingId = 7L,
+                    totalParticipantCount = 5,
+                    respondedParticipantCount = 4,
+                    candidateDateResults =
+                        listOf(
+                            CandidateDatePollResult(
+                                candidateDateRangeId = 101L,
+                                startDate = LocalDate.of(2026, 10, 3),
+                                endDate = LocalDate.of(2026, 10, 4),
+                                rank = 1,
+                                availableCount = 3,
+                                availableMembers =
+                                    listOf(
+                                        DatePollMemberResult(21L, "생성자"),
+                                        DatePollMemberResult(22L, "참여자1"),
+                                        DatePollMemberResult(23L, "참여자2"),
+                                    ),
+                                unavailableMembers = listOf(DatePollMemberResult(24L, "모두불가")),
+                            ),
+                        ),
+                ),
+            )
+
+        mockMvc
+            .perform(
+                get("/api/v1/meetings/7/date-poll/results")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S004"))
+            .andExpect(jsonPath("$.data.totalParticipantCount").value(5))
+            .andExpect(jsonPath("$.data.respondedParticipantCount").value(4))
+            .andExpect(jsonPath("$.data.candidateDateResults[0].startDate").value("2026-10-03"))
+            .andExpect(jsonPath("$.data.candidateDateResults[0].endDate").value("2026-10-04"))
+            .andExpect(jsonPath("$.data.candidateDateResults[0].availableCount").value(3))
+            .andExpect(jsonPath("$.data.candidateDateResults[0].availableMembers[0].nickname").value("생성자"))
+            .andExpect(jsonPath("$.data.candidateDateResults[0].unavailableMembers[0].nickname").value("모두불가"))
     }
 
     @Test

@@ -6,6 +6,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.SubmitDatePollResponseRequest
 import org.com.belog.meeting.controller.dto.response.MeetingDatePollResponse
+import org.com.belog.meeting.controller.dto.response.MeetingDatePollResultsResponse
 import org.com.belog.meeting.controller.swagger.MeetingDatePollSwagger
 import org.com.belog.meeting.service.MeetingDatePollService
 import org.springframework.http.ResponseEntity
@@ -34,6 +35,23 @@ class MeetingDatePollController(
                 CommonResponse.success(
                     MeetingSuccessCode.DATE_POLL_RETRIEVED,
                     MeetingDatePollResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/results")
+    override fun getDatePollResults(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingDatePollResultsResponse>> {
+        val result = meetingDatePollService.getDatePollResults(meetingId, userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.DATE_POLL_RESULTS_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    MeetingSuccessCode.DATE_POLL_RESULTS_RETRIEVED,
+                    MeetingDatePollResultsResponse.from(result),
                 ),
             )
     }

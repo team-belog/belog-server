@@ -92,12 +92,6 @@ class MeetingDatePollService(
             participants.associate { participant ->
                 requireNotNull(participant.id) to participant.toMemberResult()
             }
-        val unansweredMembers =
-            participants
-                .filter { participant ->
-                    val participantId = requireNotNull(participant.id)
-                    participantId != creatorParticipantId && participantId !in respondedParticipantIds
-                }.map { participant -> participant.toMemberResult() }
 
         val candidateResults =
             candidates
@@ -132,7 +126,6 @@ class MeetingDatePollService(
             meetingId = requireNotNull(meeting.id),
             totalParticipantCount = participants.size,
             respondedParticipantCount = respondedParticipantIds.size + 1,
-            unansweredMembers = unansweredMembers,
             candidateDateResults = candidateResults,
         )
     }

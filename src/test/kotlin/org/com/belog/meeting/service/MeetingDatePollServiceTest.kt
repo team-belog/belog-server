@@ -154,7 +154,7 @@ class MeetingDatePollServiceTest {
     }
 
     @Test
-    fun `조율 현황에서 가능 불가 미응답 멤버와 응답 진행률을 구분한다`() {
+    fun `조율 현황에서 가능 불가 멤버와 응답 진행률을 계산한다`() {
         val context = savePollResultsContext()
         val firstCandidateId = requireNotNull(context.candidates[0].id)
         val secondCandidateId = requireNotNull(context.candidates[1].id)
@@ -183,7 +183,6 @@ class MeetingDatePollServiceTest {
 
         assertEquals(5, result.totalParticipantCount)
         assertEquals(4, result.respondedParticipantCount)
-        assertEquals(listOf("미응답자"), result.unansweredMembers.map { it.nickname })
         assertEquals(listOf(3, 2, 1), result.candidateDateResults.map { it.availableCount })
         assertEquals(listOf(1, 2, 3), result.candidateDateResults.map { it.rank })
 

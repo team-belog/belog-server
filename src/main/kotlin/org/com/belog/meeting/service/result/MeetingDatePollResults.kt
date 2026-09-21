@@ -6,7 +6,6 @@ data class MeetingDatePollResults(
     val meetingId: Long,
     val totalParticipantCount: Int,
     val respondedParticipantCount: Int,
-    val unansweredMembers: List<DatePollMemberResult>,
     val candidateDateResults: List<CandidateDatePollResult>,
 )
 
