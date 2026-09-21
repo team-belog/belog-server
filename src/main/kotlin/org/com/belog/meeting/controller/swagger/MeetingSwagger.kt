@@ -66,7 +66,6 @@ interface MeetingSwagger {
                             ExampleObject(name = "생성자를 참여자로 지정", value = CREATOR_INCLUDED_EXAMPLE),
                             ExampleObject(name = "과거 날짜", value = PAST_MEETING_DATE_EXAMPLE),
                             ExampleObject(name = "잘못된 일정 범위", value = INVALID_MEETING_DATE_RANGE_EXAMPLE),
-                            ExampleObject(name = "잘못된 후보 일정 개수", value = INVALID_CANDIDATE_COUNT_EXAMPLE),
                             ExampleObject(name = "중복 후보 일정", value = DUPLICATE_CANDIDATE_DATE_RANGE_EXAMPLE),
                         ],
                     ),
@@ -155,9 +154,6 @@ private const val PAST_MEETING_DATE_EXAMPLE =
 
 private const val INVALID_MEETING_DATE_RANGE_EXAMPLE =
     """{"code":"MEETING-E007","message":"만남 종료일은 시작일보다 빠를 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
-
-private const val INVALID_CANDIDATE_COUNT_EXAMPLE =
-    """{"code":"MEETING-E008","message":"후보 일정 범위는 2개 이상 10개 이하로 등록해야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
 private const val DUPLICATE_CANDIDATE_DATE_RANGE_EXAMPLE =
     """{"code":"MEETING-E009","message":"중복된 후보 일정 범위가 포함되어 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
