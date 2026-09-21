@@ -78,6 +78,7 @@ class UserController(
             userId = userId,
             profileImageObjectKey = createProfileImageObjectKey(userId, request.profileImageObjectKey),
             nickname = request.nickname,
+            name = request.name,
             bankAccount =
                 BankAccount.create(
                     bank = requireNotNull(request.bankCode),

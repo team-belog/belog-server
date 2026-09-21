@@ -253,6 +253,7 @@ class GroupServiceTest {
         user.completeOnboarding(
             profileImageObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp"),
             nickname = nickname,
+            name = "홍길동",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
