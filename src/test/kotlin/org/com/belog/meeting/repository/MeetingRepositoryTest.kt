@@ -7,8 +7,10 @@ import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.user.config.AccountNumberEncryptionConfig
@@ -47,6 +49,12 @@ class MeetingRepositoryTest {
 
     @Autowired
     private lateinit var meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository
+
+    @Autowired
+    private lateinit var meetingScheduleResponseRepository: MeetingScheduleResponseRepository
+
+    @Autowired
+    private lateinit var meetingAvailableDateRepository: MeetingAvailableDateRepository
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
@@ -157,6 +165,41 @@ class MeetingRepositoryTest {
         }
     }
 
+    @Test
+    fun `같은 응답에 동일한 후보 일정을 중복 저장할 수 없다`() {
+        val context = savePollResponseContext()
+        val response = saveScheduleResponse(context)
+        val candidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(
+                    context.meeting,
+                    LocalDate.of(2026, 9, 21),
+                    LocalDate.of(2026, 9, 22),
+                ),
+            )
+        meetingAvailableDateRepository.saveAndFlush(MeetingAvailableDate.create(response, candidate))
+
+        assertFailsWith<DataIntegrityViolationException> {
+            meetingAvailableDateRepository.saveAndFlush(MeetingAvailableDate.create(response, candidate))
+        }
+    }
+
+    @Test
+    fun `같은 참여자는 하나의 만남에 한 번만 응답할 수 있다`() {
+        val context = savePollResponseContext()
+        saveScheduleResponse(context)
+
+        assertFailsWith<DataIntegrityViolationException> {
+            meetingScheduleResponseRepository.saveAndFlush(
+                MeetingScheduleResponse.create(
+                    meeting = context.meeting,
+                    participant = context.participant,
+                    respondedAt = Instant.parse("2026-09-20T02:00:00Z"),
+                ),
+            )
+        }
+    }
+
     private fun createMeeting(
         group: Group,
         creator: GroupMember,
@@ -194,6 +237,25 @@ class MeetingRepositoryTest {
             startDate = startDate,
             endDate = endDate,
             currentDate = LocalDate.of(2026, 9, 20),
+        )
+
+    private fun savePollResponseContext(): PollResponseContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "참여자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val participant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
+        return PollResponseContext(meeting, participant)
+    }
+
+    private fun saveScheduleResponse(context: PollResponseContext): MeetingScheduleResponse =
+        meetingScheduleResponseRepository.saveAndFlush(
+            MeetingScheduleResponse.create(
+                meeting = context.meeting,
+                participant = context.participant,
+                respondedAt = Instant.parse("2026-09-20T01:00:00Z"),
+            ),
         )
 
     private fun createGroup(inviteCode: String): Group =
@@ -237,4 +299,9 @@ class MeetingRepositoryTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    private data class PollResponseContext(
+        val meeting: Meeting,
+        val participant: MeetingParticipant,
+    )
 }
