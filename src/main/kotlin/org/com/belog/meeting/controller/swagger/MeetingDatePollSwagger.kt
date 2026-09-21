@@ -15,6 +15,7 @@ import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.meeting.controller.dto.request.SubmitDatePollResponseRequest
 import org.com.belog.meeting.controller.dto.response.MeetingDatePollResponse
+import org.com.belog.meeting.controller.dto.response.MeetingDatePollResultsResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
@@ -83,6 +84,70 @@ interface MeetingDatePollSwagger {
         @PathVariable
         meetingId: Long,
     ): ResponseEntity<CommonResponse<MeetingDatePollResponse>>
+
+    @Operation(
+        summary = "후보 일정 조율 현황 조회",
+        description =
+            "해당 만남의 참여자가 전체 응답 진행률과 후보 일정별 가능·불가 멤버를 조회합니다. " +
+                "만남 생성자는 응답 인원과 모든 후보 일정의 가능 멤버에 포함됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "후보 일정 조율 현황 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = DATE_POLL_RESULTS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "일정 조율 방식의 만남이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_DATE_POLL_MEETING_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남의 참여자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_PARTICIPANT_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getDatePollResults(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingDatePollResultsResponse>>
 
     @Operation(
         summary = "내 가능한 후보 일정 응답",
@@ -195,6 +260,9 @@ private const val NO_AVAILABLE_DATE_REQUEST_EXAMPLE =
 
 private const val DATE_POLL_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S002","message":"후보 일정을 조회했습니다.","data":{"meetingId":7,"status":"SCHEDULING","candidateDateRanges":[{"id":101,"startDate":"2026-10-03","endDate":"2026-10-04"},{"id":103,"startDate":"2026-10-10","endDate":"2026-10-11"}]}}"""
+
+private const val DATE_POLL_RESULTS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S004","message":"후보 일정 조율 현황을 조회했습니다.","data":{"meetingId":7,"totalParticipantCount":5,"respondedParticipantCount":4,"candidateDateResults":[{"candidateDateRangeId":101,"startDate":"2026-10-03","endDate":"2026-10-04","rank":1,"availableCount":3,"availableMembers":[{"groupMemberId":21,"nickname":"생성자"},{"groupMemberId":22,"nickname":"참여자1"},{"groupMemberId":23,"nickname":"참여자2"}],"unavailableMembers":[{"groupMemberId":24,"nickname":"모두불가"}]}]}}"""
 
 private const val DATE_POLL_RESPONSE_SUBMITTED_EXAMPLE =
     """{"code":"MEETING-S003","message":"가능한 후보 일정 응답을 완료했습니다.","data":null}"""

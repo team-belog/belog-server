@@ -13,8 +13,12 @@ import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.meeting.service.result.CandidateDatePollResult
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
+import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
+import org.com.belog.meeting.service.result.MeetingDatePollResults
+import org.com.belog.meeting.service.result.MyDatePollResponseResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -51,6 +55,76 @@ class MeetingDatePollService(
                         endDate = candidate.endDate,
                     )
                 },
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getDatePollResults(
+        meetingId: Long,
+        userId: Long,
+    ): MeetingDatePollResults {
+        val participants = meetingParticipantRepository.findAllWithMemberAndUserByMeetingId(meetingId)
+        if (participants.none { participant -> participant.groupMember.user.id == userId }) {
+            throwParticipantLookupException(meetingId)
+        }
+
+        val meeting = participants.first().meeting
+        validateDatePollMeeting(meeting)
+
+        val candidates = meetingCandidateDateRangeRepository.findAllByMeetingIdOrderByDate(meetingId)
+        val responses = meetingScheduleResponseRepository.findAllWithParticipantByMeetingId(meetingId)
+        val availableDates = meetingAvailableDateRepository.findAllWithResponseParticipantAndCandidateByMeetingId(meetingId)
+
+        val creatorParticipant =
+            participants.first { participant -> meeting.isCreatedBy(participant.groupMember) }
+        val creatorParticipantId = requireNotNull(creatorParticipant.id)
+        val respondedParticipantIds =
+            responses.mapTo(mutableSetOf()) { response -> requireNotNull(response.participant.id) }
+        val selectedParticipantIdsByCandidateId =
+            availableDates.groupBy(
+                keySelector = { availableDate -> requireNotNull(availableDate.candidateDateRange.id) },
+                valueTransform = { availableDate -> requireNotNull(availableDate.response.participant.id) },
+            )
+
+        val memberByParticipantId =
+            participants.associate { participant ->
+                requireNotNull(participant.id) to participant.toMemberResult()
+            }
+
+        val candidateResults =
+            candidates
+                .map { candidate ->
+                    val selectedParticipantIds = selectedParticipantIdsByCandidateId[requireNotNull(candidate.id)].orEmpty().toSet()
+                    val availableParticipantIds = selectedParticipantIds + creatorParticipantId
+                    val unavailableParticipantIds = respondedParticipantIds - selectedParticipantIds
+
+                    CandidateDatePollResult(
+                        candidateDateRangeId = requireNotNull(candidate.id),
+                        startDate = candidate.startDate,
+                        endDate = candidate.endDate,
+                        rank = 0,
+                        availableCount = availableParticipantIds.size,
+                        availableMembers =
+                            participants
+                                .mapNotNull { participant ->
+                                    memberByParticipantId[requireNotNull(participant.id)]
+                                        ?.takeIf { requireNotNull(participant.id) in availableParticipantIds }
+                                },
+                        unavailableMembers =
+                            participants
+                                .mapNotNull { participant ->
+                                    memberByParticipantId[requireNotNull(participant.id)]
+                                        ?.takeIf { requireNotNull(participant.id) in unavailableParticipantIds }
+                                },
+                    )
+                }.sortedByDescending(CandidateDatePollResult::availableCount)
+                .mapIndexed { index, result -> result.copy(rank = index + 1) }
+
+        return MeetingDatePollResults(
+            meetingId = requireNotNull(meeting.id),
+            totalParticipantCount = participants.size,
+            respondedParticipantCount = respondedParticipantIds.size + 1,
+            candidateDateResults = candidateResults,
         )
     }
 
@@ -130,4 +204,44 @@ class MeetingDatePollService(
             throw BusinessException(MeetingErrorCode.NOT_DATE_POLL_MEETING)
         }
     }
+
+    private fun findMyResponse(
+        meeting: Meeting,
+        participant: MeetingParticipant,
+        allCandidateIds: List<Long>,
+    ): MyDatePollResponseResult {
+        if (meeting.isCreatedBy(participant.groupMember)) {
+            return MyDatePollResponseResult(
+                responded = true,
+                respondedAt = null,
+                selectedCandidateDateRangeIds = allCandidateIds,
+            )
+        }
+
+        val response =
+            meetingScheduleResponseRepository.findByMeetingIdAndParticipantId(
+                meetingId = requireNotNull(meeting.id),
+                participantId = requireNotNull(participant.id),
+            ) ?: return MyDatePollResponseResult(
+                responded = false,
+                respondedAt = null,
+                selectedCandidateDateRangeIds = emptyList(),
+            )
+        val selectedCandidateIds =
+            meetingAvailableDateRepository
+                .findAllWithCandidateByResponseId(requireNotNull(response.id))
+                .map { availableDate -> requireNotNull(availableDate.candidateDateRange.id) }
+
+        return MyDatePollResponseResult(
+            responded = true,
+            respondedAt = response.respondedAt,
+            selectedCandidateDateRangeIds = selectedCandidateIds,
+        )
+    }
+
+    private fun MeetingParticipant.toMemberResult(): DatePollMemberResult =
+        DatePollMemberResult(
+            groupMemberId = requireNotNull(groupMember.id),
+            nickname = requireNotNull(groupMember.user.nickname),
+        )
 }

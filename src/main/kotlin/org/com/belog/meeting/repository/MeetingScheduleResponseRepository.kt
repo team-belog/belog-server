@@ -8,6 +8,24 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface MeetingScheduleResponseRepository : JpaRepository<MeetingScheduleResponse, Long> {
+    fun findByMeetingIdAndParticipantId(
+        meetingId: Long,
+        participantId: Long,
+    ): MeetingScheduleResponse?
+
+    @Query(
+        """
+        SELECT response
+        FROM MeetingScheduleResponse response
+        JOIN FETCH response.participant participant
+        WHERE response.meeting.id = :meetingId
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllWithParticipantByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingScheduleResponse>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
