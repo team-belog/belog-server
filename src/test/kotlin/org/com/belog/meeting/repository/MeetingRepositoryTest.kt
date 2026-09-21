@@ -7,8 +7,10 @@ import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.user.config.AccountNumberEncryptionConfig
@@ -47,6 +49,12 @@ class MeetingRepositoryTest {
 
     @Autowired
     private lateinit var meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository
+
+    @Autowired
+    private lateinit var meetingScheduleResponseRepository: MeetingScheduleResponseRepository
+
+    @Autowired
+    private lateinit var meetingAvailableDateRepository: MeetingAvailableDateRepository
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
@@ -157,6 +165,150 @@ class MeetingRepositoryTest {
         }
     }
 
+    @Test
+    fun `만남 ID와 사용자 ID로 참여자를 비관적 락 조회한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "참여자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val participant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
+
+        val foundParticipant =
+            meetingParticipantRepository.findByMeetingIdAndUserIdForUpdate(
+                meetingId = requireNotNull(meeting.id),
+                userId = requireNotNull(member.user.id),
+            )
+
+        assertEquals(participant.id, foundParticipant?.id)
+    }
+
+    @Test
+    fun `해당 만남의 후보 일정만 날짜 순으로 조회한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val otherMeeting = meetingRepository.save(createPollMeeting(group, creator))
+        meetingRepository.flush()
+        val laterCandidate =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting,
+                    LocalDate.of(2026, 9, 28),
+                    LocalDate.of(2026, 9, 29),
+                ),
+            )
+        val earlierCandidate =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting,
+                    LocalDate.of(2026, 9, 21),
+                    LocalDate.of(2026, 9, 22),
+                ),
+            )
+        val otherCandidate =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    otherMeeting,
+                    LocalDate.of(2026, 9, 20),
+                    LocalDate.of(2026, 9, 20),
+                ),
+            )
+        meetingCandidateDateRangeRepository.flush()
+
+        val candidates =
+            meetingCandidateDateRangeRepository.findAllByMeetingIdOrderByDate(requireNotNull(meeting.id))
+        val selectedCandidates =
+            meetingCandidateDateRangeRepository.findAllByMeetingIdAndIdIn(
+                meetingId = requireNotNull(meeting.id),
+                candidateDateRangeIds =
+                    listOf(
+                        requireNotNull(earlierCandidate.id),
+                        requireNotNull(otherCandidate.id),
+                    ),
+            )
+
+        assertEquals(listOf(earlierCandidate.id, laterCandidate.id), candidates.map { it.id })
+        assertEquals(listOf(earlierCandidate.id), selectedCandidates.map { it.id })
+    }
+
+    @Test
+    fun `응답 가능한 후보 일정을 날짜 순으로 저장하고 조회한다`() {
+        val context = savePollResponseContext()
+        val response = saveScheduleResponse(context)
+        val laterCandidate =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    context.meeting,
+                    LocalDate.of(2026, 9, 28),
+                    LocalDate.of(2026, 9, 29),
+                ),
+            )
+        val earlierCandidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(
+                    context.meeting,
+                    LocalDate.of(2026, 9, 21),
+                    LocalDate.of(2026, 9, 22),
+                ),
+            )
+        meetingAvailableDateRepository.saveAllAndFlush(
+            listOf(
+                MeetingAvailableDate.create(response, laterCandidate),
+                MeetingAvailableDate.create(response, earlierCandidate),
+            ),
+        )
+
+        val availableDates =
+            meetingAvailableDateRepository.findAllWithCandidateByResponseId(requireNotNull(response.id))
+        val foundResponse =
+            meetingScheduleResponseRepository.findByMeetingIdAndParticipantId(
+                meetingId = requireNotNull(context.meeting.id),
+                participantId = requireNotNull(context.participant.id),
+            )
+
+        assertEquals(response.id, foundResponse?.id)
+        assertEquals(
+            listOf(earlierCandidate.id, laterCandidate.id),
+            availableDates.map { it.candidateDateRange.id },
+        )
+    }
+
+    @Test
+    fun `같은 응답에 동일한 후보 일정을 중복 저장할 수 없다`() {
+        val context = savePollResponseContext()
+        val response = saveScheduleResponse(context)
+        val candidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(
+                    context.meeting,
+                    LocalDate.of(2026, 9, 21),
+                    LocalDate.of(2026, 9, 22),
+                ),
+            )
+        meetingAvailableDateRepository.saveAndFlush(MeetingAvailableDate.create(response, candidate))
+
+        assertFailsWith<DataIntegrityViolationException> {
+            meetingAvailableDateRepository.saveAndFlush(MeetingAvailableDate.create(response, candidate))
+        }
+    }
+
+    @Test
+    fun `같은 참여자는 하나의 만남에 한 번만 응답할 수 있다`() {
+        val context = savePollResponseContext()
+        saveScheduleResponse(context)
+
+        assertFailsWith<DataIntegrityViolationException> {
+            meetingScheduleResponseRepository.saveAndFlush(
+                MeetingScheduleResponse.create(
+                    meeting = context.meeting,
+                    participant = context.participant,
+                    respondedAt = Instant.parse("2026-09-20T02:00:00Z"),
+                ),
+            )
+        }
+    }
+
     private fun createMeeting(
         group: Group,
         creator: GroupMember,
@@ -194,6 +346,25 @@ class MeetingRepositoryTest {
             startDate = startDate,
             endDate = endDate,
             currentDate = LocalDate.of(2026, 9, 20),
+        )
+
+    private fun savePollResponseContext(): PollResponseContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "참여자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val participant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
+        return PollResponseContext(meeting, participant)
+    }
+
+    private fun saveScheduleResponse(context: PollResponseContext): MeetingScheduleResponse =
+        meetingScheduleResponseRepository.saveAndFlush(
+            MeetingScheduleResponse.create(
+                meeting = context.meeting,
+                participant = context.participant,
+                respondedAt = Instant.parse("2026-09-20T01:00:00Z"),
+            ),
         )
 
     private fun createGroup(inviteCode: String): Group =
@@ -237,4 +408,9 @@ class MeetingRepositoryTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    private data class PollResponseContext(
+        val meeting: Meeting,
+        val participant: MeetingParticipant,
+    )
 }
