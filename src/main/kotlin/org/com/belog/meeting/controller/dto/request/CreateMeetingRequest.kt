@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.com.belog.group.domain.Group
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import java.time.LocalDate
 
@@ -95,13 +96,13 @@ data class MeetingScheduleRequest(
         get() =
             when (type) {
                 MeetingScheduleType.FIXED -> dateRanges.size == FIXED_DATE_RANGE_COUNT
-                MeetingScheduleType.POLL -> dateRanges.size in MIN_POLL_DATE_RANGE_COUNT..MAX_DATE_RANGE_COUNT
+                MeetingScheduleType.POLL ->
+                    dateRanges.size in MeetingCandidateDateRange.MIN_COUNT..MeetingCandidateDateRange.MAX_COUNT
             }
 
     companion object {
         private const val FIXED_DATE_RANGE_COUNT = 1
-        private const val MIN_POLL_DATE_RANGE_COUNT = 2
-        private const val MAX_DATE_RANGE_COUNT = 10
+        private const val MAX_DATE_RANGE_COUNT = MeetingCandidateDateRange.MAX_COUNT
     }
 }
 

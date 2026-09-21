@@ -8,7 +8,10 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingCandidateDateRange
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.result.CreatedMeeting
@@ -24,6 +27,7 @@ class MeetingService(
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
     private val clock: Clock,
 ) {
     @Transactional
@@ -62,11 +66,7 @@ class MeetingService(
                 ),
             )
 
-        meetingParticipantRepository.saveAll(
-            (listOf(creator) + participants).map { groupMember ->
-                MeetingParticipant.create(meeting, groupMember)
-            },
-        )
+        saveParticipants(meeting, creator, participants)
 
         return CreatedMeeting(
             meetingId = requireNotNull(meeting.id),
@@ -78,6 +78,56 @@ class MeetingService(
             startDate = requireNotNull(meeting.startDate),
             endDate = requireNotNull(meeting.endDate),
             confirmedAt = requireNotNull(meeting.confirmedAt),
+            participantCount = participants.size + CREATOR_COUNT,
+        )
+    }
+
+    @Transactional
+    fun createPollMeeting(
+        groupId: Long,
+        creatorUserId: Long,
+        name: String,
+        location: String?,
+        participantMemberIds: List<Long>,
+        candidateDateRanges: List<MeetingDateRange>,
+    ): CreatedMeeting {
+        val creator = findCreator(groupId, creatorUserId)
+        val participants = findParticipants(groupId, creator, participantMemberIds)
+        val currentDate = LocalDate.now(clock)
+        validateCandidateDateRanges(candidateDateRanges, currentDate)
+
+        val meeting =
+            meetingRepository.save(
+                Meeting.createPoll(
+                    group = creator.group,
+                    creator = creator,
+                    name = name,
+                    location = location,
+                ),
+            )
+
+        saveParticipants(meeting, creator, participants)
+        meetingCandidateDateRangeRepository.saveAll(
+            candidateDateRanges.map { dateRange ->
+                MeetingCandidateDateRange.create(
+                    meeting = meeting,
+                    startDate = dateRange.startDate,
+                    endDate = dateRange.endDate,
+                    currentDate = currentDate,
+                )
+            },
+        )
+
+        return CreatedMeeting(
+            meetingId = requireNotNull(meeting.id),
+            groupId = groupId,
+            name = meeting.name,
+            location = meeting.location,
+            scheduleType = meeting.scheduleType,
+            status = meeting.status,
+            startDate = null,
+            endDate = null,
+            confirmedAt = null,
             participantCount = participants.size + CREATOR_COUNT,
         )
     }
@@ -116,6 +166,36 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.INVALID_PARTICIPANT)
         }
         return participants
+    }
+
+    private fun validateCandidateDateRanges(
+        candidateDateRanges: List<MeetingDateRange>,
+        currentDate: LocalDate,
+    ) {
+        if (candidateDateRanges.size !in MeetingCandidateDateRange.MIN_COUNT..MeetingCandidateDateRange.MAX_COUNT) {
+            throw BusinessException(MeetingErrorCode.INVALID_CANDIDATE_DATE_RANGE_COUNT)
+        }
+        if (candidateDateRanges.distinct().size != candidateDateRanges.size) {
+            throw BusinessException(MeetingErrorCode.DUPLICATE_CANDIDATE_DATE_RANGE)
+        }
+        if (candidateDateRanges.any { it.startDate.isBefore(currentDate) }) {
+            throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE)
+        }
+        if (candidateDateRanges.any { it.endDate.isBefore(it.startDate) }) {
+            throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
+        }
+    }
+
+    private fun saveParticipants(
+        meeting: Meeting,
+        creator: GroupMember,
+        participants: List<GroupMember>,
+    ) {
+        meetingParticipantRepository.saveAll(
+            (listOf(creator) + participants).map { groupMember ->
+                MeetingParticipant.create(meeting, groupMember)
+            },
+        )
     }
 
     companion object {

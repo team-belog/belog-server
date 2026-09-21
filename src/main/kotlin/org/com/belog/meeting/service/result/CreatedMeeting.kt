@@ -12,8 +12,8 @@ data class CreatedMeeting(
     val location: String?,
     val scheduleType: MeetingScheduleType,
     val status: MeetingStatus,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-    val confirmedAt: Instant,
+    val startDate: LocalDate?,
+    val endDate: LocalDate?,
+    val confirmedAt: Instant?,
     val participantCount: Int,
 )

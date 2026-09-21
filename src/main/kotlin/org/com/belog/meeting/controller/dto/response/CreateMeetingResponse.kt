@@ -20,12 +20,12 @@ data class CreateMeetingResponse(
     val scheduleType: MeetingScheduleType,
     @field:Schema(description = "만남 상태", example = "CONFIRMED")
     val status: MeetingStatus,
-    @field:Schema(description = "일정 시작일", example = "2026-10-03")
-    val startDate: LocalDate,
-    @field:Schema(description = "일정 종료일", example = "2026-10-04")
-    val endDate: LocalDate,
-    @field:Schema(description = "날짜 확정 시각", example = "2026-09-21T00:00:00Z")
-    val confirmedAt: Instant,
+    @field:Schema(description = "확정 일정 시작일", example = "2026-10-03", nullable = true)
+    val startDate: LocalDate?,
+    @field:Schema(description = "확정 일정 종료일", example = "2026-10-04", nullable = true)
+    val endDate: LocalDate?,
+    @field:Schema(description = "날짜 확정 시각", example = "2026-09-21T00:00:00Z", nullable = true)
+    val confirmedAt: Instant?,
     @field:Schema(description = "생성자를 포함한 참여 인원", example = "3")
     val participantCount: Int,
 ) {

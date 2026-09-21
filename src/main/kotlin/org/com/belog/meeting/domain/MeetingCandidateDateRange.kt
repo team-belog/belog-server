@@ -53,6 +53,9 @@ class MeetingCandidateDateRange protected constructor(
         protected set
 
     companion object {
+        const val MIN_COUNT = 2
+        const val MAX_COUNT = 10
+
         fun create(
             meeting: Meeting,
             startDate: LocalDate,

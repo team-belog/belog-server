@@ -9,8 +9,10 @@ import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
+import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.user.config.AccountNumberEncryptionConfig
@@ -53,6 +55,9 @@ class MeetingServiceTest {
 
     @Autowired
     private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
+    private lateinit var meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
@@ -110,6 +115,113 @@ class MeetingServiceTest {
 
         assertEquals(1, result.participantCount)
         assertEquals(1L, meetingParticipantRepository.count())
+    }
+
+    @Test
+    fun `그룹 멤버가 일정 조율 만남을 생성하면 참여자와 후보 일정 범위가 저장된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+
+        val result =
+            meetingService.createPollMeeting(
+                groupId = requireNotNull(group.id),
+                creatorUserId = requireNotNull(creator.user.id),
+                name = "  광주 여행  ",
+                location = "  서울고속버스터미널  ",
+                participantMemberIds = listOf(requireNotNull(participant.id)),
+                candidateDateRanges =
+                    listOf(
+                        MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                        MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 30)),
+                    ),
+            )
+
+        assertEquals("광주 여행", result.name)
+        assertEquals("서울고속버스터미널", result.location)
+        assertEquals(MeetingScheduleType.POLL, result.scheduleType)
+        assertEquals(MeetingStatus.SCHEDULING, result.status)
+        assertEquals(null, result.startDate)
+        assertEquals(null, result.endDate)
+        assertEquals(null, result.confirmedAt)
+        assertEquals(2, result.participantCount)
+        assertEquals(1L, meetingRepository.count())
+        assertEquals(2L, meetingParticipantRepository.count())
+        assertEquals(2L, meetingCandidateDateRangeRepository.count())
+    }
+
+    @Test
+    fun `후보 일정 범위가 두 개 미만이면 일정 조율 만남을 생성할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                createPollMeeting(
+                    group = group,
+                    creator = creator,
+                    candidateDateRanges =
+                        listOf(MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23))),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.INVALID_CANDIDATE_DATE_RANGE_COUNT, exception.errorCode)
+        assertEquals(0L, meetingRepository.count())
+    }
+
+    @Test
+    fun `중복된 후보 일정 범위가 있으면 일정 조율 만남을 생성할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val candidateDateRange =
+            MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                createPollMeeting(
+                    group = group,
+                    creator = creator,
+                    candidateDateRanges = listOf(candidateDateRange, candidateDateRange),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.DUPLICATE_CANDIDATE_DATE_RANGE, exception.errorCode)
+        assertEquals(0L, meetingRepository.count())
+    }
+
+    @Test
+    fun `후보 일정에 과거 날짜나 역전된 날짜 범위가 있으면 일정 조율 만남을 생성할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+
+        val pastDateException =
+            assertFailsWith<BusinessException> {
+                createPollMeeting(
+                    group = group,
+                    creator = creator,
+                    candidateDateRanges =
+                        listOf(
+                            MeetingDateRange(LocalDate.of(2026, 9, 20), LocalDate.of(2026, 9, 20)),
+                            MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                        ),
+                )
+            }
+        val invalidRangeException =
+            assertFailsWith<BusinessException> {
+                createPollMeeting(
+                    group = group,
+                    creator = creator,
+                    candidateDateRanges =
+                        listOf(
+                            MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 22)),
+                            MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 30)),
+                        ),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.PAST_MEETING_DATE, pastDateException.errorCode)
+        assertEquals(MeetingErrorCode.INVALID_MEETING_DATE_RANGE, invalidRangeException.errorCode)
+        assertEquals(0L, meetingRepository.count())
     }
 
     @Test
@@ -269,6 +381,19 @@ class MeetingServiceTest {
         participantMemberIds = participantMemberIds,
         startDate = LocalDate.of(2026, 9, 21),
         endDate = LocalDate.of(2026, 9, 21),
+    )
+
+    private fun createPollMeeting(
+        group: Group,
+        creator: GroupMember,
+        candidateDateRanges: List<MeetingDateRange>,
+    ) = meetingService.createPollMeeting(
+        groupId = requireNotNull(group.id),
+        creatorUserId = requireNotNull(creator.user.id),
+        name = "광주 여행",
+        location = null,
+        participantMemberIds = emptyList(),
+        candidateDateRanges = candidateDateRanges,
     )
 
     private fun createGroup(inviteCode: String): Group =

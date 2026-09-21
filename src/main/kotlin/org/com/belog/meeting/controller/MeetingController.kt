@@ -2,13 +2,12 @@ package org.com.belog.meeting.controller
 
 import jakarta.validation.Valid
 import org.com.belog.global.annotation.LoginUserId
-import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
-import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.swagger.MeetingSwagger
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
@@ -29,21 +28,34 @@ class MeetingController(
         @PathVariable groupId: Long,
         @Valid @RequestBody request: CreateMeetingRequest,
     ): ResponseEntity<CommonResponse<CreateMeetingResponse>> {
-        if (request.schedule.type != MeetingScheduleType.FIXED) {
-            throw BusinessException(MeetingErrorCode.UNSUPPORTED_SCHEDULE_TYPE)
-        }
-        val dateRange = request.schedule.dateRanges.single()
-
         val createdMeeting =
-            meetingService.createFixedMeeting(
-                groupId = groupId,
-                creatorUserId = userId,
-                name = request.name,
-                location = request.location,
-                participantMemberIds = request.participantMemberIds,
-                startDate = dateRange.startDate,
-                endDate = dateRange.endDate,
-            )
+            when (request.schedule.type) {
+                MeetingScheduleType.FIXED -> {
+                    val dateRange = request.schedule.dateRanges.single()
+                    meetingService.createFixedMeeting(
+                        groupId = groupId,
+                        creatorUserId = userId,
+                        name = request.name,
+                        location = request.location,
+                        participantMemberIds = request.participantMemberIds,
+                        startDate = dateRange.startDate,
+                        endDate = dateRange.endDate,
+                    )
+                }
+
+                MeetingScheduleType.POLL ->
+                    meetingService.createPollMeeting(
+                        groupId = groupId,
+                        creatorUserId = userId,
+                        name = request.name,
+                        location = request.location,
+                        participantMemberIds = request.participantMemberIds,
+                        candidateDateRanges =
+                            request.schedule.dateRanges.map { dateRange ->
+                                MeetingDateRange(dateRange.startDate, dateRange.endDate)
+                            },
+                    )
+            }
 
         return ResponseEntity
             .status(MeetingSuccessCode.MEETING_CREATED.status)

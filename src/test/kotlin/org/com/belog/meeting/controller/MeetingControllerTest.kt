@@ -3,6 +3,7 @@ package org.com.belog.meeting.controller
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingService
@@ -134,7 +135,35 @@ class MeetingControllerTest {
     }
 
     @Test
-    fun `일정 조율 방식으로 생성 요청하면 거절한다`() {
+    fun `후보 일정 범위로 일정 조율 만남을 생성한다`() {
+        `when`(
+            meetingService.createPollMeeting(
+                groupId = 1L,
+                creatorUserId = 15L,
+                name = "만남",
+                location = null,
+                participantMemberIds = emptyList(),
+                candidateDateRanges =
+                    listOf(
+                        MeetingDateRange(LocalDate.of(2026, 10, 3), LocalDate.of(2026, 10, 4)),
+                        MeetingDateRange(LocalDate.of(2026, 10, 10), LocalDate.of(2026, 10, 11)),
+                    ),
+            ),
+        ).thenReturn(
+            CreatedMeeting(
+                meetingId = 7L,
+                groupId = 1L,
+                name = "만남",
+                location = null,
+                scheduleType = MeetingScheduleType.POLL,
+                status = MeetingStatus.SCHEDULING,
+                startDate = null,
+                endDate = null,
+                confirmedAt = null,
+                participantCount = 1,
+            ),
+        )
+
         mockMvc
             .perform(
                 post("/api/v1/groups/1/meetings")
@@ -143,10 +172,12 @@ class MeetingControllerTest {
                     .content(
                         """{"name":"만남","schedule":{"type":"POLL","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"},{"startDate":"2026-10-10","endDate":"2026-10-11"}]}}""",
                     ),
-            ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("MEETING-E006"))
-
-        verifyNoInteractions(meetingService)
+            ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.code").value("MEETING-S001"))
+            .andExpect(jsonPath("$.data.meetingId").value(7))
+            .andExpect(jsonPath("$.data.scheduleType").value("POLL"))
+            .andExpect(jsonPath("$.data.status").value("SCHEDULING"))
+            .andExpect(jsonPath("$.data.participantCount").value(1))
     }
 
     @Test
