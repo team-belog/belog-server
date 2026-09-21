@@ -111,7 +111,7 @@ interface MeetingSwagger {
 }
 
 private const val CREATE_MEETING_REQUEST_EXAMPLE =
-    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}"""
+    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}"""
 
 private const val CREATE_MEETING_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1,"groupId":1,"name":"광주 1박 2일","location":"서울고속버스터미널","scheduleType":"FIXED","status":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","confirmedAt":"2026-09-21T00:00:00Z","participantCount":3}}"""

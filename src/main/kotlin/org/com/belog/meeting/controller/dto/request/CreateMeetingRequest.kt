@@ -3,6 +3,7 @@ package org.com.belog.meeting.controller.dto.request
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.Valid
+import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.com.belog.group.domain.Group
@@ -65,11 +66,46 @@ data class CreateMeetingRequest(
 
 data class MeetingScheduleRequest(
     @field:Schema(
-        description = "일정 등록 방식. 현재 확정 날짜 방식만 지원합니다.",
+        description = "일정 등록 방식",
         example = "FIXED",
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val type: MeetingScheduleType,
+    @field:Valid
+    @field:ArraySchema(
+        arraySchema =
+            Schema(
+                description = "일정 범위 목록. FIXED는 1개, POLL은 2~10개를 전달합니다.",
+                requiredMode = Schema.RequiredMode.REQUIRED,
+            ),
+        schema = Schema(implementation = MeetingDateRangeRequest::class),
+        minItems = FIXED_DATE_RANGE_COUNT,
+        maxItems = MAX_DATE_RANGE_COUNT,
+    )
+    @field:Size(
+        min = FIXED_DATE_RANGE_COUNT,
+        max = MAX_DATE_RANGE_COUNT,
+        message = "일정 범위는 1개 이상 ${MAX_DATE_RANGE_COUNT}개 이하여야 합니다.",
+    )
+    val dateRanges: List<MeetingDateRangeRequest>,
+) {
+    @get:AssertTrue(message = "FIXED는 일정 범위 1개, POLL은 2개 이상 10개 이하를 입력해야 합니다.")
+    @get:Schema(hidden = true)
+    val isDateRangeCountValid: Boolean
+        get() =
+            when (type) {
+                MeetingScheduleType.FIXED -> dateRanges.size == FIXED_DATE_RANGE_COUNT
+                MeetingScheduleType.POLL -> dateRanges.size in MIN_POLL_DATE_RANGE_COUNT..MAX_DATE_RANGE_COUNT
+            }
+
+    companion object {
+        private const val FIXED_DATE_RANGE_COUNT = 1
+        private const val MIN_POLL_DATE_RANGE_COUNT = 2
+        private const val MAX_DATE_RANGE_COUNT = 10
+    }
+}
+
+data class MeetingDateRangeRequest(
     @field:Schema(
         description = "일정 시작일",
         example = "2026-10-03",

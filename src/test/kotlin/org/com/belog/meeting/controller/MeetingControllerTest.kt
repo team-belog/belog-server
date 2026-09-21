@@ -74,8 +74,12 @@ class MeetingControllerTest {
                           "participantMemberIds": [22, 23],
                           "schedule": {
                             "type": "FIXED",
-                            "startDate": "2026-10-03",
-                            "endDate": "2026-10-04"
+                            "dateRanges": [
+                              {
+                                "startDate": "2026-10-03",
+                                "endDate": "2026-10-04"
+                              }
+                            ]
                           }
                         }
                         """.trimIndent(),
@@ -103,7 +107,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":" ","schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}""",
+                        """{"name":" ","schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
@@ -121,7 +125,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","participantMemberIds":[$participantIds],"schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}""",
+                        """{"name":"만남","participantMemberIds":[$participantIds],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
@@ -137,10 +141,63 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","schedule":{"type":"POLL","startDate":"2026-10-03","endDate":"2026-10-04"}}""",
+                        """{"name":"만남","schedule":{"type":"POLL","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"},{"startDate":"2026-10-10","endDate":"2026-10-11"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("MEETING-E006"))
+
+        verifyNoInteractions(meetingService)
+    }
+
+    @Test
+    fun `확정 날짜 방식에 일정 범위를 두 개 전달하면 생성을 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups/1/meetings")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "name": "만남",
+                          "schedule": {
+                            "type": "FIXED",
+                            "dateRanges": [
+                              {"startDate": "2026-10-03", "endDate": "2026-10-04"},
+                              {"startDate": "2026-10-10", "endDate": "2026-10-11"}
+                            ]
+                          }
+                        }
+                        """.trimIndent(),
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(meetingService)
+    }
+
+    @Test
+    fun `일정 조율 방식에 후보 일정 범위를 한 개만 전달하면 생성을 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups/1/meetings")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "name": "만남",
+                          "schedule": {
+                            "type": "POLL",
+                            "dateRanges": [
+                              {"startDate": "2026-10-03", "endDate": "2026-10-04"}
+                            ]
+                          }
+                        }
+                        """.trimIndent(),
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(meetingService)
     }
@@ -153,7 +210,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","schedule":{"type":"FIXED","startDate":"2026.10.03","endDate":"2026-10-04"}}""",
+                        """{"name":"만남","schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026.10.03","endDate":"2026-10-04"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E002"))
@@ -181,7 +238,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","schedule":{"type":"FIXED","startDate":"2026-10-04","endDate":"2026-10-03"}}""",
+                        """{"name":"만남","schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-04","endDate":"2026-10-03"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("MEETING-E007"))
@@ -207,7 +264,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}""",
+                        """{"name":"만남","schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}""",
                     ),
             ).andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("GROUP-E013"))
@@ -233,7 +290,7 @@ class MeetingControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"name":"만남","participantMemberIds":[99],"schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}""",
+                        """{"name":"만남","participantMemberIds":[99],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("MEETING-E001"))

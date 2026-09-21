@@ -32,6 +32,7 @@ class MeetingController(
         if (request.schedule.type != MeetingScheduleType.FIXED) {
             throw BusinessException(MeetingErrorCode.UNSUPPORTED_SCHEDULE_TYPE)
         }
+        val dateRange = request.schedule.dateRanges.single()
 
         val createdMeeting =
             meetingService.createFixedMeeting(
@@ -40,8 +41,8 @@ class MeetingController(
                 name = request.name,
                 location = request.location,
                 participantMemberIds = request.participantMemberIds,
-                startDate = request.schedule.startDate,
-                endDate = request.schedule.endDate,
+                startDate = dateRange.startDate,
+                endDate = dateRange.endDate,
             )
 
         return ResponseEntity
