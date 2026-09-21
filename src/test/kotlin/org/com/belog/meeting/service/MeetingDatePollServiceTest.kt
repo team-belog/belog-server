@@ -154,6 +154,58 @@ class MeetingDatePollServiceTest {
     }
 
     @Test
+    fun `조율 현황에서 가능 불가 멤버와 응답 진행률을 계산한다`() {
+        val context = savePollResultsContext()
+        val firstCandidateId = requireNotNull(context.candidates[0].id)
+        val secondCandidateId = requireNotNull(context.candidates[1].id)
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.firstMember.user.id),
+            candidateDateRangeIds = listOf(firstCandidateId, secondCandidateId),
+        )
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.secondMember.user.id),
+            candidateDateRangeIds = listOf(secondCandidateId),
+        )
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.unavailableMember.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val result =
+            meetingDatePollService.getDatePollResults(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.firstMember.user.id),
+            )
+
+        assertEquals(5, result.totalParticipantCount)
+        assertEquals(4, result.respondedParticipantCount)
+        assertEquals(listOf(3, 2, 1), result.candidateDateResults.map { it.availableCount })
+        assertEquals(listOf(1, 2, 3), result.candidateDateResults.map { it.rank })
+
+        val mostAvailableCandidate = result.candidateDateResults.first()
+        assertEquals(secondCandidateId, mostAvailableCandidate.candidateDateRangeId)
+        assertEquals(
+            listOf("생성자", "참여자1", "참여자2"),
+            mostAvailableCandidate.availableMembers.map { it.nickname },
+        )
+        assertEquals(
+            listOf("모두불가"),
+            mostAvailableCandidate.unavailableMembers.map { it.nickname },
+        )
+
+        val leastAvailableCandidate = result.candidateDateResults.last()
+        assertEquals(listOf("생성자"), leastAvailableCandidate.availableMembers.map { it.nickname })
+        assertEquals(
+            listOf("참여자1", "참여자2", "모두불가"),
+            leastAvailableCandidate.unavailableMembers.map { it.nickname },
+        )
+    }
+
+    @Test
     fun `만남 참여자가 아닌 사용자는 후보 일정을 조회할 수 없다`() {
         val context = savePollContext()
         val otherUser = saveCompletedUser("other-subject", "외부인")
@@ -279,6 +331,49 @@ class MeetingDatePollServiceTest {
         return PollContext(group, creator, member, meeting, candidates)
     }
 
+    private fun savePollResultsContext(): PollResultsContext {
+        val group = groupRepository.save(createGroup("RS12LT"))
+        val creator = saveGroupMember(group, "results-creator-subject", "생성자")
+        val firstMember = saveGroupMember(group, "results-member-1-subject", "참여자1")
+        val secondMember = saveGroupMember(group, "results-member-2-subject", "참여자2")
+        val unavailableMember = saveGroupMember(group, "results-unavailable-subject", "모두불가")
+        val unansweredMember = saveGroupMember(group, "results-unanswered-subject", "미응답자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        meetingParticipantRepository.saveAllAndFlush(
+            listOf(creator, firstMember, secondMember, unavailableMember, unansweredMember).map { member ->
+                MeetingParticipant.create(meeting, member)
+            },
+        )
+        val candidates =
+            meetingCandidateDateRangeRepository.saveAllAndFlush(
+                listOf(
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 1),
+                        LocalDate.of(2026, 10, 2),
+                    ),
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 3),
+                        LocalDate.of(2026, 10, 4),
+                    ),
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 5),
+                        LocalDate.of(2026, 10, 6),
+                    ),
+                ),
+            )
+
+        return PollResultsContext(
+            meeting = meeting,
+            firstMember = firstMember,
+            secondMember = secondMember,
+            unavailableMember = unavailableMember,
+            candidates = candidates,
+        )
+    }
+
     private fun createPollMeeting(
         group: Group,
         creator: GroupMember,
@@ -349,6 +444,14 @@ class MeetingDatePollServiceTest {
         val creator: GroupMember,
         val member: GroupMember,
         val meeting: Meeting,
+        val candidates: List<MeetingCandidateDateRange>,
+    )
+
+    data class PollResultsContext(
+        val meeting: Meeting,
+        val firstMember: GroupMember,
+        val secondMember: GroupMember,
+        val unavailableMember: GroupMember,
         val candidates: List<MeetingCandidateDateRange>,
     )
 
