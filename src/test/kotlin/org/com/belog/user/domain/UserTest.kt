@@ -19,6 +19,7 @@ class UserTest {
 
         assertEquals("user@example.com", user.email)
         assertEquals(null, user.nickname)
+        assertEquals(null, user.name)
         assertEquals(null, user.profileImageObjectKey)
         assertEquals(null, user.socialProfileImageUrl)
         assertEquals(null, user.bankAccount)
@@ -63,12 +64,14 @@ class UserTest {
         user.completeOnboarding(
             profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
             nickname = " 빌로그 ",
+            name = " 홍 길동 ",
             bankAccount = bankAccount,
             completedAt = completedAt,
         )
 
         assertEquals("users/1/profile/image.webp", user.profileImageObjectKey)
         assertEquals("빌로그", user.nickname)
+        assertEquals("홍 길동", user.name)
         assertEquals(Bank.KB_KOOKMIN, user.bankAccount?.bank)
         assertEquals("123456789012", user.bankAccount?.accountNumber)
         assertEquals("홍길동", user.bankAccount?.accountHolderName)
@@ -84,6 +87,41 @@ class UserTest {
             user.completeOnboarding(
                 profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
                 nickname = "123456789",
+                name = "홍길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+        assertFalse(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `사용자 이름이 비어 있으면 온보딩을 완료할 수 없다`() {
+        val user = createUser()
+
+        assertFailsWith<IllegalArgumentException> {
+            user.completeOnboarding(
+                profileImageObjectKey = null,
+                nickname = "빌로그",
+                name = " ",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+        assertFalse(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `사용자 이름이 50자를 초과하면 온보딩을 완료할 수 없다`() {
+        val user = createUser()
+
+        assertFailsWith<IllegalArgumentException> {
+            user.completeOnboarding(
+                profileImageObjectKey = null,
+                nickname = "빌로그",
+                name = "가".repeat(51),
                 bankAccount = createBankAccount(),
                 completedAt = Instant.parse("2026-09-15T00:00:00Z"),
             )
@@ -100,6 +138,7 @@ class UserTest {
         user.completeOnboarding(
             profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
             nickname = "빌로그",
+            name = "홍길동",
             bankAccount = createBankAccount(),
             completedAt = completedAt,
         )
@@ -108,6 +147,7 @@ class UserTest {
             user.completeOnboarding(
                 profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/other.webp"),
                 nickname = "새닉네임",
+                name = "김길동",
                 bankAccount = createBankAccount(),
                 completedAt = completedAt.plusSeconds(1),
             )

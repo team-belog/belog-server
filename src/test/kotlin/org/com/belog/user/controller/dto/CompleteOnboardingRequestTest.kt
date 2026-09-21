@@ -37,6 +37,20 @@ class CompleteOnboardingRequestTest {
     }
 
     @Test
+    fun `사용자 이름이 공백뿐이면 검증에 실패한다`() {
+        val request = validRequest().copy(name = " ")
+
+        assertInvalidField(request, "name")
+    }
+
+    @Test
+    fun `사용자 이름이 최대 길이를 초과하면 검증에 실패한다`() {
+        val request = validRequest().copy(name = "가".repeat(51))
+
+        assertInvalidField(request, "name")
+    }
+
+    @Test
     fun `은행 코드가 없으면 검증에 실패한다`() {
         val request = validRequest().copy(bankCode = null)
 
@@ -84,6 +98,7 @@ class CompleteOnboardingRequestTest {
         CompleteOnboardingRequest(
             profileImageObjectKey = "users/1/profile/image.webp",
             nickname = "빌로그",
+            name = "홍길동",
             bankCode = Bank.SHINHAN,
             accountNumber = "110123456789",
             accountHolderName = "홍길동",

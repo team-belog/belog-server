@@ -29,6 +29,7 @@ class UserService(
         userId: Long,
         profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
+        name: String,
         bankAccount: BankAccount,
     ) {
         val user =
@@ -47,6 +48,7 @@ class UserService(
         user.completeOnboarding(
             profileImageObjectKey = profileImageObjectKey,
             nickname = normalizedNickname,
+            name = name,
             bankAccount = bankAccount,
             completedAt = Instant.now(clock),
         )
