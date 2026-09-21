@@ -190,7 +190,7 @@ class MeetingServiceTest {
     }
 
     @Test
-    fun `후보 일정에 과거 날짜나 역전된 날짜 범위가 있으면 일정 조율 만남을 생성할 수 없다`() {
+    fun `후보 일정에 과거 날짜가 있으면 일정 조율 만남을 생성할 수 없다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")
 
@@ -206,21 +206,7 @@ class MeetingServiceTest {
                         ),
                 )
             }
-        val invalidRangeException =
-            assertFailsWith<BusinessException> {
-                createPollMeeting(
-                    group = group,
-                    creator = creator,
-                    candidateDateRanges =
-                        listOf(
-                            MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 22)),
-                            MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 30)),
-                        ),
-                )
-            }
-
         assertEquals(MeetingErrorCode.PAST_MEETING_DATE, pastDateException.errorCode)
-        assertEquals(MeetingErrorCode.INVALID_MEETING_DATE_RANGE, invalidRangeException.errorCode)
         assertEquals(0L, meetingRepository.count())
     }
 

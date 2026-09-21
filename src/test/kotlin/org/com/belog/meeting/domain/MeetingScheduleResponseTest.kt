@@ -122,8 +122,7 @@ class MeetingScheduleResponseTest {
     private fun createCandidateDateRange(meeting: Meeting): MeetingCandidateDateRange =
         MeetingCandidateDateRange.create(
             meeting = meeting,
-            startDate = LocalDate.of(2026, 9, 23),
-            endDate = LocalDate.of(2026, 9, 24),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 24)),
             currentDate = LocalDate.of(2026, 9, 22),
         )
 
@@ -147,8 +146,7 @@ class MeetingScheduleResponseTest {
             creator = creator,
             name = "광주 여행",
             location = null,
-            startDate = LocalDate.of(2026, 9, 23),
-            endDate = LocalDate.of(2026, 9, 24),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 24)),
             confirmedAt = Instant.parse("2026-09-22T00:00:00Z"),
             currentDate = LocalDate.of(2026, 9, 22),
         )

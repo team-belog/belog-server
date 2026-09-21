@@ -48,9 +48,7 @@ class MeetingService(
         if (startDate.isBefore(currentDate)) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE)
         }
-        if (endDate.isBefore(startDate)) {
-            throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
-        }
+        val dateRange = createDateRange(startDate, endDate)
 
         val meeting =
             meetingRepository.save(
@@ -59,8 +57,7 @@ class MeetingService(
                     creator = creator,
                     name = name,
                     location = location,
-                    startDate = startDate,
-                    endDate = endDate,
+                    dateRange = dateRange,
                     confirmedAt = now,
                     currentDate = currentDate,
                 ),
@@ -111,8 +108,7 @@ class MeetingService(
             candidateDateRanges.map { dateRange ->
                 MeetingCandidateDateRange.create(
                     meeting = meeting,
-                    startDate = dateRange.startDate,
-                    endDate = dateRange.endDate,
+                    dateRange = dateRange,
                     currentDate = currentDate,
                 )
             },
@@ -181,10 +177,17 @@ class MeetingService(
         if (candidateDateRanges.any { it.startDate.isBefore(currentDate) }) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE)
         }
-        if (candidateDateRanges.any { it.endDate.isBefore(it.startDate) }) {
+    }
+
+    private fun createDateRange(
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ): MeetingDateRange =
+        try {
+            MeetingDateRange(startDate, endDate)
+        } catch (_: IllegalArgumentException) {
             throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
         }
-    }
 
     private fun saveParticipants(
         meeting: Meeting,

@@ -167,9 +167,6 @@ class Meeting protected constructor(
                 "종료된 만남의 일정은 변경할 수 없습니다."
             }
         }
-        require(!dateRange.endDate.isBefore(dateRange.startDate)) {
-            "종료일은 시작일보다 빠를 수 없습니다."
-        }
         require(!dateRange.endDate.isBefore(currentDate)) {
             "종료된 일정으로 변경할 수 없습니다."
         }
@@ -189,8 +186,7 @@ class Meeting protected constructor(
             creator: GroupMember,
             name: String,
             location: String?,
-            startDate: LocalDate,
-            endDate: LocalDate,
+            dateRange: MeetingDateRange,
             confirmedAt: Instant,
             currentDate: LocalDate,
         ): Meeting {
@@ -198,8 +194,7 @@ class Meeting protected constructor(
 
             val normalizedName = normalizeName(name)
             val normalizedLocation = normalizeLocation(location)
-            require(!startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
-            require(!endDate.isBefore(startDate)) { "종료일은 시작일보다 빠를 수 없습니다." }
+            require(!dateRange.startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
 
             return Meeting(
                 group = group,
@@ -208,8 +203,8 @@ class Meeting protected constructor(
                 location = normalizedLocation,
                 scheduleType = MeetingScheduleType.FIXED,
                 status = MeetingStatus.CONFIRMED,
-                startDate = startDate,
-                endDate = endDate,
+                startDate = dateRange.startDate,
+                endDate = dateRange.endDate,
                 confirmedAt = confirmedAt,
             )
         }

@@ -9,6 +9,7 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.meeting.domain.MeetingScheduleType
@@ -210,8 +211,7 @@ class MeetingRepositoryTest {
             creator = creator,
             name = name,
             location = "서울고속버스터미널",
-            startDate = LocalDate.of(2026, 9, 21),
-            endDate = LocalDate.of(2026, 9, 22),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = LocalDate.of(2026, 9, 20),
         )
@@ -234,8 +234,7 @@ class MeetingRepositoryTest {
     ): MeetingCandidateDateRange =
         MeetingCandidateDateRange.create(
             meeting = meeting,
-            startDate = startDate,
-            endDate = endDate,
+            dateRange = MeetingDateRange(startDate, endDate),
             currentDate = LocalDate.of(2026, 9, 20),
         )
 

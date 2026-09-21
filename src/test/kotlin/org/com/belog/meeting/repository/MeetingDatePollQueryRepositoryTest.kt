@@ -11,6 +11,7 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.user.config.AccountNumberEncryptionConfig
@@ -162,8 +163,7 @@ class MeetingDatePollQueryRepositoryTest {
     ): MeetingCandidateDateRange =
         MeetingCandidateDateRange.create(
             meeting = meeting,
-            startDate = startDate,
-            endDate = startDate.plusDays(1),
+            dateRange = MeetingDateRange(startDate, startDate.plusDays(1)),
             currentDate = LocalDate.of(2026, 9, 22),
         )
 
