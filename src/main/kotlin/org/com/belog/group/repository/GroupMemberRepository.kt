@@ -14,6 +14,11 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         userId: Long,
     ): GroupMember?
 
+    fun findAllByGroupIdAndIdIn(
+        groupId: Long,
+        memberIds: Collection<Long>,
+    ): List<GroupMember>
+
     fun existsByGroupIdAndUserId(
         groupId: Long,
         userId: Long,

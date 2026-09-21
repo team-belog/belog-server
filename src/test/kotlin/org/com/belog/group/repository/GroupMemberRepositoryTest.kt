@@ -69,6 +69,32 @@ class GroupMemberRepositoryTest {
     }
 
     @Test
+    fun `그룹 ID와 멤버 ID 목록에 모두 해당하는 그룹 멤버만 조회한다`() {
+        val ownerUser = saveCompletedUser("owner-subject", "방장")
+        val memberUser = saveCompletedUser("member-subject", "멤버")
+        val otherGroupOwnerUser = saveCompletedUser("other-owner-subject", "다른방장")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val otherGroup = groupRepository.save(createGroup("EF34GH"))
+        val owner = groupMemberRepository.save(GroupMember.createOwner(group, ownerUser))
+        val member = groupMemberRepository.save(GroupMember.createMember(group, memberUser))
+        val otherGroupOwner = groupMemberRepository.save(GroupMember.createOwner(otherGroup, otherGroupOwnerUser))
+        groupMemberRepository.flush()
+
+        val members =
+            groupMemberRepository.findAllByGroupIdAndIdIn(
+                groupId = requireNotNull(group.id),
+                memberIds =
+                    listOf(
+                        requireNotNull(member.id),
+                        requireNotNull(otherGroupOwner.id),
+                    ),
+            )
+
+        assertEquals(listOf(member.id), members.map { groupMember -> groupMember.id })
+        assertTrue(members.none { groupMember -> groupMember.id == owner.id })
+    }
+
+    @Test
     fun `그룹 멤버를 OWNER 우선 가입 순으로 사용자와 함께 조회한다`() {
         val firstMemberUser = saveCompletedUser("first-member-subject", "첫멤버")
         val ownerUser = saveCompletedUser("owner-subject", "방장")
