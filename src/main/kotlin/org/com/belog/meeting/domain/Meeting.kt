@@ -133,15 +133,8 @@ class Meeting protected constructor(
         ): Meeting {
             require(creator.belongsTo(group)) { "만남 생성자는 해당 그룹의 멤버여야 합니다." }
 
-            val normalizedName = name.trim()
-            require(normalizedName.length in NAME_MIN_LENGTH..NAME_MAX_LENGTH) {
-                "만남명은 ${NAME_MIN_LENGTH}자 이상 ${NAME_MAX_LENGTH}자 이하여야 합니다."
-            }
-
-            val normalizedLocation = location?.trim()?.takeIf(String::isNotEmpty)
-            require(normalizedLocation == null || normalizedLocation.length <= LOCATION_MAX_LENGTH) {
-                "만남 장소는 ${LOCATION_MAX_LENGTH}자를 초과할 수 없습니다."
-            }
+            val normalizedName = normalizeName(name)
+            val normalizedLocation = normalizeLocation(location)
             require(!startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
             require(!endDate.isBefore(startDate)) { "종료일은 시작일보다 빠를 수 없습니다." }
 
@@ -156,6 +149,46 @@ class Meeting protected constructor(
                 endDate = endDate,
                 confirmedAt = confirmedAt,
             )
+        }
+
+        fun createPoll(
+            group: Group,
+            creator: GroupMember,
+            name: String,
+            location: String?,
+        ): Meeting {
+            require(creator.belongsTo(group)) { "만남 생성자는 해당 그룹의 멤버여야 합니다." }
+
+            val normalizedName = normalizeName(name)
+            val normalizedLocation = normalizeLocation(location)
+
+            return Meeting(
+                group = group,
+                createdBy = creator,
+                name = normalizedName,
+                location = normalizedLocation,
+                scheduleType = MeetingScheduleType.POLL,
+                status = MeetingStatus.SCHEDULING,
+                startDate = null,
+                endDate = null,
+                confirmedAt = null,
+            )
+        }
+
+        private fun normalizeName(name: String): String {
+            val normalizedName = name.trim()
+            require(normalizedName.length in NAME_MIN_LENGTH..NAME_MAX_LENGTH) {
+                "만남명은 ${NAME_MIN_LENGTH}자 이상 ${NAME_MAX_LENGTH}자 이하여야 합니다."
+            }
+            return normalizedName
+        }
+
+        private fun normalizeLocation(location: String?): String? {
+            val normalizedLocation = location?.trim()?.takeIf(String::isNotEmpty)
+            require(normalizedLocation == null || normalizedLocation.length <= LOCATION_MAX_LENGTH) {
+                "만남 장소는 ${LOCATION_MAX_LENGTH}자를 초과할 수 없습니다."
+            }
+            return normalizedLocation
         }
     }
 }

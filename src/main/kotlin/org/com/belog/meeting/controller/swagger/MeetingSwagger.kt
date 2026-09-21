@@ -39,13 +39,22 @@ interface MeetingSwagger {
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(value = CREATE_MEETING_SUCCESS_EXAMPLE)],
+                        examples = [
+                            ExampleObject(
+                                name = "확정 일정 만남 생성",
+                                value = CREATE_FIXED_MEETING_SUCCESS_EXAMPLE,
+                            ),
+                            ExampleObject(
+                                name = "일정 조율 만남 생성",
+                                value = CREATE_POLL_MEETING_SUCCESS_EXAMPLE,
+                            ),
+                        ],
                     ),
                 ],
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "요청값, 참여자 또는 확정 날짜 검증 실패",
+                description = "요청값, 참여자 또는 일정 범위 검증 실패",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -57,7 +66,7 @@ interface MeetingSwagger {
                             ExampleObject(name = "생성자를 참여자로 지정", value = CREATOR_INCLUDED_EXAMPLE),
                             ExampleObject(name = "과거 날짜", value = PAST_MEETING_DATE_EXAMPLE),
                             ExampleObject(name = "잘못된 일정 범위", value = INVALID_MEETING_DATE_RANGE_EXAMPLE),
-                            ExampleObject(name = "지원하지 않는 일정 방식", value = UNSUPPORTED_SCHEDULE_TYPE_EXAMPLE),
+                            ExampleObject(name = "중복 후보 일정", value = DUPLICATE_CANDIDATE_DATE_RANGE_EXAMPLE),
                         ],
                     ),
                 ],
@@ -100,7 +109,16 @@ interface MeetingSwagger {
                 Content(
                     mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = Schema(implementation = CreateMeetingRequest::class),
-                    examples = [ExampleObject(value = CREATE_MEETING_REQUEST_EXAMPLE)],
+                    examples = [
+                        ExampleObject(
+                            name = "확정 일정 만남",
+                            value = CREATE_FIXED_MEETING_REQUEST_EXAMPLE,
+                        ),
+                        ExampleObject(
+                            name = "일정 조율 만남",
+                            value = CREATE_POLL_MEETING_REQUEST_EXAMPLE,
+                        ),
+                    ],
                 ),
             ],
         )
@@ -110,11 +128,17 @@ interface MeetingSwagger {
     ): ResponseEntity<CommonResponse<CreateMeetingResponse>>
 }
 
-private const val CREATE_MEETING_REQUEST_EXAMPLE =
-    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","startDate":"2026-10-03","endDate":"2026-10-04"}}"""
+private const val CREATE_FIXED_MEETING_REQUEST_EXAMPLE =
+    """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}"""
 
-private const val CREATE_MEETING_SUCCESS_EXAMPLE =
+private const val CREATE_POLL_MEETING_REQUEST_EXAMPLE =
+    """{"name":"가을 여행","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"POLL","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"},{"startDate":"2026-10-10","endDate":"2026-10-11"}]}}"""
+
+private const val CREATE_FIXED_MEETING_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1,"groupId":1,"name":"광주 1박 2일","location":"서울고속버스터미널","scheduleType":"FIXED","status":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","confirmedAt":"2026-09-21T00:00:00Z","participantCount":3}}"""
+
+private const val CREATE_POLL_MEETING_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":2,"groupId":1,"name":"가을 여행","location":"서울고속버스터미널","scheduleType":"POLL","status":"SCHEDULING","startDate":null,"endDate":null,"confirmedAt":null,"participantCount":3}}"""
 
 private const val INVALID_PARTICIPANT_EXAMPLE =
     """{"code":"MEETING-E001","message":"만남 참여자는 해당 그룹의 멤버여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
@@ -131,8 +155,8 @@ private const val PAST_MEETING_DATE_EXAMPLE =
 private const val INVALID_MEETING_DATE_RANGE_EXAMPLE =
     """{"code":"MEETING-E007","message":"만남 종료일은 시작일보다 빠를 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
-private const val UNSUPPORTED_SCHEDULE_TYPE_EXAMPLE =
-    """{"code":"MEETING-E006","message":"지원하지 않는 일정 등록 방식입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+private const val DUPLICATE_CANDIDATE_DATE_RANGE_EXAMPLE =
+    """{"code":"MEETING-E009","message":"중복된 후보 일정 범위가 포함되어 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

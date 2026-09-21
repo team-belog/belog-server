@@ -48,6 +48,81 @@ class MeetingTest {
     }
 
     @Test
+    fun `일정 조율 만남을 생성하면 날짜가 정해지지 않은 조율 중 상태가 된다`() {
+        val group = createGroup("AB12CD")
+        val creator = GroupMember.createMember(group, completedUser("creator-subject", "생성자"))
+
+        val meeting =
+            Meeting.createPoll(
+                group = group,
+                creator = creator,
+                name = "  광주 여행  ",
+                location = "  서울고속버스터미널  ",
+            )
+
+        assertSame(group, meeting.group)
+        assertSame(creator, meeting.createdBy)
+        assertEquals("광주 여행", meeting.name)
+        assertEquals("서울고속버스터미널", meeting.location)
+        assertEquals(MeetingScheduleType.POLL, meeting.scheduleType)
+        assertEquals(MeetingStatus.SCHEDULING, meeting.status)
+        assertNull(meeting.startDate)
+        assertNull(meeting.endDate)
+        assertNull(meeting.confirmedAt)
+    }
+
+    @Test
+    fun `일정 조율 만남에 후보 일정 범위를 생성한다`() {
+        val meeting = createPollMeeting()
+
+        val candidateDateRange =
+            MeetingCandidateDateRange.create(
+                meeting = meeting,
+                startDate = LocalDate.of(2026, 9, 21),
+                endDate = LocalDate.of(2026, 9, 22),
+                currentDate = LocalDate.of(2026, 9, 20),
+            )
+
+        assertSame(meeting, candidateDateRange.meeting)
+        assertEquals(LocalDate.of(2026, 9, 21), candidateDateRange.startDate)
+        assertEquals(LocalDate.of(2026, 9, 22), candidateDateRange.endDate)
+    }
+
+    @Test
+    fun `확정 날짜 만남에는 후보 일정 범위를 생성할 수 없다`() {
+        assertFailsWith<IllegalArgumentException> {
+            MeetingCandidateDateRange.create(
+                meeting = createFixedMeeting(),
+                startDate = LocalDate.of(2026, 9, 21),
+                endDate = LocalDate.of(2026, 9, 22),
+                currentDate = LocalDate.of(2026, 9, 20),
+            )
+        }
+    }
+
+    @Test
+    fun `과거 날짜나 역전된 날짜로 후보 일정 범위를 생성할 수 없다`() {
+        val meeting = createPollMeeting()
+
+        assertFailsWith<IllegalArgumentException> {
+            MeetingCandidateDateRange.create(
+                meeting = meeting,
+                startDate = LocalDate.of(2026, 9, 19),
+                endDate = LocalDate.of(2026, 9, 20),
+                currentDate = LocalDate.of(2026, 9, 20),
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MeetingCandidateDateRange.create(
+                meeting = meeting,
+                startDate = LocalDate.of(2026, 9, 22),
+                endDate = LocalDate.of(2026, 9, 21),
+                currentDate = LocalDate.of(2026, 9, 20),
+            )
+        }
+    }
+
+    @Test
     fun `빈 장소는 장소가 없는 만남으로 정규화한다`() {
         val meeting = createFixedMeeting(location = "   ")
 
@@ -163,6 +238,17 @@ class MeetingTest {
             endDate = endDate,
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = currentDate,
+        )
+
+    private fun createPollMeeting(
+        group: Group = createGroup("AB12CD"),
+        creator: GroupMember = GroupMember.createOwner(group, completedUser("owner-subject", "방장")),
+    ): Meeting =
+        Meeting.createPoll(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = "서울고속버스터미널",
         )
 
     private fun createGroup(inviteCode: String): Group =
