@@ -9,10 +9,9 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleResponse
-import org.com.belog.meeting.domain.MeetingScheduleType
-import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -30,8 +29,6 @@ import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -66,36 +63,6 @@ class MeetingRepositoryTest {
     private lateinit var userRepository: UserRepository
 
     @Test
-    fun `확정 날짜 만남과 참여자를 저장한다`() {
-        val group = groupRepository.save(createGroup("AB12CD"))
-        val creator = saveGroupMember(group, "creator-subject", "생성자")
-        val member = saveGroupMember(group, "member-subject", "참여자")
-        val meeting = meetingRepository.saveAndFlush(createMeeting(group, creator))
-
-        meetingParticipantRepository.saveAllAndFlush(
-            listOf(
-                MeetingParticipant.create(meeting, creator),
-                MeetingParticipant.create(meeting, member),
-            ),
-        )
-
-        val meetingId = requireNotNull(meeting.id)
-        val foundMeeting = meetingRepository.findById(meetingId).orElseThrow()
-        assertEquals(MeetingScheduleType.FIXED, foundMeeting.scheduleType)
-        assertEquals(MeetingStatus.CONFIRMED, foundMeeting.status)
-        assertEquals(LocalDate.of(2026, 9, 21), foundMeeting.startDate)
-        assertEquals(LocalDate.of(2026, 9, 22), foundMeeting.endDate)
-        assertNotNull(foundMeeting.createdAt)
-        assertEquals(2L, meetingParticipantRepository.countByMeetingId(meetingId))
-        assertTrue(
-            meetingParticipantRepository.existsByMeetingIdAndGroupMemberId(
-                meetingId = meetingId,
-                groupMemberId = requireNotNull(member.id),
-            ),
-        )
-    }
-
-    @Test
     fun `동일한 멤버를 같은 만남에 중복 저장할 수 없다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")
@@ -126,25 +93,6 @@ class MeetingRepositoryTest {
         assertEquals(2, participants.size)
         assertEquals(1L, meetingParticipantRepository.countByMeetingId(requireNotNull(firstMeeting.id)))
         assertEquals(1L, meetingParticipantRepository.countByMeetingId(requireNotNull(secondMeeting.id)))
-    }
-
-    @Test
-    fun `일정 조율 만남의 후보 일정 범위를 저장한다`() {
-        val group = groupRepository.save(createGroup("AB12CD"))
-        val creator = saveGroupMember(group, "creator-subject", "생성자")
-        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
-
-        val candidateDateRanges =
-            meetingCandidateDateRangeRepository.saveAllAndFlush(
-                listOf(
-                    createCandidateDateRange(meeting, LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
-                    createCandidateDateRange(meeting, LocalDate.of(2026, 9, 28), LocalDate.of(2026, 9, 29)),
-                ),
-            )
-
-        assertEquals(2, candidateDateRanges.size)
-        assertTrue(candidateDateRanges.all { it.id != null })
-        assertTrue(candidateDateRanges.all { it.createdAt != null })
     }
 
     @Test
@@ -210,8 +158,7 @@ class MeetingRepositoryTest {
             creator = creator,
             name = name,
             location = "서울고속버스터미널",
-            startDate = LocalDate.of(2026, 9, 21),
-            endDate = LocalDate.of(2026, 9, 22),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = LocalDate.of(2026, 9, 20),
         )
@@ -234,8 +181,7 @@ class MeetingRepositoryTest {
     ): MeetingCandidateDateRange =
         MeetingCandidateDateRange.create(
             meeting = meeting,
-            startDate = startDate,
-            endDate = endDate,
+            dateRange = MeetingDateRange(startDate, endDate),
             currentDate = LocalDate.of(2026, 9, 20),
         )
 

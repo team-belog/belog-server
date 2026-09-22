@@ -2,6 +2,7 @@ package org.com.belog.meeting.controller
 
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDatePollService
+import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CandidateDatePollResult
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
@@ -9,7 +10,6 @@ import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -25,12 +25,15 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDate
 
-@WebMvcTest(MeetingDatePollController::class)
+@WebMvcTest(MeetingScheduleController::class)
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
-class MeetingDatePollControllerTest {
+class MeetingScheduleControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var meetingService: MeetingService
 
     @MockitoBean
     private lateinit var meetingDatePollService: MeetingDatePollService
@@ -153,19 +156,23 @@ class MeetingDatePollControllerTest {
     }
 
     @Test
-    fun `후보 일정 ID가 최대 개수를 초과하면 응답을 거절한다`() {
-        val candidateIds = (1L..11L).joinToString(",")
-
+    fun `후보 일정을 최종 일정으로 확정한다`() {
         mockMvc
             .perform(
-                put("/api/v1/meetings/7/date-poll/responses/me")
+                put("/api/v1/meetings/7/confirmed-date")
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"candidateDateRangeIds":[$candidateIds]}"""),
-            ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("CMN-E001"))
+                    .content("""{"candidateDateRangeId":101}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S005"))
+            .andExpect(jsonPath("$.message").value("만남 일정을 확정했습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
 
-        verifyNoInteractions(meetingDatePollService)
+        verify(meetingService).confirmMeetingDate(
+            meetingId = 7L,
+            userId = 15L,
+            candidateDateRangeId = 101L,
+        )
     }
 
     private fun authenticatedUser(): UsernamePasswordAuthenticationToken =

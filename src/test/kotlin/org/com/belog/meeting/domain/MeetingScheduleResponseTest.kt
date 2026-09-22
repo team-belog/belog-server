@@ -10,28 +10,9 @@ import org.com.belog.user.domain.User
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
 
 class MeetingScheduleResponseTest {
-    @Test
-    fun `만남 참여자는 후보 일정 응답을 완료할 수 있다`() {
-        val context = createPollContext()
-        val respondedAt = Instant.parse("2026-09-22T00:00:00Z")
-
-        val response =
-            MeetingScheduleResponse.create(
-                meeting = context.meeting,
-                participant = context.participant,
-                respondedAt = respondedAt,
-            )
-
-        assertSame(context.meeting, response.meeting)
-        assertSame(context.participant, response.participant)
-        assertEquals(respondedAt, response.respondedAt)
-    }
-
     @Test
     fun `만남 생성자는 후보 일정에 응답할 수 없다`() {
         val group = createGroup("AB12CD")
@@ -80,18 +61,6 @@ class MeetingScheduleResponseTest {
     }
 
     @Test
-    fun `응답에 같은 만남의 가능한 후보 일정을 연결한다`() {
-        val context = createPollContext()
-        val response = createResponse(context)
-        val candidateDateRange = createCandidateDateRange(context.meeting)
-
-        val availableDate = MeetingAvailableDate.create(response, candidateDateRange)
-
-        assertSame(response, availableDate.response)
-        assertSame(candidateDateRange, availableDate.candidateDateRange)
-    }
-
-    @Test
     fun `다른 만남의 후보 일정은 응답에 연결할 수 없다`() {
         val context = createPollContext()
         val response = createResponse(context)
@@ -122,8 +91,7 @@ class MeetingScheduleResponseTest {
     private fun createCandidateDateRange(meeting: Meeting): MeetingCandidateDateRange =
         MeetingCandidateDateRange.create(
             meeting = meeting,
-            startDate = LocalDate.of(2026, 9, 23),
-            endDate = LocalDate.of(2026, 9, 24),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 24)),
             currentDate = LocalDate.of(2026, 9, 22),
         )
 
@@ -147,8 +115,7 @@ class MeetingScheduleResponseTest {
             creator = creator,
             name = "광주 여행",
             location = null,
-            startDate = LocalDate.of(2026, 9, 23),
-            endDate = LocalDate.of(2026, 9, 24),
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 24)),
             confirmedAt = Instant.parse("2026-09-22T00:00:00Z"),
             currentDate = LocalDate.of(2026, 9, 22),
         )

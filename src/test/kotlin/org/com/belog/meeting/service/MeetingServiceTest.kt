@@ -9,6 +9,8 @@ import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
@@ -36,6 +38,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -190,7 +193,7 @@ class MeetingServiceTest {
     }
 
     @Test
-    fun `후보 일정에 과거 날짜나 역전된 날짜 범위가 있으면 일정 조율 만남을 생성할 수 없다`() {
+    fun `후보 일정에 과거 날짜가 있으면 일정 조율 만남을 생성할 수 없다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")
 
@@ -206,21 +209,7 @@ class MeetingServiceTest {
                         ),
                 )
             }
-        val invalidRangeException =
-            assertFailsWith<BusinessException> {
-                createPollMeeting(
-                    group = group,
-                    creator = creator,
-                    candidateDateRanges =
-                        listOf(
-                            MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 22)),
-                            MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 30)),
-                        ),
-                )
-            }
-
         assertEquals(MeetingErrorCode.PAST_MEETING_DATE, pastDateException.errorCode)
-        assertEquals(MeetingErrorCode.INVALID_MEETING_DATE_RANGE, invalidRangeException.errorCode)
         assertEquals(0L, meetingRepository.count())
     }
 
@@ -369,6 +358,115 @@ class MeetingServiceTest {
         assertEquals(0L, meetingRepository.count())
     }
 
+    @Test
+    fun `만남 생성자가 후보 일정을 최종 일정으로 확정한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val changed =
+            meetingService.confirmMeetingDate(
+                meetingId = requireNotNull(meeting.id),
+                userId = requireNotNull(creator.user.id),
+                candidateDateRangeId = requireNotNull(candidateDateRange.id),
+            )
+
+        assertTrue(changed)
+        assertEquals(MeetingStatus.CONFIRMED, meeting.status)
+        assertEquals(candidateDateRange.startDate, meeting.startDate)
+        assertEquals(candidateDateRange.endDate, meeting.endDate)
+        assertEquals(FIXED_INSTANT, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `만남 생성자가 확정된 일정을 수정한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                ),
+            )
+        val firstConfirmedAt = meeting.confirmedAt
+
+        val changed =
+            meetingService.updateMeetingDate(
+                meetingId = requireNotNull(meeting.id),
+                userId = requireNotNull(creator.user.id),
+                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+            )
+
+        assertTrue(changed)
+        assertEquals(LocalDate.of(2026, 9, 24), meeting.startDate)
+        assertEquals(LocalDate.of(2026, 9, 25), meeting.endDate)
+        assertEquals(firstConfirmedAt, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `종료된 만남의 일정은 수정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20)),
+                    currentDate = LocalDate.of(2026, 9, 19),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.updateMeetingDate(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(creator.user.id),
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
+    }
+
+    @Test
+    fun `생성자가 아닌 사용자는 후보 일정을 확정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "멤버")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.confirmMeetingDate(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(member.user.id),
+                    candidateDateRangeId = requireNotNull(candidateDateRange.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals(MeetingStatus.SCHEDULING, meeting.status)
+    }
+
     private fun createMeeting(
         group: Group,
         creator: GroupMember,
@@ -401,6 +499,44 @@ class MeetingServiceTest {
             name = "주말 여행 모임",
             coverImageObjectKey = null,
             inviteCode = InviteCode.create(inviteCode),
+        )
+
+    private fun createPollMeeting(
+        group: Group,
+        creator: GroupMember,
+    ): Meeting =
+        Meeting.createPoll(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = null,
+        )
+
+    private fun createFixedMeeting(
+        group: Group,
+        creator: GroupMember,
+        dateRange: MeetingDateRange,
+        currentDate: LocalDate = LocalDate.of(2026, 9, 21),
+    ): Meeting =
+        Meeting.createFixed(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = null,
+            dateRange = dateRange,
+            confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
+            currentDate = currentDate,
+        )
+
+    private fun createCandidateDateRange(
+        meeting: Meeting,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ): MeetingCandidateDateRange =
+        MeetingCandidateDateRange.create(
+            meeting = meeting,
+            dateRange = MeetingDateRange(startDate, endDate),
+            currentDate = LocalDate.of(2026, 9, 21),
         )
 
     private fun saveGroupMember(
@@ -443,7 +579,7 @@ class MeetingServiceTest {
     class FixedClockConfig {
         @Bean
         @Primary
-        fun clock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
     }
 
     companion object {

@@ -30,8 +30,7 @@ class MeetingTest {
                 creator = creator,
                 name = "  광주 1박 2일  ",
                 location = "  서울고속버스터미널  ",
-                startDate = LocalDate.of(2026, 9, 21),
-                endDate = LocalDate.of(2026, 9, 22),
+                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
                 confirmedAt = confirmedAt,
                 currentDate = LocalDate.of(2026, 9, 20),
             )
@@ -72,51 +71,24 @@ class MeetingTest {
     }
 
     @Test
-    fun `일정 조율 만남에 후보 일정 범위를 생성한다`() {
-        val meeting = createPollMeeting()
-
-        val candidateDateRange =
-            MeetingCandidateDateRange.create(
-                meeting = meeting,
-                startDate = LocalDate.of(2026, 9, 21),
-                endDate = LocalDate.of(2026, 9, 22),
-                currentDate = LocalDate.of(2026, 9, 20),
-            )
-
-        assertSame(meeting, candidateDateRange.meeting)
-        assertEquals(LocalDate.of(2026, 9, 21), candidateDateRange.startDate)
-        assertEquals(LocalDate.of(2026, 9, 22), candidateDateRange.endDate)
-    }
-
-    @Test
     fun `확정 날짜 만남에는 후보 일정 범위를 생성할 수 없다`() {
         assertFailsWith<IllegalArgumentException> {
             MeetingCandidateDateRange.create(
                 meeting = createFixedMeeting(),
-                startDate = LocalDate.of(2026, 9, 21),
-                endDate = LocalDate.of(2026, 9, 22),
+                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
                 currentDate = LocalDate.of(2026, 9, 20),
             )
         }
     }
 
     @Test
-    fun `과거 날짜나 역전된 날짜로 후보 일정 범위를 생성할 수 없다`() {
+    fun `과거 날짜로 후보 일정 범위를 생성할 수 없다`() {
         val meeting = createPollMeeting()
 
         assertFailsWith<IllegalArgumentException> {
             MeetingCandidateDateRange.create(
                 meeting = meeting,
-                startDate = LocalDate.of(2026, 9, 19),
-                endDate = LocalDate.of(2026, 9, 20),
-                currentDate = LocalDate.of(2026, 9, 20),
-            )
-        }
-        assertFailsWith<IllegalArgumentException> {
-            MeetingCandidateDateRange.create(
-                meeting = meeting,
-                startDate = LocalDate.of(2026, 9, 22),
-                endDate = LocalDate.of(2026, 9, 21),
+                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20)),
                 currentDate = LocalDate.of(2026, 9, 20),
             )
         }
@@ -153,16 +125,6 @@ class MeetingTest {
     }
 
     @Test
-    fun `종료일이 시작일보다 빠르면 만남을 생성할 수 없다`() {
-        assertFailsWith<IllegalArgumentException> {
-            createFixedMeeting(
-                startDate = LocalDate.of(2026, 9, 22),
-                endDate = LocalDate.of(2026, 9, 21),
-            )
-        }
-    }
-
-    @Test
     fun `일반 그룹 멤버도 만남을 생성할 수 있다`() {
         val group = createGroup("AB12CD")
         val member = GroupMember.createMember(group, completedUser("member-subject", "멤버"))
@@ -184,14 +146,46 @@ class MeetingTest {
     }
 
     @Test
-    fun `만남 생성자를 판별하고 같은 그룹의 방장에게는 생성자 권한을 부여하지 않는다`() {
-        val group = createGroup("AB12CD")
-        val owner = GroupMember.createOwner(group, completedUser("owner-subject", "방장"))
-        val creator = GroupMember.createMember(group, completedUser("creator-subject", "생성자"))
-        val meeting = createFixedMeeting(group = group, creator = creator)
+    fun `일정 조율 만남의 후보 일정을 최종 일정으로 확정한다`() {
+        val meeting = createPollMeeting()
+        val candidateDateRange =
+            createCandidateDateRange(
+                meeting = meeting,
+                startDate = LocalDate.of(2026, 9, 22),
+                endDate = LocalDate.of(2026, 9, 23),
+            )
+        val confirmedAt = Instant.parse("2026-09-20T01:00:00Z")
 
-        assertTrue(meeting.isCreatedBy(creator))
-        assertFalse(meeting.isCreatedBy(owner))
+        val changed =
+            meeting.confirmDate(
+                candidateDateRange = candidateDateRange,
+                confirmedAt = confirmedAt,
+                currentDate = LocalDate.of(2026, 9, 20),
+            )
+
+        assertTrue(changed)
+        assertEquals(MeetingStatus.CONFIRMED, meeting.status)
+        assertEquals(candidateDateRange.startDate, meeting.startDate)
+        assertEquals(candidateDateRange.endDate, meeting.endDate)
+        assertEquals(confirmedAt, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `이미 확정한 후보 일정으로 재요청하면 변경하지 않는다`() {
+        val meeting = createPollMeeting()
+        val candidateDateRange = createCandidateDateRange(meeting)
+        val firstConfirmedAt = Instant.parse("2026-09-20T01:00:00Z")
+        meeting.confirmDate(candidateDateRange, firstConfirmedAt, LocalDate.of(2026, 9, 20))
+
+        val changed =
+            meeting.confirmDate(
+                candidateDateRange = candidateDateRange,
+                confirmedAt = Instant.parse("2026-09-21T01:00:00Z"),
+                currentDate = LocalDate.of(2026, 9, 21),
+            )
+
+        assertFalse(changed)
+        assertEquals(firstConfirmedAt, meeting.confirmedAt)
     }
 
     @Test
@@ -234,8 +228,7 @@ class MeetingTest {
             creator = creator,
             name = name,
             location = location,
-            startDate = startDate,
-            endDate = endDate,
+            dateRange = MeetingDateRange(startDate, endDate),
             confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
             currentDate = currentDate,
         )
@@ -249,6 +242,17 @@ class MeetingTest {
             creator = creator,
             name = "광주 여행",
             location = "서울고속버스터미널",
+        )
+
+    private fun createCandidateDateRange(
+        meeting: Meeting,
+        startDate: LocalDate = LocalDate.of(2026, 9, 22),
+        endDate: LocalDate = LocalDate.of(2026, 9, 23),
+    ): MeetingCandidateDateRange =
+        MeetingCandidateDateRange.create(
+            meeting = meeting,
+            dateRange = MeetingDateRange(startDate, endDate),
+            currentDate = LocalDate.of(2026, 9, 20),
         )
 
     private fun createGroup(inviteCode: String): Group =

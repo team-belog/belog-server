@@ -2,7 +2,9 @@ package org.com.belog.meeting.controller
 
 import jakarta.validation.Valid
 import org.com.belog.global.annotation.LoginUserId
+import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
+import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
@@ -66,8 +68,12 @@ class MeetingController(
     }
 
     private fun MeetingDateRangeRequest.toDomain(): MeetingDateRange =
-        MeetingDateRange(
-            startDate = startDate,
-            endDate = endDate,
-        )
+        try {
+            MeetingDateRange(
+                startDate = startDate,
+                endDate = endDate,
+            )
+        } catch (_: IllegalArgumentException) {
+            throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
+        }
 }

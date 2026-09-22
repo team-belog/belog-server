@@ -58,8 +58,7 @@ class MeetingCandidateDateRange protected constructor(
 
         fun create(
             meeting: Meeting,
-            startDate: LocalDate,
-            endDate: LocalDate,
+            dateRange: MeetingDateRange,
             currentDate: LocalDate,
         ): MeetingCandidateDateRange {
             require(meeting.scheduleType == MeetingScheduleType.POLL) {
@@ -68,17 +67,14 @@ class MeetingCandidateDateRange protected constructor(
             require(meeting.status == MeetingStatus.SCHEDULING) {
                 "일정 조율 중인 만남에만 후보 일정 범위를 등록할 수 있습니다."
             }
-            require(!startDate.isBefore(currentDate)) {
+            require(!dateRange.startDate.isBefore(currentDate)) {
                 "과거 날짜를 후보 일정 범위로 등록할 수 없습니다."
-            }
-            require(!endDate.isBefore(startDate)) {
-                "종료일은 시작일보다 빠를 수 없습니다."
             }
 
             return MeetingCandidateDateRange(
                 meeting = meeting,
-                startDate = startDate,
-                endDate = endDate,
+                startDate = dateRange.startDate,
+                endDate = dateRange.endDate,
             )
         }
     }

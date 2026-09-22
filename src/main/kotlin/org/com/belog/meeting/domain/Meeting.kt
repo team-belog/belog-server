@@ -116,6 +116,66 @@ class Meeting protected constructor(
         return creatorId != null && groupMemberId != null && creatorId == groupMemberId
     }
 
+    fun confirmDate(
+        candidateDateRange: MeetingCandidateDateRange,
+        confirmedAt: Instant,
+        currentDate: LocalDate,
+    ): Boolean {
+        require(scheduleType == MeetingScheduleType.POLL) {
+            "일정 조율 방식의 만남만 후보 일정을 확정할 수 있습니다."
+        }
+        require(candidateDateRange.belongsTo(this)) {
+            "해당 만남에 등록된 후보 일정만 확정할 수 있습니다."
+        }
+
+        if (
+            status == MeetingStatus.CONFIRMED &&
+            startDate == candidateDateRange.startDate &&
+            endDate == candidateDateRange.endDate
+        ) {
+            return false
+        }
+
+        require(status == MeetingStatus.SCHEDULING) {
+            "일정 조율 중인 만남만 후보 일정을 확정할 수 있습니다."
+        }
+        require(!candidateDateRange.startDate.isBefore(currentDate)) {
+            "과거 날짜를 만남 일정으로 확정할 수 없습니다."
+        }
+
+        status = MeetingStatus.CONFIRMED
+        startDate = candidateDateRange.startDate
+        endDate = candidateDateRange.endDate
+        this.confirmedAt = confirmedAt
+        return true
+    }
+
+    fun changeConfirmedDate(
+        dateRange: MeetingDateRange,
+        currentDate: LocalDate,
+    ): Boolean {
+        require(status == MeetingStatus.CONFIRMED) {
+            "확정된 만남의 일정만 변경할 수 있습니다."
+        }
+
+        if (startDate == dateRange.startDate && endDate == dateRange.endDate) {
+            return false
+        }
+
+        requireNotNull(endDate).let { currentEndDate ->
+            require(!currentEndDate.isBefore(currentDate)) {
+                "종료된 만남의 일정은 변경할 수 없습니다."
+            }
+        }
+        require(!dateRange.endDate.isBefore(currentDate)) {
+            "종료된 일정으로 변경할 수 없습니다."
+        }
+
+        startDate = dateRange.startDate
+        endDate = dateRange.endDate
+        return true
+    }
+
     companion object {
         const val NAME_MIN_LENGTH = MEETING_NAME_MIN_LENGTH
         const val NAME_MAX_LENGTH = MEETING_NAME_MAX_LENGTH
@@ -126,8 +186,7 @@ class Meeting protected constructor(
             creator: GroupMember,
             name: String,
             location: String?,
-            startDate: LocalDate,
-            endDate: LocalDate,
+            dateRange: MeetingDateRange,
             confirmedAt: Instant,
             currentDate: LocalDate,
         ): Meeting {
@@ -135,8 +194,7 @@ class Meeting protected constructor(
 
             val normalizedName = normalizeName(name)
             val normalizedLocation = normalizeLocation(location)
-            require(!startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
-            require(!endDate.isBefore(startDate)) { "종료일은 시작일보다 빠를 수 없습니다." }
+            require(!dateRange.startDate.isBefore(currentDate)) { "과거 날짜로 만남을 생성할 수 없습니다." }
 
             return Meeting(
                 group = group,
@@ -145,8 +203,8 @@ class Meeting protected constructor(
                 location = normalizedLocation,
                 scheduleType = MeetingScheduleType.FIXED,
                 status = MeetingStatus.CONFIRMED,
-                startDate = startDate,
-                endDate = endDate,
+                startDate = dateRange.startDate,
+                endDate = dateRange.endDate,
                 confirmedAt = confirmedAt,
             )
         }
