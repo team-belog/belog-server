@@ -1,9 +1,11 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
-import org.com.belog.meeting.domain.MeetingParticipant
-import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
@@ -17,7 +19,7 @@ import java.time.LocalDate
 @Service
 class PlanService(
     private val meetingRepository: MeetingRepository,
-    private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
     private val clock: Clock,
 ) {
@@ -29,13 +31,14 @@ class PlanService(
         title: String,
         url: String,
     ): Plan {
-        val creator = findCreator(meetingId, creatorUserId)
+        val meeting = findMeeting(meetingId)
+        val creator = findCreator(meeting, creatorUserId)
         val currentDate = LocalDate.now(clock)
-        validateMeetingNotEnded(creator, currentDate)
+        validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
             Plan.createLink(
-                meeting = creator.meeting,
+                meeting = meeting,
                 creator = creator,
                 category = category,
                 title = title,
@@ -53,13 +56,14 @@ class PlanService(
         title: String,
         content: String,
     ): Plan {
-        val creator = findCreator(meetingId, creatorUserId)
+        val meeting = findMeeting(meetingId)
+        val creator = findCreator(meeting, creatorUserId)
         val currentDate = LocalDate.now(clock)
-        validateMeetingNotEnded(creator, currentDate)
+        validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
             Plan.createMemo(
-                meeting = creator.meeting,
+                meeting = meeting,
                 creator = creator,
                 category = category,
                 title = title,
@@ -69,25 +73,25 @@ class PlanService(
         }
     }
 
-    private fun findCreator(
-        meetingId: Long,
-        creatorUserId: Long,
-    ): MeetingParticipant =
-        meetingParticipantRepository.findByMeetingIdAndGroupMemberUserId(meetingId, creatorUserId)
-            ?: throwCreatorLookupException(meetingId)
-
-    private fun throwCreatorLookupException(meetingId: Long): Nothing {
-        if (!meetingRepository.existsById(meetingId)) {
-            throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+    private fun findMeeting(meetingId: Long): Meeting =
+        meetingRepository.findById(meetingId).orElseThrow {
+            BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         }
-        throw BusinessException(MeetingErrorCode.NOT_MEETING_PARTICIPANT)
+
+    private fun findCreator(
+        meeting: Meeting,
+        creatorUserId: Long,
+    ): GroupMember {
+        val groupId = checkNotNull(meeting.group.id) { "계획 대상 만남의 그룹 ID가 없습니다." }
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)
+            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
     private fun validateMeetingNotEnded(
-        creator: MeetingParticipant,
+        meeting: Meeting,
         currentDate: LocalDate,
     ) {
-        if (creator.meeting.endDate?.isBefore(currentDate) == true) {
+        if (meeting.endDate?.isBefore(currentDate) == true) {
             throw BusinessException(PreLogErrorCode.MEETING_ALREADY_ENDED)
         }
     }

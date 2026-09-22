@@ -25,7 +25,7 @@ interface PlanSwagger {
     @Operation(
         summary = "Pre-log 계획 생성",
         description =
-            "만남 참여자가 링크 또는 메모 계획을 생성합니다. " +
+            "해당 만남이 속한 그룹의 멤버가 링크 또는 메모 계획을 생성합니다. " +
                 "LINK는 url만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
     )
     @ApiResponses(
@@ -61,12 +61,12 @@ interface PlanSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "만남 참여자가 아님",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_MEETING_PARTICIPANT_EXAMPLE)],
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
                     ),
                 ],
             ),
@@ -127,16 +127,16 @@ private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
 
 private const val CREATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorParticipantId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place","content":null}}"""
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place","content":null}}"""
 
 private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorParticipantId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
 
 private const val INVALID_PLAN_EXAMPLE =
     """{"code":"PRE_LOG-E001","message":"계획 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
-private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
-    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+private const val NOT_GROUP_MEMBER_EXAMPLE =
+    """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
