@@ -24,8 +24,6 @@ data class PreLogMainResponse(
     val endDate: LocalDate?,
     @field:Schema(description = "장소. 미등록 시 null", example = "광주광역시 000 000", nullable = true)
     val location: String?,
-    @field:Schema(description = "만남 시작일까지 남은 일수. 일정 미확정 시 null", example = "10", nullable = true)
-    val daysUntilStart: Long?,
     @field:Schema(description = "만남 종료 여부", example = "false")
     @get:JsonProperty("isEnded")
     val isEnded: Boolean,
@@ -43,7 +41,6 @@ data class PreLogMainResponse(
                 startDate = result.startDate,
                 endDate = result.endDate,
                 location = result.location,
-                daysUntilStart = result.daysUntilStart,
                 isEnded = result.isEnded,
                 canEditMeeting = result.canEditMeeting,
             )

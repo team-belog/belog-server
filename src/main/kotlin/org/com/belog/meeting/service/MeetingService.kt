@@ -1,6 +1,7 @@
 package org.com.belog.meeting.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
@@ -45,7 +46,7 @@ class MeetingService(
         val creator = findCreator(groupId, creatorUserId)
         val participants = findParticipants(groupId, creator, participantMemberIds)
         val now = Instant.now(clock)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
 
         if (startDate.isBefore(currentDate)) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE)
@@ -92,7 +93,7 @@ class MeetingService(
     ): CreatedMeeting {
         val creator = findCreator(groupId, creatorUserId)
         val participants = findParticipants(groupId, creator, participantMemberIds)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         validateCandidateDateRanges(candidateDateRanges, currentDate)
 
         val meeting =
@@ -159,7 +160,7 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
         }
 
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         if (candidateDateRange.startDate.isBefore(currentDate)) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
         }
@@ -186,9 +187,8 @@ class MeetingService(
             return false
         }
 
-        val currentDate = LocalDate.now(clock)
-        val currentEndDate = checkNotNull(meeting.endDate) { "확정된 만남의 종료일이 없습니다." }
-        if (currentEndDate.isBefore(currentDate)) {
+        val currentDate = clock.currentBusinessDate()
+        if (meeting.isEnded(currentDate)) {
             throw BusinessException(MeetingErrorCode.MEETING_ALREADY_ENDED)
         }
         if (dateRange.endDate.isBefore(currentDate)) {

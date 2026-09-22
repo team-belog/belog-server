@@ -173,9 +173,11 @@ class PlanServiceTest {
     private fun meetingContext(endDate: LocalDate = LocalDate.of(2026, 9, 23)): MeetingContext {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
+        val currentDate = LocalDate.of(2026, 9, 22)
         `when`(group.id).thenReturn(3L)
         `when`(meeting.group).thenReturn(group)
         `when`(meeting.endDate).thenReturn(endDate)
+        `when`(meeting.isEnded(currentDate)).thenReturn(endDate.isBefore(currentDate))
         return MeetingContext(group, meeting)
     }
 

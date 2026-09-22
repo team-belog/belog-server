@@ -287,4 +287,4 @@ private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
 
 private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","daysUntilStart":10,"isEnded":false,"canEditMeeting":true}}"""
+    """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""

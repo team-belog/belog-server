@@ -1,6 +1,7 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
@@ -9,8 +10,6 @@ import org.com.belog.prelog.service.result.PreLogMainResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
-import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 @Service
 class PreLogService(
@@ -30,7 +29,7 @@ class PreLogService(
         val groupMember =
             groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
 
         return PreLogMainResult(
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
@@ -41,11 +40,8 @@ class PreLogService(
             startDate = meeting.startDate,
             endDate = meeting.endDate,
             location = meeting.location,
-            daysUntilStart = meeting.startDate?.daysUntil(currentDate),
-            isEnded = meeting.endDate?.isBefore(currentDate) == true,
+            isEnded = meeting.isEnded(currentDate),
             canEditMeeting = meeting.isCreatedBy(groupMember),
         )
     }
-
-    private fun LocalDate.daysUntil(currentDate: LocalDate): Long = ChronoUnit.DAYS.between(currentDate, this).coerceAtLeast(0)
 }

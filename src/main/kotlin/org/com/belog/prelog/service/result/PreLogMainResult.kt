@@ -12,7 +12,6 @@ data class PreLogMainResult(
     val startDate: LocalDate?,
     val endDate: LocalDate?,
     val location: String?,
-    val daysUntilStart: Long?,
     val isEnded: Boolean,
     val canEditMeeting: Boolean,
 )

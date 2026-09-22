@@ -1,6 +1,7 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.GroupRole
@@ -81,7 +82,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
@@ -106,7 +107,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
@@ -139,7 +140,7 @@ class PlanService(
         meeting: Meeting,
         currentDate: LocalDate,
     ) {
-        if (meeting.endDate?.isBefore(currentDate) == true) {
+        if (meeting.isEnded(currentDate)) {
             throw BusinessException(PreLogErrorCode.MEETING_ALREADY_ENDED)
         }
     }
