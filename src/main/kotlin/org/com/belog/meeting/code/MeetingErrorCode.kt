@@ -25,4 +25,9 @@ enum class MeetingErrorCode(
     DATE_POLL_ALREADY_RESPONDED(HttpStatus.CONFLICT, "MEETING-E015", "후보 일정 응답을 이미 완료했습니다."),
     DUPLICATE_AVAILABLE_DATE(HttpStatus.BAD_REQUEST, "MEETING-E016", "중복된 후보 일정이 선택되었습니다."),
     INVALID_AVAILABLE_DATE(HttpStatus.BAD_REQUEST, "MEETING-E017", "해당 만남의 후보 일정이 아닙니다."),
+    NOT_MEETING_CREATOR(HttpStatus.FORBIDDEN, "MEETING-E018", "만남 생성자만 일정을 관리할 수 있습니다."),
+    MEETING_ALREADY_ENDED(HttpStatus.CONFLICT, "MEETING-E019", "종료된 만남의 일정은 변경할 수 없습니다."),
+    MEETING_DATE_NOT_SCHEDULING(HttpStatus.CONFLICT, "MEETING-E020", "일정 조율 중인 만남만 확정할 수 있습니다."),
+    MEETING_DATE_NOT_CONFIRMED(HttpStatus.CONFLICT, "MEETING-E021", "확정된 만남의 일정만 변경할 수 있습니다."),
+    PAST_MEETING_DATE_SELECTION(HttpStatus.BAD_REQUEST, "MEETING-E022", "과거 날짜를 만남 일정으로 지정할 수 없습니다."),
 }

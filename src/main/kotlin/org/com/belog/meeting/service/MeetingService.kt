@@ -11,6 +11,8 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.MeetingScheduleType
+import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
@@ -126,6 +128,90 @@ class MeetingService(
             confirmedAt = null,
             participantCount = participants.size + CREATOR_COUNT,
         )
+    }
+
+    @Transactional
+    fun confirmMeetingDate(
+        meetingId: Long,
+        userId: Long,
+        candidateDateRangeId: Long,
+    ): Boolean {
+        val meeting = findMeetingForUpdate(meetingId)
+        validateScheduleManager(meeting, userId)
+        if (meeting.scheduleType != MeetingScheduleType.POLL) {
+            throw BusinessException(MeetingErrorCode.NOT_DATE_POLL_MEETING)
+        }
+
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.findByMeetingIdAndId(
+                meetingId = meetingId,
+                candidateDateRangeId = candidateDateRangeId,
+            ) ?: throw BusinessException(MeetingErrorCode.INVALID_AVAILABLE_DATE)
+
+        if (
+            meeting.status == MeetingStatus.CONFIRMED &&
+            meeting.startDate == candidateDateRange.startDate &&
+            meeting.endDate == candidateDateRange.endDate
+        ) {
+            return false
+        }
+        if (meeting.status != MeetingStatus.SCHEDULING) {
+            throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
+        }
+
+        val currentDate = LocalDate.now(clock)
+        if (candidateDateRange.startDate.isBefore(currentDate)) {
+            throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
+        }
+
+        return meeting.confirmDate(
+            candidateDateRange = candidateDateRange,
+            confirmedAt = Instant.now(clock),
+            currentDate = currentDate,
+        )
+    }
+
+    @Transactional
+    fun updateMeetingDate(
+        meetingId: Long,
+        userId: Long,
+        dateRange: MeetingDateRange,
+    ): Boolean {
+        val meeting = findMeetingForUpdate(meetingId)
+        validateScheduleManager(meeting, userId)
+        if (meeting.status != MeetingStatus.CONFIRMED) {
+            throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_CONFIRMED)
+        }
+        if (meeting.startDate == dateRange.startDate && meeting.endDate == dateRange.endDate) {
+            return false
+        }
+
+        val currentDate = LocalDate.now(clock)
+        val currentEndDate = checkNotNull(meeting.endDate) { "확정된 만남의 종료일이 없습니다." }
+        if (currentEndDate.isBefore(currentDate)) {
+            throw BusinessException(MeetingErrorCode.MEETING_ALREADY_ENDED)
+        }
+        if (dateRange.endDate.isBefore(currentDate)) {
+            throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
+        }
+
+        return meeting.changeConfirmedDate(
+            dateRange = dateRange,
+            currentDate = currentDate,
+        )
+    }
+
+    private fun findMeetingForUpdate(meetingId: Long): Meeting =
+        meetingRepository.findByIdForUpdate(meetingId)
+            ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+
+    private fun validateScheduleManager(
+        meeting: Meeting,
+        userId: Long,
+    ) {
+        if (meeting.createdBy.user.id != userId) {
+            throw BusinessException(MeetingErrorCode.NOT_MEETING_CREATOR)
+        }
     }
 
     private fun findCreator(

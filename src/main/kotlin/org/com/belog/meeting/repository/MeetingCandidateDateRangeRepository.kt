@@ -22,4 +22,9 @@ interface MeetingCandidateDateRangeRepository : JpaRepository<MeetingCandidateDa
         meetingId: Long,
         candidateDateRangeIds: Collection<Long>,
     ): List<MeetingCandidateDateRange>
+
+    fun findByMeetingIdAndId(
+        meetingId: Long,
+        candidateDateRangeId: Long,
+    ): MeetingCandidateDateRange?
 }
