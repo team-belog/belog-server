@@ -83,7 +83,8 @@ class UserControllerTest {
         assertEquals(1L, invocation.arguments[0])
         assertEquals("users/1/profile/image-key", invocation.arguments[1])
         assertEquals("빌로그", invocation.arguments[2])
-        val bankAccount = invocation.arguments[3] as BankAccount
+        assertEquals("홍길동", invocation.arguments[3])
+        val bankAccount = invocation.arguments[4] as BankAccount
         assertEquals(Bank.SHINHAN, bankAccount.bank)
         assertEquals("110123456789", bankAccount.accountNumber)
         assertEquals("홍길동", bankAccount.accountHolderName)
@@ -97,7 +98,7 @@ class UserControllerTest {
                     .principal(authenticatedUser(1L))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
+                        """{"nickname":"빌로그","name":"홍길동","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
                     ),
             ).andExpect(status().isOk)
 
@@ -106,6 +107,22 @@ class UserControllerTest {
                 invocation.method.name.startsWith("completeOnboarding")
             }
         assertEquals(null, invocation.arguments[1])
+    }
+
+    @Test
+    fun `사용자 이름이 누락된 온보딩 요청은 400 응답을 반환한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/users/me/onboarding")
+                    .principal(authenticatedUser(1L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E002"))
+
+        verifyNoInteractions(userService)
     }
 
     @Test
@@ -219,5 +236,5 @@ class UserControllerTest {
         )
 
     private fun validOnboardingRequest(profileImageObjectKey: String): String =
-        """{"profileImageObjectKey":"$profileImageObjectKey","nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
+        """{"profileImageObjectKey":"$profileImageObjectKey","nickname":"빌로그","name":"홍길동","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 }

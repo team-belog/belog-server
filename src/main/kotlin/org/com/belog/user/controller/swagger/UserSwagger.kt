@@ -211,10 +211,10 @@ private const val PROFILE_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE =
     """{"code":"USER-S001","message":"프로필 이미지 업로드 URL이 발급되었습니다.","data":{"objectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","uploadUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp?...","method":"PUT","requiredHeaders":{"Content-Type":"image/webp","Content-Length":"524288"},"expiresAt":"2026-09-14T14:05:00Z"}}"""
 
 private const val ONBOARDING_WITH_GOOGLE_IMAGE_REQUEST_EXAMPLE =
-    """{"nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
+    """{"nickname":"빌로그","name":"홍길동","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 
 private const val ONBOARDING_WITH_CUSTOM_IMAGE_REQUEST_EXAMPLE =
-    """{"profileImageObjectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","nickname":"빌로그","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
+    """{"profileImageObjectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","nickname":"빌로그","name":"홍길동","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 
 private const val INVALID_NICKNAME_LENGTH_EXAMPLE =
     """{"code":"CMN-E001","message":"요청값이 올바르지 않습니다.","data":{"fieldErrors":[{"field":"nickname","reason":"닉네임은 1자 이상 8자 이하여야 합니다."}],"timestamp":"2026-09-13T00:00:00Z"}}"""

@@ -288,6 +288,7 @@ class MeetingRepositoryTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = nickname,
+            name = "홍길동",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,

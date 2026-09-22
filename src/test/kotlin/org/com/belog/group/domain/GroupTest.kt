@@ -71,6 +71,7 @@ class GroupTest {
                 completeOnboarding(
                     profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
                     nickname = "빌로그",
+                    name = "홍길동",
                     bankAccount =
                         BankAccount.create(
                             bank = Bank.KB_KOOKMIN,

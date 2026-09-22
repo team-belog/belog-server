@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
@@ -136,6 +137,7 @@ class UserServiceTest {
             userId = userId,
             profileImageObjectKey = null,
             nickname = "belog",
+            name = " 홍 길동 ",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
@@ -146,7 +148,18 @@ class UserServiceTest {
 
         val user = userRepository.findById(userId).orElseThrow()
         assertEquals(null, user.profileImageObjectKey)
+        assertEquals("홍 길동", user.name)
         assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `온보딩 완료 사용자의 이름을 null로 변경할 수 없다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "belog")
+
+        assertFailsWith<DataAccessException> {
+            jdbcTemplate.update("UPDATE users SET name = NULL WHERE id = ?", userId)
+        }
     }
 
     @Test
@@ -265,6 +278,7 @@ class UserServiceTest {
             userId = userId,
             profileImageObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp"),
             nickname = nickname,
+            name = "홍길동",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
