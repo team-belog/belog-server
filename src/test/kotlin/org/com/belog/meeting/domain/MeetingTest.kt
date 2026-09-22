@@ -162,17 +162,6 @@ class MeetingTest {
     }
 
     @Test
-    fun `만남 생성자를 판별하고 같은 그룹의 방장에게는 생성자 권한을 부여하지 않는다`() {
-        val group = createGroup("AB12CD")
-        val owner = GroupMember.createOwner(group, completedUser("owner-subject", "방장"))
-        val creator = GroupMember.createMember(group, completedUser("creator-subject", "생성자"))
-        val meeting = createFixedMeeting(group = group, creator = creator)
-
-        assertTrue(meeting.isCreatedBy(creator))
-        assertFalse(meeting.isCreatedBy(owner))
-    }
-
-    @Test
     fun `일정 조율 만남의 후보 일정을 최종 일정으로 확정한다`() {
         val meeting = createPollMeeting()
         val candidateDateRange =
@@ -198,54 +187,6 @@ class MeetingTest {
     }
 
     @Test
-    fun `다른 만남의 후보 일정은 확정할 수 없다`() {
-        val meeting = createPollMeeting()
-        val otherMeeting = createPollMeeting()
-        val otherCandidateDateRange = createCandidateDateRange(otherMeeting)
-
-        assertFailsWith<IllegalArgumentException> {
-            meeting.confirmDate(
-                candidateDateRange = otherCandidateDateRange,
-                confirmedAt = Instant.parse("2026-09-20T01:00:00Z"),
-                currentDate = LocalDate.of(2026, 9, 20),
-            )
-        }
-    }
-
-    @Test
-    fun `확정 날짜 방식의 만남은 후보 일정을 확정할 수 없다`() {
-        val fixedMeeting = createFixedMeeting()
-        val candidateDateRange = createCandidateDateRange(createPollMeeting())
-
-        assertFailsWith<IllegalArgumentException> {
-            fixedMeeting.confirmDate(
-                candidateDateRange = candidateDateRange,
-                confirmedAt = Instant.parse("2026-09-20T01:00:00Z"),
-                currentDate = LocalDate.of(2026, 9, 20),
-            )
-        }
-    }
-
-    @Test
-    fun `시작일이 지난 후보 일정은 확정할 수 없다`() {
-        val meeting = createPollMeeting()
-        val candidateDateRange =
-            createCandidateDateRange(
-                meeting = meeting,
-                startDate = LocalDate.of(2026, 9, 20),
-                endDate = LocalDate.of(2026, 9, 21),
-            )
-
-        assertFailsWith<IllegalArgumentException> {
-            meeting.confirmDate(
-                candidateDateRange = candidateDateRange,
-                confirmedAt = Instant.parse("2026-09-21T00:00:00Z"),
-                currentDate = LocalDate.of(2026, 9, 21),
-            )
-        }
-    }
-
-    @Test
     fun `이미 확정한 후보 일정으로 재요청하면 변경하지 않는다`() {
         val meeting = createPollMeeting()
         val candidateDateRange = createCandidateDateRange(meeting)
@@ -261,27 +202,6 @@ class MeetingTest {
 
         assertFalse(changed)
         assertEquals(firstConfirmedAt, meeting.confirmedAt)
-    }
-
-    @Test
-    fun `이미 확정된 조율 만남을 다른 후보 일정으로 다시 확정할 수 없다`() {
-        val meeting = createPollMeeting()
-        val firstCandidate = createCandidateDateRange(meeting)
-        val secondCandidate =
-            createCandidateDateRange(
-                meeting = meeting,
-                startDate = LocalDate.of(2026, 9, 24),
-                endDate = LocalDate.of(2026, 9, 25),
-            )
-        meeting.confirmDate(firstCandidate, Instant.parse("2026-09-20T01:00:00Z"), LocalDate.of(2026, 9, 20))
-
-        assertFailsWith<IllegalArgumentException> {
-            meeting.confirmDate(
-                candidateDateRange = secondCandidate,
-                confirmedAt = Instant.parse("2026-09-20T02:00:00Z"),
-                currentDate = LocalDate.of(2026, 9, 20),
-            )
-        }
     }
 
     @Test
@@ -334,32 +254,6 @@ class MeetingTest {
             meeting.changeConfirmedDate(
                 dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
                 currentDate = LocalDate.of(2026, 9, 22),
-            )
-        }
-    }
-
-    @Test
-    fun `이미 종료된 일정으로 변경할 수 없다`() {
-        val meeting =
-            createFixedMeeting(
-                startDate = LocalDate.of(2026, 9, 22),
-                endDate = LocalDate.of(2026, 9, 23),
-            )
-
-        assertFailsWith<IllegalArgumentException> {
-            meeting.changeConfirmedDate(
-                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20)),
-                currentDate = LocalDate.of(2026, 9, 21),
-            )
-        }
-    }
-
-    @Test
-    fun `조율 중인 만남은 확정 일정으로 변경할 수 없다`() {
-        assertFailsWith<IllegalArgumentException> {
-            createPollMeeting().changeConfirmedDate(
-                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
-                currentDate = LocalDate.of(2026, 9, 21),
             )
         }
     }

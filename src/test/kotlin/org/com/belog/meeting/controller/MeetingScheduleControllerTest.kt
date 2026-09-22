@@ -2,6 +2,7 @@ package org.com.belog.meeting.controller
 
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDatePollService
+import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CandidateDatePollResult
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
@@ -25,12 +26,15 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPat
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.LocalDate
 
-@WebMvcTest(MeetingDatePollController::class)
+@WebMvcTest(MeetingScheduleController::class)
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
-class MeetingDatePollControllerTest {
+class MeetingScheduleControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var meetingService: MeetingService
 
     @MockitoBean
     private lateinit var meetingDatePollService: MeetingDatePollService
@@ -166,6 +170,26 @@ class MeetingDatePollControllerTest {
             .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(meetingDatePollService)
+    }
+
+    @Test
+    fun `후보 일정을 최종 일정으로 확정한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/meetings/7/confirmed-date")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"candidateDateRangeId":101}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S005"))
+            .andExpect(jsonPath("$.message").value("만남 일정을 확정했습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(meetingService).confirmMeetingDate(
+            meetingId = 7L,
+            userId = 15L,
+            candidateDateRangeId = 101L,
+        )
     }
 
     private fun authenticatedUser(): UsernamePasswordAuthenticationToken =
