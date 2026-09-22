@@ -10,10 +10,12 @@ import org.com.belog.prelog.code.PreLogSuccessCode
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
-import org.com.belog.prelog.controller.swagger.PlanSwagger
+import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
+import org.com.belog.prelog.controller.swagger.PreLogSwagger
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanService
+import org.com.belog.prelog.service.PreLogService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -24,11 +26,29 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/v1/meetings/{meetingId}/pre-log/plans")
-class PlanController(
+@RequestMapping("/api/v1/meetings/{meetingId}/pre-log")
+class PreLogController(
+    private val preLogService: PreLogService,
     private val planService: PlanService,
-) : PlanSwagger {
+) : PreLogSwagger {
     @GetMapping
+    override fun getPreLogMain(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<PreLogMainResponse>> {
+        val result = preLogService.getPreLogMain(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PRE_LOG_MAIN_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.PRE_LOG_MAIN_RETRIEVED,
+                    PreLogMainResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/plans")
     override fun getPlans(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -57,7 +77,7 @@ class PlanController(
             )
     }
 
-    @PostMapping
+    @PostMapping("/plans")
     override fun createPlan(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,

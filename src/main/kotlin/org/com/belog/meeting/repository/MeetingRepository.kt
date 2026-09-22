@@ -8,6 +8,19 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface MeetingRepository : JpaRepository<Meeting, Long> {
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
+        JOIN FETCH meeting.group
+        JOIN FETCH meeting.createdBy
+        WHERE meeting.id = :meetingId
+        """,
+    )
+    fun findByIdWithGroupAndCreator(
+        @Param("meetingId") meetingId: Long,
+    ): Meeting?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """

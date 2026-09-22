@@ -10,4 +10,5 @@ enum class PreLogSuccessCode(
 ) : SuccessCode {
     PLAN_CREATED(HttpStatus.CREATED, "PRE_LOG-S001", "계획이 생성되었습니다."),
     PLAN_LIST_RETRIEVED(HttpStatus.OK, "PRE_LOG-S002", "계획 목록을 조회했습니다."),
+    PRE_LOG_MAIN_RETRIEVED(HttpStatus.OK, "PRE_LOG-S003", "Pre-log 메인 정보를 조회했습니다."),
 }
