@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 
-@Tag(name = "Pre-log", description = "만남 전 계획 관련 API")
+@Tag(name = "Pre-log", description = "Pre-log 관련 API")
 interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 메인 화면 조회",
