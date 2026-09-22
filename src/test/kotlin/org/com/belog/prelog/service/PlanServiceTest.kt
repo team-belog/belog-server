@@ -17,6 +17,7 @@ import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageRequest
@@ -167,6 +168,7 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
+        verify(context.meeting).isEnded(LocalDate.of(2026, 9, 22))
         verifyNoInteractions(planRepository)
     }
 
