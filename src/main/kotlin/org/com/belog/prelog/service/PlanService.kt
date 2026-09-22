@@ -169,7 +169,6 @@ class PlanService(
             category = category,
             title = title,
             url = url,
-            content = content,
             address = null,
             thumbnailUrl = null,
             likeCount = 0,
