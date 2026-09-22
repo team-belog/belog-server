@@ -1,9 +1,9 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
-import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
@@ -56,14 +56,14 @@ class PlanService(
         val hasNext = plans.size > size
         val pagePlans = if (hasNext) plans.take(size) else plans
         val loginGroupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
-        val isGroupCreator = groupMember.role == GroupRole.OWNER
+        val isMeetingCreator = meeting.isCreatedBy(groupMember)
 
         return PlanListResult(
             items =
                 pagePlans.map { plan ->
                     plan.toListItemResult(
                         loginGroupMemberId = loginGroupMemberId,
-                        isGroupCreator = isGroupCreator,
+                        isMeetingCreator = isMeetingCreator,
                     )
                 },
             nextCursor = if (hasNext) pagePlans.lastOrNull()?.id else null,
@@ -81,7 +81,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
@@ -106,7 +106,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = LocalDate.now(clock)
+        val currentDate = clock.currentBusinessDate()
         validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
@@ -139,7 +139,7 @@ class PlanService(
         meeting: Meeting,
         currentDate: LocalDate,
     ) {
-        if (meeting.endDate?.isBefore(currentDate) == true) {
+        if (meeting.isEnded(currentDate)) {
             throw BusinessException(PreLogErrorCode.MEETING_ALREADY_ENDED)
         }
     }
@@ -157,7 +157,7 @@ class PlanService(
 
     private fun Plan.toListItemResult(
         loginGroupMemberId: Long,
-        isGroupCreator: Boolean,
+        isMeetingCreator: Boolean,
     ): PlanListItemResult {
         val planId = checkNotNull(id) { "조회된 계획의 ID가 없습니다." }
         val creatorId = checkNotNull(createdBy.id) { "계획 작성자의 그룹 멤버 ID가 없습니다." }
@@ -174,7 +174,7 @@ class PlanService(
             likeCount = 0,
             likedByMe = false,
             pinned = false,
-            canDelete = isPlanCreator || isGroupCreator,
+            canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )
     }

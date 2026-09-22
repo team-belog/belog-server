@@ -116,6 +116,8 @@ class Meeting protected constructor(
         return creatorId != null && groupMemberId != null && creatorId == groupMemberId
     }
 
+    fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
+
     fun confirmDate(
         candidateDateRange: MeetingCandidateDateRange,
         confirmedAt: Instant,
@@ -162,10 +164,8 @@ class Meeting protected constructor(
             return false
         }
 
-        requireNotNull(endDate).let { currentEndDate ->
-            require(!currentEndDate.isBefore(currentDate)) {
-                "종료된 만남의 일정은 변경할 수 없습니다."
-            }
+        require(!isEnded(currentDate)) {
+            "종료된 만남의 일정은 변경할 수 없습니다."
         }
         require(!dateRange.endDate.isBefore(currentDate)) {
             "종료된 일정으로 변경할 수 없습니다."

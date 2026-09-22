@@ -19,6 +19,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
+import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
 import org.com.belog.prelog.domain.PlanCategory
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -26,8 +27,61 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 
-@Tag(name = "Pre-log", description = "만남 전 계획 관련 API")
-interface PlanSwagger {
+@Tag(name = "Pre-log", description = "Pre-log 관련 API")
+interface PreLogSwagger {
+    @Operation(
+        summary = "Pre-log 메인 화면 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 만남 및 그룹 정보와 " +
+                "로그인 사용자의 만남 수정 권한을 조회합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Pre-log 메인 정보 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPreLogMain(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<PreLogMainResponse>>
+
     @Operation(
         summary = "Pre-log 계획 목록 조회",
         description =
@@ -231,3 +285,6 @@ private const val MEETING_ALREADY_ENDED_EXAMPLE =
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
+
+private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""

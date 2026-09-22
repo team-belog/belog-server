@@ -6,6 +6,7 @@ import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanService
+import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
@@ -22,7 +23,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@WebMvcTest(PlanController::class)
+@WebMvcTest(PreLogController::class)
 @AutoConfigureMockMvc(addFilters = false)
 @ActiveProfiles("test")
 class PlanControllerTest {
@@ -31,6 +32,9 @@ class PlanControllerTest {
 
     @MockitoBean
     private lateinit var planService: PlanService
+
+    @MockitoBean
+    private lateinit var preLogService: PreLogService
 
     @Test
     fun `LINK 계획을 생성한다`() {

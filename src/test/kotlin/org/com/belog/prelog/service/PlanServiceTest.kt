@@ -17,6 +17,7 @@ import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageRequest
@@ -61,7 +62,7 @@ class PlanServiceTest {
 
     @Test
     fun `계획 작성자는 계획을 삭제할 수 있다`() {
-        stubPlanList(loginRole = GroupRole.MEMBER, loginGroupMemberId = 10L, planCreatorId = 10L)
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 10L, isMeetingCreator = false)
 
         val result = getPlans()
 
@@ -69,8 +70,8 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `그룹 생성자는 다른 사용자의 계획도 삭제할 수 있다`() {
-        stubPlanList(loginRole = GroupRole.OWNER, loginGroupMemberId = 10L, planCreatorId = 11L)
+    fun `만남 생성자는 다른 사용자의 계획도 삭제할 수 있다`() {
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 11L, isMeetingCreator = true)
 
         val result = getPlans()
 
@@ -78,8 +79,13 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `일반 그룹 멤버는 다른 사용자의 계획을 삭제할 수 없다`() {
-        stubPlanList(loginRole = GroupRole.MEMBER, loginGroupMemberId = 10L, planCreatorId = 11L)
+    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 삭제할 수 없다`() {
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 11L,
+            isMeetingCreator = false,
+            loginRole = GroupRole.OWNER,
+        )
 
         val result = getPlans()
 
@@ -167,22 +173,26 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
+        verify(context.meeting).isEnded(LocalDate.of(2026, 9, 22))
         verifyNoInteractions(planRepository)
     }
 
     private fun meetingContext(endDate: LocalDate = LocalDate.of(2026, 9, 23)): MeetingContext {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
+        val currentDate = LocalDate.of(2026, 9, 22)
         `when`(group.id).thenReturn(3L)
         `when`(meeting.group).thenReturn(group)
         `when`(meeting.endDate).thenReturn(endDate)
+        `when`(meeting.isEnded(currentDate)).thenReturn(endDate.isBefore(currentDate))
         return MeetingContext(group, meeting)
     }
 
     private fun stubPlanList(
-        loginRole: GroupRole,
         loginGroupMemberId: Long,
         planCreatorId: Long,
+        isMeetingCreator: Boolean,
+        loginRole: GroupRole = GroupRole.MEMBER,
     ) {
         val context = meetingContext()
         val loginGroupMember = mock(GroupMember::class.java)
@@ -200,6 +210,7 @@ class PlanServiceTest {
         `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
         `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(isMeetingCreator)
         `when`(
             planRepository.findPageWithCreator(
                 meetingId = 1L,

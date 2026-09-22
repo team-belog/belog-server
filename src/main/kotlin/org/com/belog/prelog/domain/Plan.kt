@@ -143,7 +143,7 @@ class Plan protected constructor(
             require(creator.belongsTo(meeting.group)) {
                 "계획 생성자는 해당 만남이 속한 그룹의 멤버여야 합니다."
             }
-            require(meeting.endDate?.isBefore(currentDate) != true) {
+            require(!meeting.isEnded(currentDate)) {
                 "종료된 만남에는 계획을 추가할 수 없습니다."
             }
         }
