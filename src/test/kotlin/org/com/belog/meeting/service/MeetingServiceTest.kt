@@ -579,7 +579,7 @@ class MeetingServiceTest {
     class FixedClockConfig {
         @Bean
         @Primary
-        fun clock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
     }
 
     companion object {

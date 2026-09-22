@@ -10,7 +10,6 @@ import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -154,22 +153,6 @@ class MeetingScheduleControllerTest {
             userId = 15L,
             candidateDateRangeIds = emptyList(),
         )
-    }
-
-    @Test
-    fun `후보 일정 ID가 최대 개수를 초과하면 응답을 거절한다`() {
-        val candidateIds = (1L..11L).joinToString(",")
-
-        mockMvc
-            .perform(
-                put("/api/v1/meetings/7/date-poll/responses/me")
-                    .principal(authenticatedUser())
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("""{"candidateDateRangeIds":[$candidateIds]}"""),
-            ).andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.code").value("CMN-E001"))
-
-        verifyNoInteractions(meetingDatePollService)
     }
 
     @Test

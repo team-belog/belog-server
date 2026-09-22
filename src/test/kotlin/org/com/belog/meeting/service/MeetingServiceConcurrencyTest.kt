@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.context.annotation.Import
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.junit.jupiter.Container
@@ -39,6 +40,7 @@ import kotlin.test.assertTrue
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Import(MeetingServiceTest.FixedClockConfig::class)
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MeetingServiceConcurrencyTest {
@@ -165,6 +167,7 @@ class MeetingServiceConcurrencyTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = "생성자",
+            name = "홍길동",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,

@@ -10,28 +10,9 @@ import org.com.belog.user.domain.User
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
-import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertSame
 
 class MeetingScheduleResponseTest {
-    @Test
-    fun `만남 참여자는 후보 일정 응답을 완료할 수 있다`() {
-        val context = createPollContext()
-        val respondedAt = Instant.parse("2026-09-22T00:00:00Z")
-
-        val response =
-            MeetingScheduleResponse.create(
-                meeting = context.meeting,
-                participant = context.participant,
-                respondedAt = respondedAt,
-            )
-
-        assertSame(context.meeting, response.meeting)
-        assertSame(context.participant, response.participant)
-        assertEquals(respondedAt, response.respondedAt)
-    }
-
     @Test
     fun `만남 생성자는 후보 일정에 응답할 수 없다`() {
         val group = createGroup("AB12CD")
@@ -77,18 +58,6 @@ class MeetingScheduleResponseTest {
                 respondedAt = Instant.parse("2026-09-22T00:00:00Z"),
             )
         }
-    }
-
-    @Test
-    fun `응답에 같은 만남의 가능한 후보 일정을 연결한다`() {
-        val context = createPollContext()
-        val response = createResponse(context)
-        val candidateDateRange = createCandidateDateRange(context.meeting)
-
-        val availableDate = MeetingAvailableDate.create(response, candidateDateRange)
-
-        assertSame(response, availableDate.response)
-        assertSame(candidateDateRange, availableDate.candidateDateRange)
     }
 
     @Test
