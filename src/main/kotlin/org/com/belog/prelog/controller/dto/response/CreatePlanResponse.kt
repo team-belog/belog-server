@@ -11,8 +11,8 @@ data class CreatePlanResponse(
     val planId: Long,
     @field:Schema(description = "만남 ID", example = "1")
     val meetingId: Long,
-    @field:Schema(description = "계획 생성 참여자 ID", example = "10")
-    val creatorParticipantId: Long,
+    @field:Schema(description = "계획을 작성한 그룹 멤버 ID", example = "10")
+    val creatorGroupMemberId: Long,
     @field:Schema(description = "계획 유형", example = "LINK", allowableValues = ["LINK", "MEMO"])
     val type: PlanType,
     @field:Schema(description = "계획 카테고리", example = "RESTAURANT")
@@ -29,7 +29,7 @@ data class CreatePlanResponse(
             CreatePlanResponse(
                 planId = requireNotNull(plan.id),
                 meetingId = requireNotNull(plan.meeting.id),
-                creatorParticipantId = requireNotNull(plan.createdBy.id),
+                creatorGroupMemberId = requireNotNull(plan.createdBy.id),
                 type = plan.type,
                 category = plan.category,
                 title = plan.title,

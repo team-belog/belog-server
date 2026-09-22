@@ -127,10 +127,10 @@ private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
 
 private const val CREATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorParticipantId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place","content":null}}"""
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place","content":null}}"""
 
 private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorParticipantId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
 
 private const val INVALID_PLAN_EXAMPLE =
     """{"code":"PRE_LOG-E001","message":"계획 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

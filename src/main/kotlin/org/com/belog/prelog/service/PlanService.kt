@@ -36,7 +36,7 @@ class PlanService(
         return savePlan {
             Plan.createLink(
                 meeting = creator.meeting,
-                creator = creator,
+                creator = creator.groupMember,
                 category = category,
                 title = title,
                 url = url,
@@ -60,7 +60,7 @@ class PlanService(
         return savePlan {
             Plan.createMemo(
                 meeting = creator.meeting,
-                creator = creator,
+                creator = creator.groupMember,
                 category = category,
                 title = title,
                 content = content,

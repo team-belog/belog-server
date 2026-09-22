@@ -5,7 +5,6 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
-import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -26,7 +25,7 @@ class PlanTest {
         val plan =
             Plan.createLink(
                 meeting = context.meeting,
-                creator = context.participant,
+                creator = context.groupMember,
                 category = PlanCategory.RESTAURANT,
                 title = "  광주 맛집  ",
                 url = "  https://example.com/place  ",
@@ -34,7 +33,7 @@ class PlanTest {
             )
 
         assertSame(context.meeting, plan.meeting)
-        assertSame(context.participant, plan.createdBy)
+        assertSame(context.groupMember, plan.createdBy)
         assertEquals(PlanType.LINK, plan.type)
         assertEquals(PlanCategory.RESTAURANT, plan.category)
         assertEquals("광주 맛집", plan.title)
@@ -49,7 +48,7 @@ class PlanTest {
         val plan =
             Plan.createMemo(
                 meeting = context.meeting,
-                creator = context.participant,
+                creator = context.groupMember,
                 category = PlanCategory.ACTIVITY,
                 title = "  일정 메모  ",
                 content = "  여유롭게 출발하기  ",
@@ -64,15 +63,27 @@ class PlanTest {
     }
 
     @Test
-    fun `다른 만남의 참여자는 계획을 생성할 수 없다`() {
+    fun `같은 그룹의 비참여자는 계획을 생성할 수 있고 다른 그룹 멤버는 생성할 수 없다`() {
         val context = createMeetingContext()
-        val otherMeeting = createFixedMeeting(context.group, context.groupMember)
-        val otherParticipant = MeetingParticipant.create(otherMeeting, context.groupMember)
+        val nonParticipant = GroupMember.createMember(context.group, completedUser("non-participant"))
+        val plan =
+            Plan.createLink(
+                meeting = context.meeting,
+                creator = nonParticipant,
+                category = PlanCategory.CAFE,
+                title = "카페",
+                url = "https://example.com/cafe",
+                currentDate = CURRENT_DATE,
+            )
+        assertSame(nonParticipant, plan.createdBy)
+
+        val otherGroup = createGroup("EF34GH")
+        val otherGroupMember = GroupMember.createMember(otherGroup, completedUser("other-group-member"))
 
         assertFailsWith<IllegalArgumentException> {
             Plan.createLink(
                 meeting = context.meeting,
-                creator = otherParticipant,
+                creator = otherGroupMember,
                 category = PlanCategory.CAFE,
                 title = "카페",
                 url = "https://example.com/cafe",
@@ -93,7 +104,7 @@ class PlanTest {
         assertFailsWith<IllegalArgumentException> {
             Plan.createMemo(
                 meeting = context.meeting,
-                creator = context.participant,
+                creator = context.groupMember,
                 category = PlanCategory.OTHER,
                 title = "메모",
                 content = "종료된 만남 메모",
@@ -118,7 +129,7 @@ class PlanTest {
             assertFailsWith<IllegalArgumentException> {
                 Plan.createLink(
                     meeting = context.meeting,
-                    creator = context.participant,
+                    creator = context.groupMember,
                     category = PlanCategory.RESTAURANT,
                     title = "맛집",
                     url = url,
@@ -136,7 +147,7 @@ class PlanTest {
             assertFailsWith<IllegalArgumentException> {
                 Plan.createMemo(
                     meeting = context.meeting,
-                    creator = context.participant,
+                    creator = context.groupMember,
                     category = PlanCategory.OTHER,
                     title = title,
                     content = "내용",
@@ -154,7 +165,7 @@ class PlanTest {
             assertFailsWith<IllegalArgumentException> {
                 Plan.createMemo(
                     meeting = context.meeting,
-                    creator = context.participant,
+                    creator = context.groupMember,
                     category = PlanCategory.OTHER,
                     title = "메모",
                     content = content,
@@ -170,10 +181,9 @@ class PlanTest {
         meetingCreationDate: LocalDate = CURRENT_DATE,
     ): MeetingContext {
         val group = createGroup()
-        val groupMember = GroupMember.createOwner(group, completedUser())
+        val groupMember = GroupMember.createOwner(group, completedUser("owner"))
         val meeting = createFixedMeeting(group, groupMember, startDate, endDate, meetingCreationDate)
-        val participant = MeetingParticipant.create(meeting, groupMember)
-        return MeetingContext(group, groupMember, meeting, participant)
+        return MeetingContext(group, groupMember, meeting)
     }
 
     private fun createFixedMeeting(
@@ -193,19 +203,19 @@ class PlanTest {
             currentDate = currentDate,
         )
 
-    private fun createGroup(): Group =
+    private fun createGroup(inviteCode: String = "AB12CD"): Group =
         Group.create(
             name = "여행 모임",
             coverImageObjectKey = null,
-            inviteCode = InviteCode.create("AB12CD"),
+            inviteCode = InviteCode.create(inviteCode),
         )
 
-    private fun completedUser(): User =
+    private fun completedUser(providerUserId: String): User =
         User
             .createSocialUser(
-                email = "user@example.com",
+                email = "$providerUserId@example.com",
                 provider = SocialProvider.GOOGLE,
-                providerUserId = "user-subject",
+                providerUserId = providerUserId,
             ).apply {
                 completeOnboarding(
                     profileImageObjectKey = null,
@@ -225,7 +235,6 @@ class PlanTest {
         val group: Group,
         val groupMember: GroupMember,
         val meeting: Meeting,
-        val participant: MeetingParticipant,
     )
 
     companion object {

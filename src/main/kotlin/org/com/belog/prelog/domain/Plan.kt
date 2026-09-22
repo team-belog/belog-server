@@ -14,9 +14,9 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import org.com.belog.global.domain.BaseEntity
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
-import org.com.belog.meeting.domain.MeetingParticipant
-import org.com.belog.meeting.domain.belongsTo
 import java.net.URI
 import java.time.LocalDate
 
@@ -63,11 +63,11 @@ class Plan protected constructor(
     val meeting: Meeting,
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "created_by_meeting_participant_id",
+        name = "created_by_group_member_id",
         nullable = false,
-        foreignKey = ForeignKey(name = "fk_pre_log_plans_created_by_participant_id"),
+        foreignKey = ForeignKey(name = "fk_pre_log_plans_created_by_group_member_id"),
     )
-    val createdBy: MeetingParticipant,
+    val createdBy: GroupMember,
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     val type: PlanType,
@@ -95,7 +95,7 @@ class Plan protected constructor(
 
         fun createLink(
             meeting: Meeting,
-            creator: MeetingParticipant,
+            creator: GroupMember,
             category: PlanCategory,
             title: String,
             url: String,
@@ -116,7 +116,7 @@ class Plan protected constructor(
 
         fun createMemo(
             meeting: Meeting,
-            creator: MeetingParticipant,
+            creator: GroupMember,
             category: PlanCategory,
             title: String,
             content: String,
@@ -137,11 +137,11 @@ class Plan protected constructor(
 
         private fun validateCreation(
             meeting: Meeting,
-            creator: MeetingParticipant,
+            creator: GroupMember,
             currentDate: LocalDate,
         ) {
-            require(creator.belongsTo(meeting)) {
-                "계획 생성자는 해당 만남의 참여자여야 합니다."
+            require(creator.belongsTo(meeting.group)) {
+                "계획 생성자는 해당 만남이 속한 그룹의 멤버여야 합니다."
             }
             require(meeting.endDate?.isBefore(currentDate) != true) {
                 "종료된 만남에는 계획을 추가할 수 없습니다."
@@ -185,4 +185,14 @@ class Plan protected constructor(
             return normalizedContent
         }
     }
+}
+
+private fun GroupMember.belongsTo(group: Group): Boolean {
+    if (this.group === group) {
+        return true
+    }
+
+    val memberGroupId = this.group.id
+    val groupId = group.id
+    return memberGroupId != null && groupId != null && memberGroupId == groupId
 }
