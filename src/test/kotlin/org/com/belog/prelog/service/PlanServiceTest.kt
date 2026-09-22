@@ -62,7 +62,7 @@ class PlanServiceTest {
 
     @Test
     fun `계획 작성자는 계획을 삭제할 수 있다`() {
-        stubPlanList(loginRole = GroupRole.MEMBER, loginGroupMemberId = 10L, planCreatorId = 10L)
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 10L, isMeetingCreator = false)
 
         val result = getPlans()
 
@@ -70,8 +70,8 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `그룹 생성자는 다른 사용자의 계획도 삭제할 수 있다`() {
-        stubPlanList(loginRole = GroupRole.OWNER, loginGroupMemberId = 10L, planCreatorId = 11L)
+    fun `만남 생성자는 다른 사용자의 계획도 삭제할 수 있다`() {
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 11L, isMeetingCreator = true)
 
         val result = getPlans()
 
@@ -79,8 +79,13 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `일반 그룹 멤버는 다른 사용자의 계획을 삭제할 수 없다`() {
-        stubPlanList(loginRole = GroupRole.MEMBER, loginGroupMemberId = 10L, planCreatorId = 11L)
+    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 삭제할 수 없다`() {
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 11L,
+            isMeetingCreator = false,
+            loginRole = GroupRole.OWNER,
+        )
 
         val result = getPlans()
 
@@ -184,9 +189,10 @@ class PlanServiceTest {
     }
 
     private fun stubPlanList(
-        loginRole: GroupRole,
         loginGroupMemberId: Long,
         planCreatorId: Long,
+        isMeetingCreator: Boolean,
+        loginRole: GroupRole = GroupRole.MEMBER,
     ) {
         val context = meetingContext()
         val loginGroupMember = mock(GroupMember::class.java)
@@ -204,6 +210,7 @@ class PlanServiceTest {
         `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
         `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(isMeetingCreator)
         `when`(
             planRepository.findPageWithCreator(
                 meetingId = 1L,
