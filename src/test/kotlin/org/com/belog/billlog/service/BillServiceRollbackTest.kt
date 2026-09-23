@@ -24,6 +24,7 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyList
 import org.mockito.Mockito.doThrow
@@ -49,6 +50,12 @@ import kotlin.test.assertFailsWith
     AccountNumberAttributeConverter::class,
 )
 class BillServiceRollbackTest {
+    private val meetingParticipantIds = mutableListOf<Long>()
+    private val meetingIds = mutableListOf<Long>()
+    private val groupMemberIds = mutableListOf<Long>()
+    private val userIds = mutableListOf<Long>()
+    private val groupIds = mutableListOf<Long>()
+
     @Autowired
     private lateinit var billService: BillService
 
@@ -73,19 +80,32 @@ class BillServiceRollbackTest {
     @MockitoBean
     private lateinit var settlementRequestRepository: SettlementRequestRepository
 
+    @AfterEach
+    fun cleanUpFixtures() {
+        meetingParticipantRepository.deleteAllByIdInBatch(meetingParticipantIds)
+        meetingRepository.deleteAllByIdInBatch(meetingIds)
+        groupMemberRepository.deleteAllByIdInBatch(groupMemberIds)
+        userRepository.deleteAllByIdInBatch(userIds)
+        groupRepository.deleteAllByIdInBatch(groupIds)
+    }
+
     @Test
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     fun `정산 요청 저장 중 실패하면 결제 내역 전체가 롤백된다`() {
         val group = groupRepository.save(createGroup())
+        groupIds += requireNotNull(group.id)
         val creator = saveGroupMember(group, "creator-subject", "작성자")
         val member = saveGroupMember(group, "member-subject", "참여자")
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, creator))
-        meetingParticipantRepository.saveAllAndFlush(
-            listOf(
-                MeetingParticipant.create(meeting, creator),
-                MeetingParticipant.create(meeting, member),
-            ),
-        )
+        meetingIds += requireNotNull(meeting.id)
+        val participants =
+            meetingParticipantRepository.saveAllAndFlush(
+                listOf(
+                    MeetingParticipant.create(meeting, creator),
+                    MeetingParticipant.create(meeting, member),
+                ),
+            )
+        meetingParticipantIds += participants.map { participant -> requireNotNull(participant.id) }
         doThrow(IllegalStateException("정산 요청 저장 실패"))
             .`when`(settlementRequestRepository)
             .saveAll(anyList<SettlementRequest>())
@@ -147,7 +167,9 @@ class BillServiceRollbackTest {
         nickname: String,
     ): GroupMember {
         val user = saveCompletedUser(providerUserId, nickname)
-        return groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+        val groupMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+        groupMemberIds += requireNotNull(groupMember.id)
+        return groupMember
     }
 
     private fun saveCompletedUser(
@@ -174,6 +196,8 @@ class BillServiceRollbackTest {
                 ),
             completedAt = Instant.parse("2026-09-20T00:00:00Z"),
         )
-        return userRepository.saveAndFlush(user)
+        val savedUser = userRepository.saveAndFlush(user)
+        userIds += requireNotNull(savedUser.id)
+        return savedUser
     }
 }
