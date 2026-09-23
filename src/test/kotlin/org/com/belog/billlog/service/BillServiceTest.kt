@@ -89,11 +89,9 @@ class BillServiceTest {
         assertEquals(2L, billItemRepository.count())
         assertEquals(2L, billShareRepository.count())
         assertEquals(1L, settlementRequestRepository.count())
-        assertEquals(2, result.itemCount)
-        assertEquals(2, result.shareCount)
-        assertEquals(1, result.settlementRequestCount)
 
         val bill = billRepository.findAll().single()
+        assertEquals(bill.id, result.billId)
         assertEquals("아랑이 카페", bill.title)
         assertEquals(11_000L, bill.totalAmount)
         assertEquals(BillSplitType.EQUAL_SPLIT, bill.splitType)

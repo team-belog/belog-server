@@ -52,16 +52,10 @@ class BillService(
         val bill = saveBill(command, meeting, creator, payer)
         saveItems(command, bill)
         val shares = saveShares(command, bill, shareParticipants)
-        val settlementRequestCount = saveSettlementRequests(shares, payer)
+        saveSettlementRequests(shares, payer)
 
         return RegisteredBill(
             billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
-            meetingId = command.meetingId,
-            totalAmount = bill.totalAmount,
-            splitType = bill.splitType,
-            itemCount = command.items.size,
-            shareCount = shares.size,
-            settlementRequestCount = settlementRequestCount,
         )
     }
 
@@ -190,7 +184,7 @@ class BillService(
     private fun saveSettlementRequests(
         shares: List<BillShare>,
         payer: MeetingParticipant,
-    ): Int {
+    ) {
         val payerId = checkNotNull(payer.id) { "결제자의 만남 참여자 ID가 없습니다." }
         val settlementRequests =
             shares
@@ -198,7 +192,6 @@ class BillService(
                 .map(SettlementRequest::create)
 
         settlementRequestRepository.saveAll(settlementRequests)
-        return settlementRequests.size
     }
 
     private fun <T> saveDomainEntity(block: () -> T): T =

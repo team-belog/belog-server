@@ -42,7 +42,11 @@ data class RegisterBillRequest(
     @field:Positive(message = "결제 총액은 0원보다 커야 합니다.")
     val totalAmount: Long,
     @field:Schema(
-        description = "클라이언트에서 사용한 정산 방식",
+        description =
+            "클라이언트에서 사용한 정산 방식\n" +
+                "- EQUAL_SPLIT: 선택 인원 균등 분배\n" +
+                "- ITEM_TAG: 항목별 태그 인원 분배\n" +
+                "- MANUAL: 개인별 금액 직접 입력",
         example = "EQUAL_SPLIT",
         allowableValues = ["EQUAL_SPLIT", "ITEM_TAG", "MANUAL"],
         requiredMode = Schema.RequiredMode.REQUIRED,

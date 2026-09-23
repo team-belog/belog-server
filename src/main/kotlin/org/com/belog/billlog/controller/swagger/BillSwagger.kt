@@ -110,7 +110,7 @@ private const val REGISTER_BILL_REQUEST_EXAMPLE =
     """{"title":"아랑이 카페","payerMemberId":10,"totalAmount":11000,"splitType":"EQUAL_SPLIT","items":[{"name":"아메리카노","amount":4000},{"name":"프라푸치노","amount":7000}],"shares":[{"participantMemberId":10,"amount":5500},{"participantMemberId":11,"amount":5500}]}"""
 
 private const val REGISTER_BILL_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S001","message":"결제 내역과 정산 요청이 등록되었습니다.","data":{"billId":1,"meetingId":7,"totalAmount":11000,"splitType":"EQUAL_SPLIT","itemCount":2,"shareCount":2,"settlementRequestCount":1}}"""
+    """{"code":"BILL_LOG-S001","message":"결제 내역과 정산 요청이 등록되었습니다.","data":{"billId":1}}"""
 
 private const val ITEM_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E005","message":"결제 항목 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
