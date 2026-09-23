@@ -6,6 +6,8 @@ spring:
     url: "${DB_URL}"
     username: "${DB_USERNAME}"
     password: "${DB_PASSWORD}"
+  flyway:
+    enabled: true
   jpa:
     hibernate:
       ddl-auto: validate

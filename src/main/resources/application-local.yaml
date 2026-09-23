@@ -6,9 +6,11 @@ spring:
     url: "${DB_URL:jdbc:mysql://localhost:3306/belog}"
     username: "${DB_USERNAME:belog}"
     password: "${DB_PASSWORD:belog-local-password}"
+  flyway:
+    enabled: true
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     show-sql: true
     properties:
       hibernate:
