@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface PlanRepository : JpaRepository<Plan, Long> {
+    fun existsByMeetingId(meetingId: Long): Boolean
+
     @Query(
         """
         SELECT plan

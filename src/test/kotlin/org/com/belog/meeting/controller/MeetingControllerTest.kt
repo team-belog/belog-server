@@ -6,6 +6,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
+import org.com.belog.meeting.service.MeetingDetailService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.junit.jupiter.api.Test
@@ -34,6 +35,9 @@ class MeetingControllerTest {
 
     @MockitoBean
     private lateinit var meetingService: MeetingService
+
+    @MockitoBean
+    private lateinit var meetingDetailService: MeetingDetailService
 
     @Test
     fun `확정 날짜 만남을 생성한다`() {
