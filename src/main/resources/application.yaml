@@ -4,6 +4,12 @@ spring:
   jpa:
     open-in-view: false
 
+  flyway:
+    enabled: false
+    locations: classpath:db/migration
+    validate-migration-naming: true
+    clean-disabled: true
+
   web:
     error:
       include-exception: false
