@@ -15,6 +15,7 @@ import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
+import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
@@ -126,6 +127,60 @@ interface MeetingSwagger {
         @RequestBody
         request: CreateMeetingRequest,
     ): ResponseEntity<CommonResponse<CreateMeetingResponse>>
+
+    @Operation(
+        summary = "만남 상세 조회",
+        description =
+            "만남 기본 정보와 로그인 사용자의 수정 권한, " +
+                "Pre-log, Bill-log, Post-log의 작성 상태를 조회합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 상세 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = MEETING_DETAIL_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun getMeetingDetail(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingDetailResponse>>
 }
 
 private const val CREATE_FIXED_MEETING_REQUEST_EXAMPLE =
@@ -135,10 +190,13 @@ private const val CREATE_POLL_MEETING_REQUEST_EXAMPLE =
     """{"name":"가을 여행","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"POLL","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"},{"startDate":"2026-10-10","endDate":"2026-10-11"}]}}"""
 
 private const val CREATE_FIXED_MEETING_SUCCESS_EXAMPLE =
-    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1,"groupId":1,"name":"광주 1박 2일","location":"서울고속버스터미널","scheduleType":"FIXED","status":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","confirmedAt":"2026-09-21T00:00:00Z","participantCount":3}}"""
+    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":1}}"""
 
 private const val CREATE_POLL_MEETING_SUCCESS_EXAMPLE =
-    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":2,"groupId":1,"name":"가을 여행","location":"서울고속버스터미널","scheduleType":"POLL","status":"SCHEDULING","startDate":null,"endDate":null,"confirmedAt":null,"participantCount":3}}"""
+    """{"code":"MEETING-S001","message":"만남이 생성되었습니다.","data":{"meetingId":2}}"""
+
+private const val MEETING_DETAIL_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S006","message":"만남 상세 정보를 조회했습니다.","data":{"meetingId":7,"groupId":1,"groupName":"피놀리와 기니휘기","meetingName":"1박 2일 광주 여행","scheduleType":"FIXED","meetingStatus":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","location":"광주광역시 000 000","canEditMeeting":true,"logStatuses":{"preLog":"IN_PROGRESS","billLog":"NOT_STARTED","postLog":"NOT_STARTED"}}}"""
 
 private const val INVALID_PARTICIPANT_EXAMPLE =
     """{"code":"MEETING-E001","message":"만남 참여자는 해당 그룹의 멤버여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
@@ -163,3 +221,6 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val GROUP_NOT_FOUND_EXAMPLE =
     """{"code":"GROUP-E012","message":"그룹을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val MEETING_NOT_FOUND_EXAMPLE =
+    """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

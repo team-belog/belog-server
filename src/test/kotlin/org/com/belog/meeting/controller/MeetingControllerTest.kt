@@ -6,6 +6,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
+import org.com.belog.meeting.service.MeetingDetailService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.junit.jupiter.api.Test
@@ -34,6 +35,9 @@ class MeetingControllerTest {
 
     @MockitoBean
     private lateinit var meetingService: MeetingService
+
+    @MockitoBean
+    private lateinit var meetingDetailService: MeetingDetailService
 
     @Test
     fun `확정 날짜 만남을 생성한다`() {
@@ -89,15 +93,7 @@ class MeetingControllerTest {
             .andExpect(jsonPath("$.code").value("MEETING-S001"))
             .andExpect(jsonPath("$.message").value("만남이 생성되었습니다."))
             .andExpect(jsonPath("$.data.meetingId").value(7))
-            .andExpect(jsonPath("$.data.groupId").value(1))
-            .andExpect(jsonPath("$.data.name").value("광주 1박 2일"))
-            .andExpect(jsonPath("$.data.location").value("서울고속버스터미널"))
-            .andExpect(jsonPath("$.data.scheduleType").value("FIXED"))
-            .andExpect(jsonPath("$.data.status").value("CONFIRMED"))
-            .andExpect(jsonPath("$.data.startDate").value("2026-10-03"))
-            .andExpect(jsonPath("$.data.endDate").value("2026-10-04"))
-            .andExpect(jsonPath("$.data.confirmedAt").value("2026-09-21T00:00:00Z"))
-            .andExpect(jsonPath("$.data.participantCount").value(3))
+            .andExpect(jsonPath("$.data.length()").value(1))
     }
 
     @Test
@@ -175,12 +171,7 @@ class MeetingControllerTest {
             ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.code").value("MEETING-S001"))
             .andExpect(jsonPath("$.data.meetingId").value(7))
-            .andExpect(jsonPath("$.data.scheduleType").value("POLL"))
-            .andExpect(jsonPath("$.data.status").value("SCHEDULING"))
-            .andExpect(jsonPath("$.data.startDate").isEmpty)
-            .andExpect(jsonPath("$.data.endDate").isEmpty)
-            .andExpect(jsonPath("$.data.confirmedAt").isEmpty)
-            .andExpect(jsonPath("$.data.participantCount").value(1))
+            .andExpect(jsonPath("$.data.length()").value(1))
     }
 
     @Test
