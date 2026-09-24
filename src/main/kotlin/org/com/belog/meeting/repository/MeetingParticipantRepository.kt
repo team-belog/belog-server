@@ -24,6 +24,21 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         """
         SELECT participant
         FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id IN :meetingIds
+        ORDER BY meeting.id DESC, participant.id ASC
+        """,
+    )
+    fun findAllWithUserByMeetingIdIn(
+        @Param("meetingIds") meetingIds: Collection<Long>,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
         JOIN FETCH participant.groupMember
         WHERE participant.meeting.id = :meetingId
           AND participant.groupMember.id IN :groupMemberIds
