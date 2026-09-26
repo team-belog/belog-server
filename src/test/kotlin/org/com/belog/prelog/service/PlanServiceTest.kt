@@ -137,6 +137,7 @@ class PlanServiceTest {
         val context = meetingContext()
         val groupMember = mock(GroupMember::class.java)
         `when`(groupMember.group).thenReturn(context.group)
+        `when`(groupMember.belongsTo(context.group)).thenCallRealMethod()
         `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
         `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }

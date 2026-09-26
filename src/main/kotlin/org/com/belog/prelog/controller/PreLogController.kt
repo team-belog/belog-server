@@ -9,17 +9,21 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.code.PreLogSuccessCode
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
+import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
 import org.com.belog.prelog.controller.swagger.PreLogSwagger
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.service.PlanLikeService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -30,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController
 class PreLogController(
     private val preLogService: PreLogService,
     private val planService: PlanService,
+    private val planLikeService: PlanLikeService,
 ) : PreLogSwagger {
     @GetMapping
     override fun getPreLogMain(
@@ -110,6 +115,52 @@ class PreLogController(
                 CommonResponse.success(
                     PreLogSuccessCode.PLAN_CREATED,
                     CreatePlanResponse.from(plan),
+                ),
+            )
+    }
+
+    @PutMapping("/plans/{planId}/likes/me")
+    override fun likePlan(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @PathVariable planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>> {
+        val result =
+            planLikeService.likePlan(
+                meetingId = meetingId,
+                planId = planId,
+                userId = userId,
+            )
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_LIKED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.PLAN_LIKED,
+                    PlanLikeResponse.from(result),
+                ),
+            )
+    }
+
+    @DeleteMapping("/plans/{planId}/likes/me")
+    override fun unlikePlan(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @PathVariable planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>> {
+        val result =
+            planLikeService.unlikePlan(
+                meetingId = meetingId,
+                planId = planId,
+                userId = userId,
+            )
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_LIKE_CANCELED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.PLAN_LIKE_CANCELED,
+                    PlanLikeResponse.from(result),
                 ),
             )
     }

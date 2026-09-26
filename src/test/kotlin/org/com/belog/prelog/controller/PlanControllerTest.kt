@@ -5,6 +5,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.service.PlanLikeService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
@@ -35,6 +36,9 @@ class PlanControllerTest {
 
     @MockitoBean
     private lateinit var preLogService: PreLogService
+
+    @MockitoBean
+    private lateinit var planLikeService: PlanLikeService
 
     @Test
     fun `LINK 계획을 생성한다`() {

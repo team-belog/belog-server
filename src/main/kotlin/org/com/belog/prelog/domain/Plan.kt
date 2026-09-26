@@ -14,7 +14,6 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import org.com.belog.global.domain.BaseEntity
-import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
 import java.net.URI
@@ -185,14 +184,4 @@ class Plan protected constructor(
             return normalizedContent
         }
     }
-}
-
-private fun GroupMember.belongsTo(group: Group): Boolean {
-    if (this.group === group) {
-        return true
-    }
-
-    val memberGroupId = this.group.id
-    val groupId = group.id
-    return memberGroupId != null && groupId != null && memberGroupId == groupId
 }
