@@ -8,6 +8,7 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.code.GroupSuccessCode
 import org.com.belog.group.controller.dto.request.CreateGroupRequest
 import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
+import org.com.belog.group.controller.dto.request.UpdateGroupCoverImageRequest
 import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
 import org.com.belog.group.controller.dto.response.GroupDetailResponse
@@ -21,6 +22,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -90,6 +92,23 @@ class GroupController(
                     GroupCoverImageUploadUrlResponse.from(upload),
                 ),
             )
+    }
+
+    @PutMapping("/{groupId}/cover-image")
+    override fun updateCoverImage(
+        @LoginUserId userId: Long,
+        @PathVariable groupId: Long,
+        @Valid @RequestBody request: UpdateGroupCoverImageRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        groupCoverImageService.updateCoverImage(
+            groupId = groupId,
+            userId = userId,
+            coverImageObjectKey = createCoverImageObjectKey(userId, request.coverImageObjectKey),
+        )
+
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_COVER_IMAGE_UPDATED.status)
+            .body(CommonResponse.success(GroupSuccessCode.GROUP_COVER_IMAGE_UPDATED))
     }
 
     @PostMapping
