@@ -18,6 +18,7 @@ import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
+import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
 import org.com.belog.prelog.domain.PlanCategory
@@ -257,6 +258,124 @@ interface PreLogSwagger {
         @RequestBody
         request: CreatePlanRequest,
     ): ResponseEntity<CommonResponse<CreatePlanResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 좋아요 등록",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 계획에 좋아요를 등록합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 이미 등록된 좋아요 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 좋아요 등록 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = LIKE_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun likePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 좋아요 취소",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 자신이 등록한 계획 좋아요를 취소합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 등록된 좋아요가 없어도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 좋아요 취소 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = UNLIKE_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun unlikePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>>
 }
 
 private const val CREATE_LINK_PLAN_REQUEST_EXAMPLE =
@@ -282,6 +401,15 @@ private const val MEETING_NOT_FOUND_EXAMPLE =
 
 private const val MEETING_ALREADY_ENDED_EXAMPLE =
     """{"code":"PRE_LOG-E002","message":"종료된 만남에는 계획을 추가할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_NOT_FOUND_EXAMPLE =
+    """{"code":"PRE_LOG-E003","message":"계획을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val LIKE_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S005","message":"계획에 좋아요를 등록했습니다.","data":{"planId":12,"likedByMe":true,"likeCount":3}}"""
+
+private const val UNLIKE_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S006","message":"계획 좋아요를 취소했습니다.","data":{"planId":12,"likedByMe":false,"likeCount":2}}"""
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
