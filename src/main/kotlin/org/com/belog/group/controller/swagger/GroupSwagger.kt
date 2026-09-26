@@ -15,6 +15,7 @@ import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.group.controller.dto.request.CreateGroupRequest
 import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
+import org.com.belog.group.controller.dto.request.UpdateGroupCoverImageRequest
 import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
 import org.com.belog.group.controller.dto.response.GroupDetailResponse
@@ -207,6 +208,91 @@ interface GroupSwagger {
     ): ResponseEntity<CommonResponse<GroupCoverImageUploadUrlResponse>>
 
     @Operation(
+        summary = "그룹 커버 이미지 변경",
+        description =
+            "미리 업로드한 이미지의 Object Key로 그룹 커버 이미지를 변경합니다. " +
+                "해당 그룹의 OWNER만 변경할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 커버 이미지 변경 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = UPDATE_COVER_IMAGE_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 또는 커버 이미지 Object Key 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 커버 이미지 Object Key", value = INVALID_COVER_IMAGE_OBJECT_KEY_EXAMPLE),
+                            ExampleObject(name = "업로드되지 않은 커버 이미지", value = COVER_IMAGE_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "잘못된 커버 이미지 정보", value = INVALID_COVER_IMAGE_METADATA_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아니거나 OWNER 권한이 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "OWNER 권한 없음", value = GROUP_OWNER_REQUIRED_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun updateCoverImage(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = UpdateGroupCoverImageRequest::class),
+                    examples = [ExampleObject(value = UPDATE_COVER_IMAGE_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: UpdateGroupCoverImageRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "그룹 생성",
         description =
             "그룹을 생성하고 요청한 사용자를 최초 멤버이자 OWNER로 등록한 뒤 초대 정보를 발급합니다. " +
@@ -303,6 +389,12 @@ private const val COVER_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
 private const val COVER_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE =
     """{"code":"GROUP-S002","message":"그룹 커버 이미지 업로드 URL이 발급되었습니다.","data":{"objectKey":"group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp","uploadUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp?...","method":"PUT","requiredHeaders":{"Content-Type":"image/webp","Content-Length":"524288"},"expiresAt":"2026-09-17T03:05:00Z"}}"""
 
+private const val UPDATE_COVER_IMAGE_REQUEST_EXAMPLE =
+    """{"coverImageObjectKey":"group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp"}"""
+
+private const val UPDATE_COVER_IMAGE_SUCCESS_EXAMPLE =
+    """{"code":"GROUP-S006","message":"그룹 커버 이미지가 변경되었습니다.","data":null}"""
+
 private const val CREATE_GROUP_REQUEST_EXAMPLE =
     """{"name":"주말 러닝 모임","coverImageObjectKey":"group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp"}"""
 
@@ -338,6 +430,9 @@ private const val GET_GROUP_MEMBERS_SUCCESS_EXAMPLE =
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
+
+private const val GROUP_OWNER_REQUIRED_EXAMPLE =
+    """{"code":"GROUP-E014","message":"그룹 OWNER만 커버 이미지를 변경할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
 
 private const val GROUP_NOT_FOUND_EXAMPLE =
     """{"code":"GROUP-E012","message":"그룹을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
