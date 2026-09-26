@@ -250,13 +250,3 @@ class Meeting protected constructor(
         }
     }
 }
-
-internal fun GroupMember.belongsTo(group: Group): Boolean {
-    if (this.group === group) {
-        return true
-    }
-
-    val memberGroupId = this.group.id
-    val groupId = group.id
-    return memberGroupId != null && groupId != null && memberGroupId == groupId
-}
