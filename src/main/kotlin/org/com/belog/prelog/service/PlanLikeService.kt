@@ -103,7 +103,7 @@ class PlanLikeService(
         PlanLikeResult(
             planId = planId,
             likedByMe = likedByMe,
-            likeCount = planLikeRepository.countByPlanId(planId),
+            likeCount = planLikeRepository.findAllByPlanIdForShare(planId).size.toLong(),
         )
 
     private data class PlanLikeTarget(
