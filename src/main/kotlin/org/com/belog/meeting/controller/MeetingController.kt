@@ -1,9 +1,6 @@
 package org.com.belog.meeting.controller
 
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Max
-import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.Positive
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
@@ -36,8 +33,8 @@ class MeetingController(
     override fun getPastMeetings(
         @LoginUserId userId: Long,
         @PathVariable groupId: Long,
-        @RequestParam(required = false) @Positive cursor: Long?,
-        @RequestParam(defaultValue = "10") @Min(1) @Max(50) size: Int,
+        @RequestParam(required = false) cursor: Long?,
+        @RequestParam(defaultValue = "10") size: Int,
     ): ResponseEntity<CommonResponse<PastMeetingListResponse>> {
         val result =
             meetingService.getPastMeetings(
