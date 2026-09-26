@@ -1,11 +1,11 @@
 package org.com.belog.user.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.ProfileImageFormat
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.ProfileImageUpload
-import org.com.belog.user.infrastructure.S3ProfileImageReadUrlProvider
 import org.com.belog.user.infrastructure.S3ProfileImageUploadUrlProvider
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
@@ -20,8 +20,8 @@ import kotlin.test.assertFailsWith
 class ProfileImageServiceTest {
     private val userRepository = mock(UserRepository::class.java)
     private val profileImageUploadUrlProvider = mock(S3ProfileImageUploadUrlProvider::class.java)
-    private val profileImageReadUrlProvider = mock(S3ProfileImageReadUrlProvider::class.java)
-    private val service = ProfileImageService(userRepository, profileImageUploadUrlProvider, profileImageReadUrlProvider)
+    private val s3ObjectReadUrlProvider = mock(S3ObjectReadUrlProvider::class.java)
+    private val service = ProfileImageService(userRepository, profileImageUploadUrlProvider, s3ObjectReadUrlProvider)
 
     @Test
     fun `지원하는 이미지 형식이면 업로드 URL을 발급한다`() {
@@ -69,12 +69,12 @@ class ProfileImageServiceTest {
     @Test
     fun `프로필 이미지 object key로 조회 URL을 생성한다`() {
         val objectKey = ProfileImageObjectKey.create(15L, "users/15/profile/image.webp")
-        `when`(profileImageReadUrlProvider.generateReadUrl(objectKey)).thenReturn("https://example.com/profile")
+        `when`(s3ObjectReadUrlProvider.generateReadUrl(objectKey.value)).thenReturn("https://example.com/profile")
 
         val result = service.generateReadUrl(15L, objectKey.value)
 
         assertEquals("https://example.com/profile", result)
-        verify(profileImageReadUrlProvider).generateReadUrl(objectKey)
+        verify(s3ObjectReadUrlProvider).generateReadUrl(objectKey.value)
     }
 
     @Test
@@ -82,6 +82,6 @@ class ProfileImageServiceTest {
         val result = service.generateReadUrl(15L, null)
 
         assertEquals(null, result)
-        verifyNoInteractions(profileImageReadUrlProvider)
+        verifyNoInteractions(s3ObjectReadUrlProvider)
     }
 }
