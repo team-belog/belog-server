@@ -12,7 +12,6 @@ data class GroupDetailResult(
     val canDeleteGroup: Boolean,
     val schedulingMeetings: List<SchedulingMeetingResult>,
     val activeMeetings: List<ActiveMeetingResult>,
-    val pastMeetings: PastMeetingPageResult,
 )
 
 data class SchedulingMeetingResult(
@@ -23,19 +22,6 @@ data class SchedulingMeetingResult(
 )
 
 data class ActiveMeetingResult(
-    val meetingId: Long,
-    val name: String,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
-)
-
-data class PastMeetingPageResult(
-    val items: List<PastMeetingResult>,
-    val nextCursor: Long?,
-    val hasNext: Boolean,
-)
-
-data class PastMeetingResult(
     val meetingId: Long,
     val name: String,
     val startDate: LocalDate,

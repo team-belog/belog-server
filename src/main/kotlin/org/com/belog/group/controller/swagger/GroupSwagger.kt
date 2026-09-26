@@ -17,6 +17,7 @@ import org.com.belog.group.controller.dto.request.CreateGroupRequest
 import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
 import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
+import org.com.belog.group.controller.dto.response.GroupDetailResponse
 import org.com.belog.group.controller.dto.response.GroupMembersResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -25,6 +26,59 @@ import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "Group", description = "그룹 관련 API")
 interface GroupSwagger {
+    @Operation(
+        summary = "그룹 조회",
+        description =
+            "그룹 정보와 일정 조율 중인 만남, 종료되지 않은 확정 만남을 조회합니다. " +
+                "해당 그룹에 참여한 사용자만 조회할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "그룹 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_GROUP_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getGroup(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+    ): ResponseEntity<CommonResponse<GroupDetailResponse>>
+
     @Operation(
         summary = "그룹 멤버 목록 조회",
         description = "그룹 멤버를 OWNER 우선, 가입 순으로 조회합니다. 해당 그룹에 참여한 사용자만 조회할 수 있습니다.",
@@ -287,3 +341,6 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val GROUP_NOT_FOUND_EXAMPLE =
     """{"code":"GROUP-E012","message":"그룹을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
+
+private const val GET_GROUP_SUCCESS_EXAMPLE =
+    """{"code":"GROUP-S005","message":"그룹을 조회했습니다.","data":{"groupId":1,"name":"피놀리와 기니휘기","coverImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/group-covers/15/image.webp?...","inviteCode":"QCRJNN","memberCount":15,"canEditCoverImage":true,"canDeleteGroup":true,"schedulingMeetings":[{"meetingId":10,"name":"1박 2일 광주 여행","participantNicknames":["이정원","정다빈","김성연"],"participantCount":3}],"activeMeetings":[{"meetingId":11,"name":"여름 부산 여행","startDate":"2026-09-25","endDate":"2026-09-26"}]}}"""

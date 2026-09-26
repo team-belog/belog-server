@@ -10,6 +10,7 @@ import org.com.belog.group.controller.dto.request.CreateGroupRequest
 import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
 import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
+import org.com.belog.group.controller.dto.response.GroupDetailResponse
 import org.com.belog.group.controller.dto.response.GroupMembersResponse
 import org.com.belog.group.controller.swagger.GroupSwagger
 import org.com.belog.group.domain.GroupCoverImageObjectKey
@@ -31,6 +32,27 @@ class GroupController(
     private val groupCoverImageService: GroupCoverImageService,
     private val groupMembershipService: GroupMembershipService,
 ) : GroupSwagger {
+    @GetMapping("/{groupId}")
+    override fun getGroup(
+        @LoginUserId userId: Long,
+        @PathVariable groupId: Long,
+    ): ResponseEntity<CommonResponse<GroupDetailResponse>> {
+        val group =
+            groupService.getGroup(
+                groupId = groupId,
+                userId = userId,
+            )
+
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    GroupSuccessCode.GROUP_RETRIEVED,
+                    GroupDetailResponse.from(group),
+                ),
+            )
+    }
+
     @GetMapping("/{groupId}/members")
     override fun getGroupMembers(
         @LoginUserId userId: Long,
