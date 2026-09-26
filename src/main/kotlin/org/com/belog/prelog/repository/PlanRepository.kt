@@ -10,6 +10,11 @@ import org.springframework.data.repository.query.Param
 interface PlanRepository : JpaRepository<Plan, Long> {
     fun existsByMeetingId(meetingId: Long): Boolean
 
+    fun findByIdAndMeetingId(
+        planId: Long,
+        meetingId: Long,
+    ): Plan?
+
     @Query(
         """
         SELECT plan
