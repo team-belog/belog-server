@@ -12,6 +12,7 @@ import org.com.belog.user.controller.dto.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.ProfileImageUploadUrlRequest
 import org.com.belog.user.controller.dto.ProfileImageUploadUrlResponse
+import org.com.belog.user.controller.dto.UpdateBankAccountRequest
 import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
@@ -21,6 +22,7 @@ import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -42,6 +44,26 @@ class UserController(
             .status(CommonSuccessCode.OK.status)
             .cacheControl(CacheControl.noStore())
             .body(CommonResponse.success(CommonSuccessCode.OK, response))
+    }
+
+    @PutMapping("/me/bank-account")
+    override fun updateBankAccount(
+        @LoginUserId userId: Long,
+        @Valid @RequestBody request: UpdateBankAccountRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        userService.updateBankAccount(
+            userId = userId,
+            bankAccount =
+                BankAccount.create(
+                    bank = requireNotNull(request.bankCode),
+                    accountNumber = request.accountNumber,
+                    accountHolderName = request.accountHolderName,
+                ),
+        )
+
+        return ResponseEntity
+            .status(CommonSuccessCode.OK.status)
+            .body(CommonResponse.success(CommonSuccessCode.OK))
     }
 
     @GetMapping("/nickname/availability")

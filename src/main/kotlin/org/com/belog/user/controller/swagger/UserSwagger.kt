@@ -18,6 +18,7 @@ import org.com.belog.user.controller.dto.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.ProfileImageUploadUrlRequest
 import org.com.belog.user.controller.dto.ProfileImageUploadUrlResponse
+import org.com.belog.user.controller.dto.UpdateBankAccountRequest
 import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -67,6 +68,67 @@ interface UserSwagger {
         @LoginUserId
         userId: Long,
     ): ResponseEntity<CommonResponse<BankAccountResponse>>
+
+    @Operation(
+        summary = "내 계좌 수정",
+        description = "로그인한 사용자의 정산 계좌 정보를 수정합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계좌 수정 성공",
+                useReturnTypeSchema = true,
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED,
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자 또는 등록 계좌를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "사용자 없음", value = USER_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "등록 계좌 없음", value = BANK_ACCOUNT_NOT_REGISTERED_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun updateBankAccount(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = UpdateBankAccountRequest::class),
+                    examples = [ExampleObject(value = UPDATE_BANK_ACCOUNT_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: UpdateBankAccountRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
         summary = "닉네임 중복 확인",
@@ -253,6 +315,9 @@ private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
 
 private const val BANK_ACCOUNT_SUCCESS_EXAMPLE =
     """{"code":"CMN-S001","message":"요청이 성공했습니다.","data":{"bankCode":"SHINHAN","bankName":"신한은행","accountNumber":"110123456789","accountHolderName":"홍길동"}}"""
+
+private const val UPDATE_BANK_ACCOUNT_REQUEST_EXAMPLE =
+    """{"bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""
 
 private const val PROFILE_IMAGE_UPLOAD_URL_SUCCESS_EXAMPLE =
     """{"code":"USER-S001","message":"프로필 이미지 업로드 URL이 발급되었습니다.","data":{"objectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp","uploadUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp?...","method":"PUT","requiredHeaders":{"Content-Type":"image/webp","Content-Length":"524288"},"expiresAt":"2026-09-14T14:05:00Z"}}"""

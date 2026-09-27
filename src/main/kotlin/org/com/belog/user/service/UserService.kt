@@ -36,6 +36,22 @@ class UserService(
     }
 
     @Transactional
+    fun updateBankAccount(
+        userId: Long,
+        bankAccount: BankAccount,
+    ) {
+        val user =
+            userRepository.findByIdForUpdate(userId)
+                ?: throw BusinessException(UserErrorCode.USER_NOT_FOUND)
+
+        if (user.bankAccount == null) {
+            throw BusinessException(UserErrorCode.BANK_ACCOUNT_NOT_REGISTERED)
+        }
+
+        user.updateBankAccount(bankAccount)
+    }
+
+    @Transactional
     fun completeOnboarding(
         userId: Long,
         profileImageObjectKey: ProfileImageObjectKey?,

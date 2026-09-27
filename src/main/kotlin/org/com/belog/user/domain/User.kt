@@ -111,6 +111,12 @@ class User protected constructor(
         this.onboardingCompletedAt = completedAt
     }
 
+    fun updateBankAccount(bankAccount: BankAccount) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 계좌를 수정할 수 있습니다." }
+
+        this.bankAccount = bankAccount
+    }
+
     fun updateSocialProfileImageUrl(socialProfileImageUrl: String?) {
         if (socialProfileImageUrl != null) {
             this.socialProfileImageUrl = normalizeSocialProfileImageUrl(socialProfileImageUrl)
