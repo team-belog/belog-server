@@ -6,7 +6,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
-import org.com.belog.user.controller.dto.BankResponse
+import org.com.belog.user.controller.dto.response.BankResponse
 import org.springframework.http.ResponseEntity
 
 @Tag(name = "Bank", description = "은행 관련 API")

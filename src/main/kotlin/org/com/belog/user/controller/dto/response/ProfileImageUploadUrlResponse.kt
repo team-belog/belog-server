@@ -1,4 +1,4 @@
-package org.com.belog.user.controller.dto
+package org.com.belog.user.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.user.domain.ProfileImageUpload

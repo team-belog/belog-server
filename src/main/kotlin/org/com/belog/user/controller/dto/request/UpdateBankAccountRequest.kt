@@ -1,4 +1,4 @@
-package org.com.belog.user.controller.dto
+package org.com.belog.user.controller.dto.request
 
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
