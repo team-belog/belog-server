@@ -193,6 +193,74 @@ class UserServiceTest {
     }
 
     @Test
+    fun `등록된 계좌를 새로운 계좌로 수정한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "belog")
+
+        userService.updateBankAccount(
+            userId = userId,
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.SHINHAN,
+                    accountNumber = "110123456789",
+                    accountHolderName = "김빌로그",
+                ),
+        )
+
+        val updatedBankAccount = requireNotNull(userRepository.findById(userId).orElseThrow().bankAccount)
+        assertEquals(Bank.SHINHAN, updatedBankAccount.bank)
+        assertEquals("110123456789", updatedBankAccount.accountNumber)
+        assertEquals("김빌로그", updatedBankAccount.accountHolderName)
+    }
+
+    @Test
+    fun `수정한 계좌번호는 암호화해서 저장한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "belog")
+        val updatedAccountNumber = "110123456789"
+
+        userService.updateBankAccount(
+            userId = userId,
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.SHINHAN,
+                    accountNumber = updatedAccountNumber,
+                    accountHolderName = "홍길동",
+                ),
+        )
+
+        val encryptedAccountNumber =
+            jdbcTemplate.queryForObject(
+                "SELECT encrypted_account_number FROM users WHERE id = ?",
+                String::class.java,
+                userId,
+            )
+        assertNotNull(encryptedAccountNumber)
+        assertNotEquals(updatedAccountNumber, encryptedAccountNumber)
+        assertTrue(encryptedAccountNumber.startsWith("v1."))
+        val savedUser = userRepository.findById(userId).orElseThrow()
+        assertEquals(updatedAccountNumber, savedUser.bankAccount?.accountNumber)
+    }
+
+    @Test
+    fun `존재하지 않는 사용자의 계좌를 수정할 수 없다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                userService.updateBankAccount(
+                    userId = 999L,
+                    bankAccount =
+                        BankAccount.create(
+                            bank = Bank.SHINHAN,
+                            accountNumber = "110123456789",
+                            accountHolderName = "홍길동",
+                        ),
+                )
+            }
+
+        assertEquals(UserErrorCode.USER_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
     fun `이미 사용 중인 닉네임으로 온보딩을 완료할 수 없다`() {
         val firstUserId = createUser("first-google-subject", "first@example.com")
         val secondUserId = createUser("second-google-subject", "second@example.com")
