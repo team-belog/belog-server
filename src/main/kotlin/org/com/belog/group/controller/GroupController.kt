@@ -103,7 +103,7 @@ class GroupController(
         groupCoverImageService.updateCoverImage(
             groupId = groupId,
             userId = userId,
-            coverImageObjectKey = createCoverImageObjectKey(userId, request.coverImageObjectKey),
+            coverImageObjectKeyValue = request.coverImageObjectKey,
         )
 
         return ResponseEntity

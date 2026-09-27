@@ -122,21 +122,21 @@ class GroupCoverImageServiceTest {
 
     @Test
     fun `OWNER는 검증된 커버 이미지로 그룹 커버 이미지를 변경한다`() {
-        val objectKey = GroupCoverImageObjectKey.create(15L, "group-covers/15/image.webp")
+        val objectKeyValue = "group-covers/15/image.webp"
+        val objectKey = GroupCoverImageObjectKey.create(15L, objectKeyValue)
         val owner = mock(GroupMember::class.java)
         `when`(groupRepository.existsById(1L)).thenReturn(true)
         `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(owner)
         `when`(owner.role).thenReturn(GroupRole.OWNER)
 
-        service.updateCoverImage(1L, 15L, objectKey)
+        service.updateCoverImage(1L, 15L, objectKeyValue)
 
         verify(groupCoverImageObjectVerifier).verify(objectKey)
         verify(groupCoverImageUpdateService).update(1L, objectKey)
     }
 
     @Test
-    fun `MEMBER는 그룹 커버 이미지를 변경할 수 없다`() {
-        val objectKey = GroupCoverImageObjectKey.create(15L, "group-covers/15/image.webp")
+    fun `MEMBER는 다른 사용자의 Object Key를 전달해도 권한 오류가 우선한다`() {
         val member = mock(GroupMember::class.java)
         `when`(groupRepository.existsById(1L)).thenReturn(true)
         `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(member)
@@ -144,10 +144,26 @@ class GroupCoverImageServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                service.updateCoverImage(1L, 15L, objectKey)
+                service.updateCoverImage(1L, 15L, "group-covers/16/image.webp")
             }
 
         assertEquals(GroupErrorCode.GROUP_OWNER_REQUIRED, exception.errorCode)
+        verifyNoInteractions(groupCoverImageObjectVerifier, groupCoverImageUpdateService)
+    }
+
+    @Test
+    fun `OWNER가 잘못된 Object Key를 전달하면 기존 오류 코드로 변환한다`() {
+        val owner = mock(GroupMember::class.java)
+        `when`(groupRepository.existsById(1L)).thenReturn(true)
+        `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(owner)
+        `when`(owner.role).thenReturn(GroupRole.OWNER)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                service.updateCoverImage(1L, 15L, "group-covers/16/image.webp")
+            }
+
+        assertEquals(GroupErrorCode.INVALID_COVER_IMAGE_OBJECT_KEY, exception.errorCode)
         verifyNoInteractions(groupCoverImageObjectVerifier, groupCoverImageUpdateService)
     }
 }

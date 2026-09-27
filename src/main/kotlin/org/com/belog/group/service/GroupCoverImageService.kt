@@ -51,7 +51,7 @@ class GroupCoverImageService(
     fun updateCoverImage(
         groupId: Long,
         userId: Long,
-        coverImageObjectKey: GroupCoverImageObjectKey,
+        coverImageObjectKeyValue: String,
     ) {
         if (!groupRepository.existsById(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
@@ -65,7 +65,18 @@ class GroupCoverImageService(
             throw BusinessException(GroupErrorCode.GROUP_OWNER_REQUIRED)
         }
 
+        val coverImageObjectKey = createCoverImageObjectKey(userId, coverImageObjectKeyValue)
         groupCoverImageObjectVerifier.verify(coverImageObjectKey)
         groupCoverImageUpdateService.update(groupId, coverImageObjectKey)
     }
+
+    private fun createCoverImageObjectKey(
+        userId: Long,
+        value: String,
+    ): GroupCoverImageObjectKey =
+        try {
+            GroupCoverImageObjectKey.create(userId, value)
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(GroupErrorCode.INVALID_COVER_IMAGE_OBJECT_KEY, exception)
+        }
 }
