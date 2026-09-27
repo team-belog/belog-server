@@ -2,7 +2,7 @@ package org.com.belog.user.controller
 
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.global.response.code.CommonSuccessCode
-import org.com.belog.user.controller.dto.BankResponse
+import org.com.belog.user.controller.dto.response.BankResponse
 import org.com.belog.user.controller.swagger.BankSwagger
 import org.com.belog.user.domain.Bank
 import org.springframework.http.ResponseEntity

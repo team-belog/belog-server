@@ -1,4 +1,4 @@
-package org.com.belog.user.controller.dto
+package org.com.belog.user.controller.dto.response
 
 import org.com.belog.user.domain.Bank
 

@@ -20,6 +20,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -37,6 +38,47 @@ class UserControllerTest {
 
     @MockitoBean
     private lateinit var profileImageService: ProfileImageService
+
+    @Test
+    fun `인증된 사용자의 계좌 정보를 수정한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/users/me/bank-account")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}""",
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("CMN-S001"))
+
+        val invocation =
+            mockingDetails(userService).invocations.single { invocation ->
+                invocation.method.name.startsWith("updateBankAccount")
+            }
+        assertEquals(15L, invocation.arguments[0])
+        val bankAccount = invocation.arguments[1] as BankAccount
+        assertEquals(Bank.SHINHAN, bankAccount.bank)
+        assertEquals("110123456789", bankAccount.accountNumber)
+        assertEquals("홍길동", bankAccount.accountHolderName)
+    }
+
+    @Test
+    fun `잘못된 계좌 수정 요청을 거절한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/users/me/bank-account")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"bankCode":"SHINHAN","accountNumber":"110-ABC-456789","accountHolderName":"홍길동"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+            .andExpect(jsonPath("$.data.fieldErrors[0].field").value("accountNumber"))
+
+        verifyNoInteractions(userService)
+    }
 
     @Test
     fun `다른 사용자의 object key로 온보딩을 요청하면 400 응답을 반환한다`() {

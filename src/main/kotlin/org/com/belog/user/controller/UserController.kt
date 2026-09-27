@@ -7,18 +7,22 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.global.response.code.CommonSuccessCode
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.code.UserSuccessCode
-import org.com.belog.user.controller.dto.CompleteOnboardingRequest
-import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
-import org.com.belog.user.controller.dto.ProfileImageUploadUrlRequest
-import org.com.belog.user.controller.dto.ProfileImageUploadUrlResponse
+import org.com.belog.user.controller.dto.request.CompleteOnboardingRequest
+import org.com.belog.user.controller.dto.request.ProfileImageUploadUrlRequest
+import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
+import org.com.belog.user.controller.dto.response.BankAccountResponse
+import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
+import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
 import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
+import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -30,6 +34,38 @@ class UserController(
     private val userService: UserService,
     private val profileImageService: ProfileImageService,
 ) : UserSwagger {
+    @GetMapping("/me/bank-account")
+    override fun getBankAccount(
+        @LoginUserId userId: Long,
+    ): ResponseEntity<CommonResponse<BankAccountResponse>> {
+        val response = BankAccountResponse.from(userService.getBankAccount(userId))
+
+        return ResponseEntity
+            .status(CommonSuccessCode.OK.status)
+            .cacheControl(CacheControl.noStore())
+            .body(CommonResponse.success(CommonSuccessCode.OK, response))
+    }
+
+    @PutMapping("/me/bank-account")
+    override fun updateBankAccount(
+        @LoginUserId userId: Long,
+        @Valid @RequestBody request: UpdateBankAccountRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        userService.updateBankAccount(
+            userId = userId,
+            bankAccount =
+                BankAccount.create(
+                    bank = requireNotNull(request.bankCode),
+                    accountNumber = request.accountNumber,
+                    accountHolderName = request.accountHolderName,
+                ),
+        )
+
+        return ResponseEntity
+            .status(CommonSuccessCode.OK.status)
+            .body(CommonResponse.success(CommonSuccessCode.OK))
+    }
+
     @GetMapping("/nickname/availability")
     override fun checkNicknameAvailability(
         @RequestParam

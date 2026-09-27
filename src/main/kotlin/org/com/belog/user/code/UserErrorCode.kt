@@ -14,4 +14,5 @@ enum class UserErrorCode(
     INVALID_PROFILE_IMAGE_OBJECT_KEY(HttpStatus.BAD_REQUEST, "USER-E004", "프로필 이미지 object key가 올바르지 않습니다."),
     UNSUPPORTED_PROFILE_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "USER-E005", "지원하지 않는 프로필 이미지 형식입니다."),
     INVALID_PROFILE_IMAGE_SIZE(HttpStatus.BAD_REQUEST, "USER-E006", "프로필 이미지는 5MB 이하여야 합니다."),
+    BANK_ACCOUNT_NOT_REGISTERED(HttpStatus.NOT_FOUND, "USER-E007", "등록된 계좌가 없습니다."),
 }
