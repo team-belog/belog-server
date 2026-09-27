@@ -37,15 +37,22 @@ private const val GROUP_NAME_MAX_LENGTH = 20
 class Group protected constructor(
     @Column(nullable = false, length = GROUP_NAME_MAX_LENGTH)
     val name: String,
-    @Column(name = "cover_image_object_key", length = GroupCoverImageObjectKey.MAX_LENGTH)
-    val coverImageObjectKey: String?,
+    coverImageObjectKey: String?,
     @Column(name = "invite_code", nullable = false, length = InviteCode.LENGTH)
     val inviteCode: String,
 ) : BaseEntity() {
+    @Column(name = "cover_image_object_key", length = GroupCoverImageObjectKey.MAX_LENGTH)
+    var coverImageObjectKey: String? = coverImageObjectKey
+        protected set
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
         protected set
+
+    fun changeCoverImage(coverImageObjectKey: GroupCoverImageObjectKey) {
+        this.coverImageObjectKey = coverImageObjectKey.value
+    }
 
     companion object {
         const val NAME_MIN_LENGTH = GROUP_NAME_MIN_LENGTH

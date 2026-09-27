@@ -21,4 +21,5 @@ enum class GroupErrorCode(
     GROUP_MEMBER_LIMIT_EXCEEDED(HttpStatus.CONFLICT, "GROUP-E011", "그룹 최대 인원에 도달했습니다."),
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP-E012", "그룹을 찾을 수 없습니다."),
     NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "GROUP-E013", "그룹 멤버만 접근할 수 있습니다."),
+    GROUP_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "GROUP-E014", "그룹 OWNER만 커버 이미지를 변경할 수 있습니다."),
 }
