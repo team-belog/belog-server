@@ -7,6 +7,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.global.response.code.CommonSuccessCode
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.code.UserSuccessCode
+import org.com.belog.user.controller.dto.BankAccountResponse
 import org.com.belog.user.controller.dto.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.ProfileImageUploadUrlRequest
@@ -16,6 +17,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.ProfileImageService
 import org.com.belog.user.service.UserService
+import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -30,6 +32,18 @@ class UserController(
     private val userService: UserService,
     private val profileImageService: ProfileImageService,
 ) : UserSwagger {
+    @GetMapping("/me/bank-account")
+    override fun getBankAccount(
+        @LoginUserId userId: Long,
+    ): ResponseEntity<CommonResponse<BankAccountResponse>> {
+        val response = BankAccountResponse.from(userService.getBankAccount(userId))
+
+        return ResponseEntity
+            .status(CommonSuccessCode.OK.status)
+            .cacheControl(CacheControl.noStore())
+            .body(CommonResponse.success(CommonSuccessCode.OK, response))
+    }
+
     @GetMapping("/nickname/availability")
     override fun checkNicknameAvailability(
         @RequestParam

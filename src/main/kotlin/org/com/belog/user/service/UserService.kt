@@ -24,6 +24,17 @@ class UserService(
     @Transactional(readOnly = true)
     fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNickname(nickname)
 
+    @Transactional(readOnly = true)
+    fun getBankAccount(userId: Long): BankAccount {
+        val user =
+            userRepository.findById(userId).orElseThrow {
+                BusinessException(UserErrorCode.USER_NOT_FOUND)
+            }
+
+        return user.bankAccount
+            ?: throw BusinessException(UserErrorCode.BANK_ACCOUNT_NOT_REGISTERED)
+    }
+
     @Transactional
     fun completeOnboarding(
         userId: Long,
