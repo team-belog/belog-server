@@ -9,4 +9,5 @@ enum class UserSuccessCode(
     override val message: String,
 ) : SuccessCode {
     PROFILE_IMAGE_UPLOAD_URL_ISSUED(HttpStatus.OK, "USER-S001", "프로필 이미지 업로드 URL이 발급되었습니다."),
+    PROFILE_RETRIEVED(HttpStatus.OK, "USER-S002", "프로필을 조회했습니다."),
 }

@@ -19,6 +19,7 @@ import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
+import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -26,6 +27,62 @@ import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
+    @Operation(
+        summary = "내 프로필 조회",
+        description =
+            "로그인한 사용자의 닉네임과 표시용 프로필 이미지 URL을 조회합니다. " +
+                "앱 기본 이미지를 사용하는 경우 profileImageUrl은 null입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "프로필 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [
+                            ExampleObject(name = "프로필 이미지 있음", value = PROFILE_SUCCESS_EXAMPLE),
+                            ExampleObject(name = "앱 기본 이미지 사용", value = DEFAULT_PROFILE_SUCCESS_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED,
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "온보딩 미완료",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ONBOARDING_REQUIRED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = USER_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getProfile(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+    ): ResponseEntity<CommonResponse<UserProfileResponse>>
+
     @Operation(
         summary = "내 계좌 조회",
         description = "로그인한 사용자의 정산 계좌 정보를 조회합니다.",
@@ -313,6 +370,12 @@ const val NICKNAME_LENGTH_MESSAGE = "닉네임은 1자 이상 8자 이하여야 
 private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
     """{"contentType":"image/webp","fileSize":524288}"""
 
+private const val PROFILE_SUCCESS_EXAMPLE =
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
+
+private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":null}}"""
+
 private const val BANK_ACCOUNT_SUCCESS_EXAMPLE =
     """{"code":"CMN-S001","message":"요청이 성공했습니다.","data":{"bankCode":"SHINHAN","bankName":"신한은행","accountNumber":"110123456789","accountHolderName":"홍길동"}}"""
 
@@ -342,6 +405,9 @@ private const val USER_NOT_FOUND_EXAMPLE =
 
 private const val BANK_ACCOUNT_NOT_REGISTERED_EXAMPLE =
     """{"code":"USER-E007","message":"등록된 계좌가 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val ONBOARDING_REQUIRED_EXAMPLE =
+    """{"code":"USER-E008","message":"온보딩을 완료한 사용자만 이용할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE =
     """{"code":"USER-E004","message":"프로필 이미지 object key가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""

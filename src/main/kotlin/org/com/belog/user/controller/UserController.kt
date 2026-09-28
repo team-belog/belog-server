@@ -13,10 +13,12 @@ import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
+import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.ProfileImageService
+import org.com.belog.user.service.UserProfileService
 import org.com.belog.user.service.UserService
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
@@ -33,7 +35,20 @@ import org.springframework.web.bind.annotation.RestController
 class UserController(
     private val userService: UserService,
     private val profileImageService: ProfileImageService,
+    private val userProfileService: UserProfileService,
 ) : UserSwagger {
+    @GetMapping("/me/profile")
+    override fun getProfile(
+        @LoginUserId userId: Long,
+    ): ResponseEntity<CommonResponse<UserProfileResponse>> {
+        val response = UserProfileResponse.from(userProfileService.getProfile(userId))
+
+        return ResponseEntity
+            .status(UserSuccessCode.PROFILE_RETRIEVED.status)
+            .cacheControl(CacheControl.noStore())
+            .body(CommonResponse.success(UserSuccessCode.PROFILE_RETRIEVED, response))
+    }
+
     @GetMapping("/me/bank-account")
     override fun getBankAccount(
         @LoginUserId userId: Long,

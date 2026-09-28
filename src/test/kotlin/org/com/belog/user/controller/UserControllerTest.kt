@@ -4,6 +4,7 @@ import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageUpload
 import org.com.belog.user.service.ProfileImageService
+import org.com.belog.user.service.UserProfileService
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
@@ -38,6 +39,9 @@ class UserControllerTest {
 
     @MockitoBean
     private lateinit var profileImageService: ProfileImageService
+
+    @MockitoBean
+    private lateinit var userProfileService: UserProfileService
 
     @Test
     fun `인증된 사용자의 계좌 정보를 수정한다`() {
