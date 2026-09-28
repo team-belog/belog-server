@@ -30,11 +30,13 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -78,6 +80,9 @@ class BillServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @MockitoBean
+    private lateinit var userService: UserService
 
     @Test
     fun `그룹 멤버가 결제 내역을 등록하면 항목과 개인별 부담 금액 및 정산 요청이 저장된다`() {
