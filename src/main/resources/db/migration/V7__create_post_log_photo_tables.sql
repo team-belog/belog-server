@@ -19,7 +19,7 @@ CREATE TABLE post_log_photos
     uploaded_by_group_member_id BIGINT       NOT NULL,
     object_key                  VARCHAR(512) NOT NULL,
     captured_at_utc             DATETIME(6)  NOT NULL,
-    captured_offset_minutes     SMALLINT     NOT NULL,
+    captured_offset_minutes     INTEGER      NOT NULL,
     created_at                  DATETIME(6)  NOT NULL,
     updated_at                  DATETIME(6)  NOT NULL,
     CONSTRAINT pk_post_log_photos PRIMARY KEY (id),
