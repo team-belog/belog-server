@@ -6,6 +6,7 @@ import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
+import org.com.belog.user.infrastructure.S3ProfileImageObjectVerifier
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -20,7 +21,15 @@ import kotlin.test.assertFailsWith
 class UserProfileServiceTest {
     private val userRepository = mock(UserRepository::class.java)
     private val profileImageService = mock(ProfileImageService::class.java)
-    private val service = UserProfileService(userRepository, profileImageService)
+    private val profileImageObjectVerifier = mock(S3ProfileImageObjectVerifier::class.java)
+    private val userProfileUpdateTransactionService = mock(UserProfileUpdateTransactionService::class.java)
+    private val service =
+        UserProfileService(
+            userRepository,
+            profileImageService,
+            profileImageObjectVerifier,
+            userProfileUpdateTransactionService,
+        )
 
     @Test
     fun `현재 사용자의 닉네임과 프로필 이미지 URL을 조회한다`() {
