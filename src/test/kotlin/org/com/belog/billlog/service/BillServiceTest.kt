@@ -1,5 +1,6 @@
 package org.com.belog.billlog.service
 
+import jakarta.persistence.EntityManager
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequestStatus
@@ -35,8 +36,10 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -81,6 +84,12 @@ class BillServiceTest {
     @Autowired
     private lateinit var userRepository: UserRepository
 
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
     @MockitoBean
     private lateinit var userService: UserService
 
@@ -120,6 +129,71 @@ class BillServiceTest {
         assertEquals(context.memberParticipant.id, settlementRequest.participant.id)
         assertEquals(7_000L, settlementRequest.amount)
         assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
+    }
+
+    @Test
+    fun `그룹 멤버가 결제 내역 상세를 조회한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-23T01:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                meetingId = requireNotNull(context.meeting.id),
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(registeredBill.billId, result.billId)
+        assertEquals(LocalDate.of(2026, 9, 23), result.paymentDate)
+        assertEquals("아랑이 카페", result.title)
+        assertEquals("작성자", result.payerNickname)
+        assertEquals(BillSplitType.EQUAL_SPLIT, result.settlementMethod)
+        assertEquals(listOf("아메리카노", "프라푸치노"), result.items.map { item -> item.name })
+        assertEquals(listOf(4_000L, 7_000L), result.items.map { item -> item.amount })
+        assertEquals(11_000L, result.totalAmount)
+        assertEquals(
+            listOf(context.payerParticipant.id, context.memberParticipant.id),
+            result.shares.map { share -> share.meetingParticipantId },
+        )
+        assertEquals(listOf("작성자", "참여자"), result.shares.map { share -> share.nickname })
+        assertEquals(listOf(4_000L, 7_000L), result.shares.map { share -> share.amount })
+        assertEquals(listOf(null, null), result.shares.map { share -> share.profileImageUrl })
+    }
+
+    @Test
+    fun `결제일과 만남 시작일을 기준으로 회차를 계산한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-25T00:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                meetingId = requireNotNull(context.meeting.id),
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(LocalDate.of(2026, 9, 25), result.paymentDate)
+        assertEquals(3, result.dayNumber)
+    }
+
+    @Test
+    fun `정산 참여자 중 결제자를 식별한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-23T01:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                meetingId = requireNotNull(context.meeting.id),
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+        val sharesByParticipantId = result.shares.associateBy { share -> share.meetingParticipantId }
+
+        assertEquals(true, sharesByParticipantId.getValue(requireNotNull(context.payerParticipant.id)).payer)
+        assertEquals(false, sharesByParticipantId.getValue(requireNotNull(context.memberParticipant.id)).payer)
     }
 
     @Test
@@ -281,6 +355,19 @@ class BillServiceTest {
         assertEquals(0L, billItemRepository.count())
         assertEquals(0L, billShareRepository.count())
         assertEquals(0L, settlementRequestRepository.count())
+    }
+
+    private fun updateBillCreatedAt(
+        billId: Long,
+        createdAt: Instant,
+    ) {
+        billRepository.flush()
+        jdbcTemplate.update(
+            "UPDATE bill_log_bills SET created_at = ? WHERE id = ?",
+            Timestamp.from(createdAt),
+            billId,
+        )
+        entityManager.clear()
     }
 
     private fun createGroup(): Group =
