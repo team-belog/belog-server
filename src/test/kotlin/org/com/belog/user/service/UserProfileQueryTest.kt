@@ -6,42 +6,40 @@ import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
-import org.com.belog.user.infrastructure.S3ProfileImageObjectVerifier
+import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.transaction.PlatformTransactionManager
+import java.time.Clock
 import java.time.Instant
 import java.util.Optional
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class UserProfileServiceTest {
+class UserProfileQueryTest {
     private val userRepository = mock(UserRepository::class.java)
-    private val profileImageService = mock(ProfileImageService::class.java)
-    private val profileImageObjectVerifier = mock(S3ProfileImageObjectVerifier::class.java)
-    private val userProfileUpdateTransactionService = mock(UserProfileUpdateTransactionService::class.java)
+    private val profileImageStorage = mock(ProfileImageStorage::class.java)
+    private val transactionManager = mock(PlatformTransactionManager::class.java)
     private val service =
-        UserProfileService(
+        UserService(
             userRepository,
-            profileImageService,
-            profileImageObjectVerifier,
-            userProfileUpdateTransactionService,
+            profileImageStorage,
+            transactionManager,
+            Clock.systemUTC(),
         )
 
     @Test
     fun `현재 사용자의 닉네임과 프로필 이미지 URL을 조회한다`() {
         val user = completedUser()
         `when`(userRepository.findById(15L)).thenReturn(Optional.of(user))
-        `when`(profileImageService.resolveProfileImageUrl(user)).thenReturn("https://example.com/profile")
 
         val result = service.getProfile(15L)
 
         assertEquals("빌로그", result.nickname)
-        assertEquals("https://example.com/profile", result.profileImageUrl)
-        verify(profileImageService).resolveProfileImageUrl(user)
+        assertEquals("https://example.com/social-profile", result.profileImageUrl)
     }
 
     @Test
@@ -54,7 +52,7 @@ class UserProfileServiceTest {
             }
 
         assertEquals(UserErrorCode.USER_NOT_FOUND, exception.errorCode)
-        verifyNoInteractions(profileImageService)
+        verifyNoInteractions(profileImageStorage)
     }
 
     @Test
@@ -68,7 +66,7 @@ class UserProfileServiceTest {
             }
 
         assertEquals(UserErrorCode.ONBOARDING_REQUIRED, exception.errorCode)
-        verifyNoInteractions(profileImageService)
+        verifyNoInteractions(profileImageStorage)
     }
 
     private fun completedUser(): User =

@@ -7,6 +7,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.result.SocialUserResult
 import org.junit.jupiter.api.AfterEach
@@ -18,6 +19,7 @@ import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
@@ -45,6 +47,9 @@ class UserServiceTest {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @MockitoBean
+    private lateinit var profileImageStorage: ProfileImageStorage
 
     @AfterEach
     fun cleanUp() {

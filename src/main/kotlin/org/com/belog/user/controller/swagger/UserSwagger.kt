@@ -302,7 +302,7 @@ interface UserSwagger {
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "요청값 또는 프로필 이미지 object key 검증 실패",
+                description = "요청값, 프로필 이미지 object key 또는 업로드된 이미지 검증 실패",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -310,6 +310,8 @@ interface UserSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 프로필 이미지 object key", value = INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE),
+                            ExampleObject(name = "업로드된 프로필 이미지 없음", value = PROFILE_IMAGE_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "잘못된 프로필 이미지 정보", value = INVALID_PROFILE_IMAGE_METADATA_EXAMPLE),
                         ],
                     ),
                 ],
@@ -411,6 +413,12 @@ private const val ONBOARDING_REQUIRED_EXAMPLE =
 
 private const val INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE =
     """{"code":"USER-E004","message":"프로필 이미지 object key가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val PROFILE_IMAGE_NOT_FOUND_EXAMPLE =
+    """{"code":"USER-E009","message":"업로드된 프로필 이미지를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val INVALID_PROFILE_IMAGE_METADATA_EXAMPLE =
+    """{"code":"USER-E010","message":"프로필 이미지 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val NICKNAME_ALREADY_EXISTS_EXAMPLE =
     """{"code":"USER-E002","message":"이미 사용 중인 닉네임입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""

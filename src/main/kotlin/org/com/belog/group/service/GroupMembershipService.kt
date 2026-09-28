@@ -12,7 +12,7 @@ import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.group.service.result.JoinedGroup
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
-import org.com.belog.user.service.ProfileImageService
+import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
@@ -23,7 +23,7 @@ class GroupMembershipService(
     private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val groupMemberRepository: GroupMemberRepository,
-    private val profileImageService: ProfileImageService,
+    private val userService: UserService,
 ) {
     @Transactional(readOnly = true)
     fun getGroupMembers(
@@ -37,7 +37,7 @@ class GroupMembershipService(
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
                 nickname = requireNotNull(memberUser.nickname),
-                profileImageUrl = profileImageService.resolveProfileImageUrl(memberUser),
+                profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )
         }

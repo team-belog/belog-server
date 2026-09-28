@@ -1,7 +1,6 @@
 package org.com.belog.user.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -10,22 +9,30 @@ import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.ProfileImageUpload
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
-import org.com.belog.user.infrastructure.S3ProfileImageUploadUrlProvider
+import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import org.springframework.transaction.PlatformTransactionManager
+import java.time.Clock
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-class ProfileImageServiceTest {
+class UserProfileImageTest {
     private val userRepository = mock(UserRepository::class.java)
-    private val profileImageUploadUrlProvider = mock(S3ProfileImageUploadUrlProvider::class.java)
-    private val s3ObjectReadUrlProvider = mock(S3ObjectReadUrlProvider::class.java)
-    private val service = ProfileImageService(userRepository, profileImageUploadUrlProvider, s3ObjectReadUrlProvider)
+    private val profileImageStorage = mock(ProfileImageStorage::class.java)
+    private val transactionManager = mock(PlatformTransactionManager::class.java)
+    private val service =
+        UserService(
+            userRepository,
+            profileImageStorage,
+            transactionManager,
+            Clock.systemUTC(),
+        )
 
     @Test
     fun `지원하는 이미지 형식이면 업로드 URL을 발급한다`() {
@@ -38,23 +45,23 @@ class ProfileImageServiceTest {
                 expiresAt = Instant.parse("2026-09-14T14:05:00Z"),
             )
         `when`(userRepository.existsById(15L)).thenReturn(true)
-        `when`(profileImageUploadUrlProvider.issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)).thenReturn(expected)
+        `when`(profileImageStorage.issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)).thenReturn(expected)
 
-        val result = service.issueUploadUrl(15L, "IMAGE/WEBP", 1024L)
+        val result = service.issueProfileImageUploadUrl(15L, "IMAGE/WEBP", 1024L)
 
         assertEquals(expected, result)
-        verify(profileImageUploadUrlProvider).issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)
+        verify(profileImageStorage).issueUploadUrl(15L, ProfileImageFormat.WEBP, 1024L)
     }
 
     @Test
     fun `지원하지 않는 이미지 형식은 거부한다`() {
         val exception =
             assertFailsWith<BusinessException> {
-                service.issueUploadUrl(15L, "image/gif", 1024L)
+                service.issueProfileImageUploadUrl(15L, "image/gif", 1024L)
             }
 
         assertEquals(UserErrorCode.UNSUPPORTED_PROFILE_IMAGE_TYPE, exception.errorCode)
-        verifyNoInteractions(userRepository, profileImageUploadUrlProvider)
+        verifyNoInteractions(userRepository, profileImageStorage)
     }
 
     @Test
@@ -63,23 +70,23 @@ class ProfileImageServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                service.issueUploadUrl(15L, "image/webp", 1024L)
+                service.issueProfileImageUploadUrl(15L, "image/webp", 1024L)
             }
 
         assertEquals(UserErrorCode.USER_NOT_FOUND, exception.errorCode)
-        verifyNoInteractions(profileImageUploadUrlProvider)
+        verifyNoInteractions(profileImageStorage)
     }
 
     @Test
     fun `직접 업로드한 프로필 이미지의 조회 URL을 생성한다`() {
         val objectKey = ProfileImageObjectKey.create(15L, "users/15/profile/image.webp")
         val user = completedUser(objectKey)
-        `when`(s3ObjectReadUrlProvider.generateReadUrl(objectKey.value)).thenReturn("https://example.com/profile")
+        `when`(profileImageStorage.generateReadUrl(objectKey.value)).thenReturn("https://example.com/profile")
 
         val result = service.resolveProfileImageUrl(user)
 
         assertEquals("https://example.com/profile", result)
-        verify(s3ObjectReadUrlProvider).generateReadUrl(objectKey.value)
+        verify(profileImageStorage).generateReadUrl(objectKey.value)
     }
 
     @Test
@@ -89,7 +96,7 @@ class ProfileImageServiceTest {
         val result = service.resolveProfileImageUrl(user)
 
         assertEquals("https://example.com/social-profile", result)
-        verifyNoInteractions(s3ObjectReadUrlProvider)
+        verifyNoInteractions(profileImageStorage)
     }
 
     @Test
@@ -100,7 +107,7 @@ class ProfileImageServiceTest {
         val result = service.resolveProfileImageUrl(user)
 
         assertEquals(null, result)
-        verifyNoInteractions(s3ObjectReadUrlProvider)
+        verifyNoInteractions(profileImageStorage)
     }
 
     private fun completedUser(

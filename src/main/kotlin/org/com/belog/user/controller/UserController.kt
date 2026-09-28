@@ -17,8 +17,6 @@ import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
-import org.com.belog.user.service.ProfileImageService
-import org.com.belog.user.service.UserProfileService
 import org.com.belog.user.service.UserService
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
@@ -34,14 +32,12 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userService: UserService,
-    private val profileImageService: ProfileImageService,
-    private val userProfileService: UserProfileService,
 ) : UserSwagger {
     @GetMapping("/me/profile")
     override fun getProfile(
         @LoginUserId userId: Long,
     ): ResponseEntity<CommonResponse<UserProfileResponse>> {
-        val response = UserProfileResponse.from(userProfileService.getProfile(userId))
+        val response = UserProfileResponse.from(userService.getProfile(userId))
 
         return ResponseEntity
             .status(UserSuccessCode.PROFILE_RETRIEVED.status)
@@ -104,7 +100,7 @@ class UserController(
         @Valid @RequestBody request: ProfileImageUploadUrlRequest,
     ): ResponseEntity<CommonResponse<ProfileImageUploadUrlResponse>> {
         val upload =
-            profileImageService.issueUploadUrl(
+            userService.issueProfileImageUploadUrl(
                 userId = userId,
                 contentType = request.contentType,
                 fileSize = request.fileSize,
