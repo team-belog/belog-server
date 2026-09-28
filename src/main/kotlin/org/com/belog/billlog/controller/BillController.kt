@@ -3,6 +3,7 @@ package org.com.belog.billlog.controller
 import jakarta.validation.Valid
 import org.com.belog.billlog.code.BillLogSuccessCode
 import org.com.belog.billlog.controller.dto.request.RegisterBillRequest
+import org.com.belog.billlog.controller.dto.response.BillDetailResponse
 import org.com.belog.billlog.controller.dto.response.RegisterBillResponse
 import org.com.belog.billlog.controller.swagger.BillSwagger
 import org.com.belog.billlog.service.BillService
@@ -12,6 +13,7 @@ import org.com.belog.billlog.service.command.RegisterBillCommand
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -23,6 +25,29 @@ import org.springframework.web.bind.annotation.RestController
 class BillController(
     private val billService: BillService,
 ) : BillSwagger {
+    @GetMapping("/{billId}")
+    override fun getBillDetail(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @PathVariable billId: Long,
+    ): ResponseEntity<CommonResponse<BillDetailResponse>> {
+        val billDetail =
+            billService.getBillDetail(
+                meetingId = meetingId,
+                billId = billId,
+                userId = userId,
+            )
+
+        return ResponseEntity
+            .status(BillLogSuccessCode.BILL_DETAIL_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    BillLogSuccessCode.BILL_DETAIL_RETRIEVED,
+                    BillDetailResponse.from(billDetail),
+                ),
+            )
+    }
+
     @PostMapping
     override fun registerBill(
         @LoginUserId userId: Long,

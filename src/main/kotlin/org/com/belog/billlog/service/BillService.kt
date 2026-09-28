@@ -10,8 +10,12 @@ import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.billlog.service.command.RegisterBillCommand
+import org.com.belog.billlog.service.result.BillDetailResult
+import org.com.belog.billlog.service.result.BillItemResult
+import org.com.belog.billlog.service.result.BillShareResult
 import org.com.belog.billlog.service.result.RegisteredBill
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.toBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
@@ -20,8 +24,10 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.temporal.ChronoUnit
 
 @Service
 class BillService(
@@ -32,13 +38,14 @@ class BillService(
     private val billItemRepository: BillItemRepository,
     private val billShareRepository: BillShareRepository,
     private val settlementRequestRepository: SettlementRequestRepository,
+    private val userService: UserService,
 ) {
     @Transactional
     fun registerBill(command: RegisterBillCommand): RegisteredBill {
         validateCommand(command)
 
         val meeting = findMeeting(command.meetingId)
-        val creator = findCreator(meeting, command.creatorUserId)
+        val creator = findGroupMember(meeting, command.creatorUserId)
         val participantsByMemberId = findParticipantsByMemberId(meeting, command)
         val payer =
             participantsByMemberId[command.payerMemberId]
@@ -56,6 +63,64 @@ class BillService(
 
         return RegisteredBill(
             billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getBillDetail(
+        meetingId: Long,
+        billId: Long,
+        userId: Long,
+    ): BillDetailResult {
+        val meeting = findMeeting(meetingId)
+        findGroupMember(meeting, userId)
+
+        val bill =
+            billRepository.findByIdAndMeetingIdWithPayer(billId = billId, meetingId = meetingId)
+                ?: throw BusinessException(BillLogErrorCode.BILL_NOT_FOUND)
+        val items = billItemRepository.findAllByBillIdOrderByItemOrderAsc(billId)
+        val shares = billShareRepository.findAllWithParticipantAndUserByBillId(billId)
+        val paymentDate =
+            checkNotNull(bill.createdAt) { "조회된 결제 내역의 생성 시각이 없습니다." }
+                .toBusinessDate()
+        val meetingStartDate =
+            meeting.startDate
+                ?: throw BusinessException(BillLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
+        val daysFromMeetingStart = ChronoUnit.DAYS.between(meetingStartDate, paymentDate)
+        val dayNumber = if (daysFromMeetingStart < 0) daysFromMeetingStart else daysFromMeetingStart + 1
+        val payerParticipantId = checkNotNull(bill.payer.id) { "조회된 결제자의 만남 참여자 ID가 없습니다." }
+        val payerNickname = checkNotNull(bill.payer.groupMember.user.nickname) { "조회된 결제자의 닉네임이 없습니다." }
+
+        return BillDetailResult(
+            billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
+            dayNumber = Math.toIntExact(dayNumber),
+            paymentDate = paymentDate,
+            title = bill.title,
+            payerNickname = payerNickname,
+            settlementMethod = bill.splitType,
+            items =
+                items.map { item ->
+                    BillItemResult(
+                        name = item.name,
+                        amount = item.amount,
+                    )
+                },
+            totalAmount = bill.totalAmount,
+            shares =
+                shares.map { share ->
+                    val participant = share.participant
+                    val participantId =
+                        checkNotNull(participant.id) { "조회된 부담자의 만남 참여자 ID가 없습니다." }
+                    val participantUser = participant.groupMember.user
+
+                    BillShareResult(
+                        meetingParticipantId = participantId,
+                        nickname = checkNotNull(participantUser.nickname) { "조회된 부담자의 닉네임이 없습니다." },
+                        profileImageUrl = userService.resolveProfileImageUrl(participantUser),
+                        amount = share.amount,
+                        payer = participantId == payerParticipantId,
+                    )
+                },
         )
     }
 
@@ -101,12 +166,12 @@ class BillService(
         meetingRepository.findByIdWithGroupAndCreator(meetingId)
             ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
 
-    private fun findCreator(
+    private fun findGroupMember(
         meeting: Meeting,
-        creatorUserId: Long,
+        userId: Long,
     ): GroupMember {
         val groupId = checkNotNull(meeting.group.id) { "결제 내역 대상 만남의 그룹 ID가 없습니다." }
-        return groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
