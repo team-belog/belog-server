@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.meeting.domain.MeetingParticipant
+import java.time.Instant
 
 @Entity
 @Table(
@@ -30,6 +31,12 @@ import org.com.belog.meeting.domain.MeetingParticipant
         CheckConstraint(
             name = "chk_bill_log_settlement_requests_amount",
             constraint = "amount > 0",
+        ),
+        CheckConstraint(
+            name = "chk_bill_log_settlement_requests_completion",
+            constraint =
+                "(status = 'PENDING' AND completed_at IS NULL) OR " +
+                    "(status = 'COMPLETED' AND completed_at IS NOT NULL)",
         ),
     ],
 )
@@ -50,14 +57,30 @@ class SettlementRequest protected constructor(
     val participant: MeetingParticipant,
     @Column(nullable = false)
     val amount: Long,
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    val status: SettlementRequestStatus,
+    status: SettlementRequestStatus,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
         protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    var status: SettlementRequestStatus = status
+        protected set
+
+    @Column(name = "completed_at")
+    var completedAt: Instant? = null
+        protected set
+
+    fun complete(completedAt: Instant) {
+        if (status == SettlementRequestStatus.COMPLETED) {
+            return
+        }
+
+        status = SettlementRequestStatus.COMPLETED
+        this.completedAt = completedAt
+    }
 
     companion object {
         fun create(share: BillShare): SettlementRequest {
