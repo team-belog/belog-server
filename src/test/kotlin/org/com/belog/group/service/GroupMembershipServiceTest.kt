@@ -15,9 +15,11 @@ import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
-import org.com.belog.user.service.ProfileImageService
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
+import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -51,7 +53,7 @@ class GroupMembershipServiceTest {
     private lateinit var userRepository: UserRepository
 
     @MockitoBean
-    private lateinit var profileImageService: ProfileImageService
+    private lateinit var userService: UserService
 
     @AfterEach
     fun cleanUp() {
@@ -171,9 +173,14 @@ class GroupMembershipServiceTest {
         val savedMember = groupMemberRepository.save(GroupMember.createMember(group, member))
         groupMemberRepository.flush()
         val ownerId = requireNotNull(owner.id)
-        `when`(profileImageService.generateReadUrl(ownerId, owner.profileImageObjectKey))
-            .thenReturn("https://example.com/s3-profile")
-        `when`(profileImageService.generateReadUrl(requireNotNull(member.id), null)).thenReturn(null)
+        `when`(userService.resolveProfileImageUrl(anyValue())).thenAnswer { invocation ->
+            val user = invocation.arguments[0] as User
+            if (user.profileImageObjectKey == null) {
+                "https://example.com/social-profile"
+            } else {
+                "https://example.com/s3-profile"
+            }
+        }
 
         val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), ownerId)
 
@@ -186,8 +193,7 @@ class GroupMembershipServiceTest {
         assertEquals("멤버", results[1].nickname)
         assertEquals("https://example.com/social-profile", results[1].profileImageUrl)
         assertEquals(GroupRole.MEMBER, results[1].role)
-        verify(profileImageService).generateReadUrl(ownerId, owner.profileImageObjectKey)
-        verify(profileImageService).generateReadUrl(requireNotNull(member.id), null)
+        verify(userService, times(2)).resolveProfileImageUrl(anyValue())
     }
 
     @Test
@@ -250,6 +256,12 @@ class GroupMembershipServiceTest {
             completedAt = Instant.parse("2026-09-15T00:00:00Z"),
         )
         return userRepository.saveAndFlush(user)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
     }
 
     private fun saveUser(

@@ -21,6 +21,7 @@ class UserTest {
         assertEquals(null, user.nickname)
         assertEquals(null, user.name)
         assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
         assertEquals(null, user.socialProfileImageUrl)
         assertEquals(null, user.bankAccount)
         assertFalse(user.isOnboardingCompleted)
@@ -70,6 +71,7 @@ class UserTest {
         )
 
         assertEquals("users/1/profile/image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
         assertEquals("빌로그", user.nickname)
         assertEquals("홍 길동", user.name)
         assertEquals(Bank.KB_KOOKMIN, user.bankAccount?.bank)
@@ -77,6 +79,52 @@ class UserTest {
         assertEquals("홍길동", user.bankAccount?.accountHolderName)
         assertEquals(completedAt, user.onboardingCompletedAt)
         assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `직접 업로드한 이미지 없이 온보딩하면 소셜 프로필 이미지를 유지한다`() {
+        val user = createUser()
+
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = "빌로그",
+            name = "홍길동",
+            bankAccount = createBankAccount(),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
+        assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `온보딩을 완료한 사용자의 닉네임을 수정한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateNickname(" 새닉네임 ")
+
+        assertEquals("새닉네임", user.nickname)
+    }
+
+    @Test
+    fun `직접 업로드한 프로필 이미지로 변경한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateProfileImage(ProfileImageObjectKey.create(1L, "users/1/profile/new-image.webp"))
+
+        assertEquals("users/1/profile/new-image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
+    }
+
+    @Test
+    fun `프로필 이미지를 앱 기본 이미지로 초기화한다`() {
+        val user = completedUser(ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"))
+
+        user.resetProfileImage()
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.DEFAULT, user.profileImageSource)
     }
 
     @Test
@@ -160,6 +208,17 @@ class UserTest {
             provider = SocialProvider.GOOGLE,
             providerUserId = "google-subject",
         )
+
+    private fun completedUser(profileImageObjectKey: ProfileImageObjectKey?): User =
+        createUser().apply {
+            completeOnboarding(
+                profileImageObjectKey = profileImageObjectKey,
+                nickname = "빌로그",
+                name = "홍길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
 
     private fun createBankAccount(): BankAccount =
         BankAccount.create(
