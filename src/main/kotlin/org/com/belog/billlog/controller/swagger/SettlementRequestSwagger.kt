@@ -98,10 +98,10 @@ interface SettlementRequestSwagger {
 private const val UPDATE_STATUS_REQUEST_EXAMPLE = """{"status":"COMPLETED"}"""
 
 private const val INVALID_STATUS_EXAMPLE =
-    """{"code":"BILL_LOG-E013","message":"정산 요청은 완료 상태로만 변경할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+    """{"code":"BILL_LOG-E015","message":"정산 요청은 완료 상태로만 변경할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val ACCESS_DENIED_EXAMPLE =
-    """{"code":"BILL_LOG-E012","message":"결제자만 정산을 완료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+    """{"code":"BILL_LOG-E014","message":"결제자만 정산을 완료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val NOT_FOUND_EXAMPLE =
-    """{"code":"BILL_LOG-E011","message":"정산 요청을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+    """{"code":"BILL_LOG-E013","message":"정산 요청을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
