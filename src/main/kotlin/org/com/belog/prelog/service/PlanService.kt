@@ -14,6 +14,7 @@ import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
+import org.com.belog.prelog.service.result.PlanPinResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -121,6 +122,30 @@ class PlanService(
         }
     }
 
+    @Transactional
+    fun pinPlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+    ): PlanPinResult {
+        val plan = findPinTarget(meetingId, planId, userId)
+        plan.pin()
+
+        return plan.toPinResult()
+    }
+
+    @Transactional
+    fun unpinPlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+    ): PlanPinResult {
+        val plan = findPinTarget(meetingId, planId, userId)
+        plan.unpin()
+
+        return plan.toPinResult()
+    }
+
     private fun findMeeting(meetingId: Long): Meeting =
         meetingRepository.findById(meetingId).orElseThrow {
             BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
@@ -133,6 +158,18 @@ class PlanService(
         val groupId = checkNotNull(meeting.group.id) { "계획 대상 만남의 그룹 ID가 없습니다." }
         return groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+    }
+
+    private fun findPinTarget(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+    ): Plan {
+        val meeting = findMeeting(meetingId)
+        findGroupMember(meeting, userId)
+
+        return planRepository.findByIdAndMeetingId(planId, meetingId)
+            ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
     }
 
     private fun validateMeetingNotEnded(
@@ -154,6 +191,12 @@ class PlanService(
 
         return planRepository.save(plan)
     }
+
+    private fun Plan.toPinResult(): PlanPinResult =
+        PlanPinResult(
+            planId = checkNotNull(id) { "핀 상태를 변경한 계획의 ID가 없습니다." },
+            pinned = pinned,
+        )
 
     private fun Plan.toListItemResult(
         loginGroupMemberId: Long,
