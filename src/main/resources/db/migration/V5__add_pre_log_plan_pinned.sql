@@ -1,2 +1,0 @@
-ALTER TABLE pre_log_plans
-    ADD COLUMN pinned BOOLEAN NOT NULL DEFAULT FALSE;
