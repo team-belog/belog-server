@@ -4,6 +4,7 @@ import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageUpload
 import org.com.belog.user.service.UserService
+import org.com.belog.user.service.command.ProfileImageChange
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
@@ -18,12 +19,14 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 
 @WebMvcTest(UserController::class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -34,6 +37,85 @@ class UserControllerTest {
 
     @MockitoBean
     private lateinit var userService: UserService
+
+    @Test
+    fun `닉네임만 수정하면 기존 프로필 이미지를 유지하도록 요청한다`() {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/profile")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"nickname":"새닉네임"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("CMN-S001"))
+
+        val invocation = profileUpdateInvocation()
+        assertEquals(15L, invocation.arguments[0])
+        assertEquals("새닉네임", invocation.arguments[1])
+        assertEquals(null, invocation.arguments[2])
+    }
+
+    @Test
+    fun `업로드한 이미지로 프로필 이미지를 수정하도록 요청한다`() {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/profile")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"profileImageType":"CUSTOM","profileImageObjectKey":"users/15/profile/image.webp"}""",
+                    ),
+            ).andExpect(status().isOk)
+
+        val profileImageChange = assertIs<ProfileImageChange.Update>(profileUpdateInvocation().arguments[2])
+        assertEquals("users/15/profile/image.webp", profileImageChange.objectKey.value)
+    }
+
+    @Test
+    fun `프로필 이미지를 앱 기본 이미지로 수정하도록 요청한다`() {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/profile")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"profileImageType":"DEFAULT"}"""),
+            ).andExpect(status().isOk)
+
+        assertEquals(ProfileImageChange.Reset, profileUpdateInvocation().arguments[2])
+    }
+
+    @Test
+    fun `수정할 항목이 없는 프로필 수정 요청을 거절한다`() {
+        assertInvalidProfileUpdate("{}")
+    }
+
+    @Test
+    fun `CUSTOM 타입에 object key가 없는 프로필 수정 요청을 거절한다`() {
+        assertInvalidProfileUpdate("""{"profileImageType":"CUSTOM"}""")
+    }
+
+    @Test
+    fun `DEFAULT 타입에 object key가 포함된 프로필 수정 요청을 거절한다`() {
+        assertInvalidProfileUpdate(
+            """{"profileImageType":"DEFAULT","profileImageObjectKey":"users/15/profile/image.webp"}""",
+        )
+    }
+
+    @Test
+    fun `다른 사용자의 object key로 프로필 수정을 요청하면 거절한다`() {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/profile")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"profileImageType":"CUSTOM","profileImageObjectKey":"users/20/profile/image.webp"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("USER-E004"))
+
+        verifyNoInteractions(userService)
+    }
 
     @Test
     fun `인증된 사용자의 계좌 정보를 수정한다`() {
@@ -272,6 +354,24 @@ class UserControllerTest {
             "access-token",
             emptyList(),
         )
+
+    private fun profileUpdateInvocation() =
+        mockingDetails(userService).invocations.single { invocation ->
+            invocation.method.name.startsWith("updateProfile")
+        }
+
+    private fun assertInvalidProfileUpdate(content: String) {
+        mockMvc
+            .perform(
+                patch("/api/v1/users/me/profile")
+                    .principal(authenticatedUser(15L))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(content),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(userService)
+    }
 
     private fun validOnboardingRequest(profileImageObjectKey: String): String =
         """{"profileImageObjectKey":"$profileImageObjectKey","nickname":"빌로그","name":"홍길동","bankCode":"SHINHAN","accountNumber":"110123456789","accountHolderName":"홍길동"}"""

@@ -9,9 +9,12 @@ import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.command.ProfileImageChange
 import org.com.belog.user.service.result.SocialUserResult
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
@@ -337,6 +340,127 @@ class UserServiceTest {
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `닉네임만 변경하면 기존 프로필 이미지를 유지한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "기존닉네임")
+        val existingObjectKey = "users/$userId/profile/image.webp"
+
+        userService.updateProfile(
+            userId = userId,
+            nickname = "새닉네임",
+            profileImageChange = null,
+        )
+
+        val updatedUser = userRepository.findById(userId).orElseThrow()
+        assertEquals("새닉네임", updatedUser.nickname)
+        assertEquals(ProfileImageSource.CUSTOM, updatedUser.profileImageSource)
+        assertEquals(existingObjectKey, updatedUser.profileImageObjectKey)
+    }
+
+    @Test
+    fun `업로드한 이미지로 프로필 이미지를 변경한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "기존닉네임")
+        val newObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/new-image.webp")
+
+        userService.updateProfile(
+            userId = userId,
+            nickname = null,
+            profileImageChange = ProfileImageChange.Update(newObjectKey),
+        )
+
+        val updatedUser = userRepository.findById(userId).orElseThrow()
+        verify(profileImageStorage).verify(newObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, updatedUser.profileImageSource)
+        assertEquals(newObjectKey.value, updatedUser.profileImageObjectKey)
+    }
+
+    @Test
+    fun `프로필 이미지를 앱 기본 이미지로 변경한다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "기존닉네임")
+
+        userService.updateProfile(
+            userId = userId,
+            nickname = null,
+            profileImageChange = ProfileImageChange.Reset,
+        )
+
+        val updatedUser = userRepository.findById(userId).orElseThrow()
+        assertEquals(ProfileImageSource.DEFAULT, updatedUser.profileImageSource)
+        assertEquals(null, updatedUser.profileImageObjectKey)
+    }
+
+    @Test
+    fun `중복 닉네임과 이미지 변경을 함께 요청하면 모든 변경을 롤백한다`() {
+        val firstUserId = createUser("first-google-subject", "first@example.com")
+        val secondUserId = createUser("second-google-subject", "second@example.com")
+        completeOnboarding(firstUserId, "중복닉네임")
+        completeOnboarding(secondUserId, "기존닉네임")
+        val existingObjectKey = "users/$secondUserId/profile/image.webp"
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                userService.updateProfile(
+                    userId = secondUserId,
+                    nickname = "중복닉네임",
+                    profileImageChange = ProfileImageChange.Reset,
+                )
+            }
+
+        val unchangedUser = userRepository.findById(secondUserId).orElseThrow()
+        assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.errorCode)
+        assertEquals("기존닉네임", unchangedUser.nickname)
+        assertEquals(ProfileImageSource.CUSTOM, unchangedUser.profileImageSource)
+        assertEquals(existingObjectKey, unchangedUser.profileImageObjectKey)
+    }
+
+    @Test
+    fun `S3 이미지 검증에 실패하면 프로필을 변경하지 않는다`() {
+        val userId = createUser("google-subject", "user@example.com")
+        completeOnboarding(userId, "기존닉네임")
+        val existingObjectKey = "users/$userId/profile/image.webp"
+        val newObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/new-image.webp")
+        doThrow(BusinessException(UserErrorCode.PROFILE_IMAGE_NOT_FOUND))
+            .`when`(profileImageStorage)
+            .verify(newObjectKey)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                userService.updateProfile(
+                    userId = userId,
+                    nickname = "새닉네임",
+                    profileImageChange = ProfileImageChange.Update(newObjectKey),
+                )
+            }
+
+        val unchangedUser = userRepository.findById(userId).orElseThrow()
+        assertEquals(UserErrorCode.PROFILE_IMAGE_NOT_FOUND, exception.errorCode)
+        assertEquals("기존닉네임", unchangedUser.nickname)
+        assertEquals(ProfileImageSource.CUSTOM, unchangedUser.profileImageSource)
+        assertEquals(existingObjectKey, unchangedUser.profileImageObjectKey)
+    }
+
+    @Test
+    fun `온보딩을 완료하지 않은 사용자는 프로필을 변경할 수 없다`() {
+        val userId = createUser("google-subject", "user@example.com")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                userService.updateProfile(
+                    userId = userId,
+                    nickname = "새닉네임",
+                    profileImageChange = null,
+                )
+            }
+
+        val unchangedUser = userRepository.findById(userId).orElseThrow()
+        assertEquals(UserErrorCode.ONBOARDING_REQUIRED, exception.errorCode)
+        assertEquals(null, unchangedUser.nickname)
+        assertEquals(ProfileImageSource.SOCIAL, unchangedUser.profileImageSource)
     }
 
     private fun completeOnboarding() {
