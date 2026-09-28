@@ -99,6 +99,35 @@ class UserTest {
     }
 
     @Test
+    fun `온보딩을 완료한 사용자의 닉네임을 수정한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateNickname(" 새닉네임 ")
+
+        assertEquals("새닉네임", user.nickname)
+    }
+
+    @Test
+    fun `직접 업로드한 프로필 이미지로 변경한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateProfileImage(ProfileImageObjectKey.create(1L, "users/1/profile/new-image.webp"))
+
+        assertEquals("users/1/profile/new-image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
+    }
+
+    @Test
+    fun `프로필 이미지를 앱 기본 이미지로 초기화한다`() {
+        val user = completedUser(ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"))
+
+        user.resetProfileImage()
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.DEFAULT, user.profileImageSource)
+    }
+
+    @Test
     fun `닉네임이 8자를 초과하면 온보딩을 완료할 수 없다`() {
         val user = createUser()
 
@@ -179,6 +208,17 @@ class UserTest {
             provider = SocialProvider.GOOGLE,
             providerUserId = "google-subject",
         )
+
+    private fun completedUser(profileImageObjectKey: ProfileImageObjectKey?): User =
+        createUser().apply {
+            completeOnboarding(
+                profileImageObjectKey = profileImageObjectKey,
+                nickname = "빌로그",
+                name = "홍길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
 
     private fun createBankAccount(): BankAccount =
         BankAccount.create(

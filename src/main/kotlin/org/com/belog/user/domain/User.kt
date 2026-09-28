@@ -99,12 +99,9 @@ class User protected constructor(
     ) {
         check(!isOnboardingCompleted) { "이미 온보딩을 완료한 사용자입니다." }
 
-        val normalizedNickname = nickname.trim()
+        val normalizedNickname = normalizeNickname(nickname)
         val normalizedName = name.trim()
 
-        require(normalizedNickname.length in NICKNAME_MIN_LENGTH..NICKNAME_MAX_LENGTH) {
-            "닉네임은 ${NICKNAME_MIN_LENGTH}자 이상 ${NICKNAME_MAX_LENGTH}자 이하여야 합니다."
-        }
         require(normalizedName.isNotEmpty() && normalizedName.length <= NAME_MAX_LENGTH) {
             "사용자 이름은 비어 있을 수 없으며 ${NAME_MAX_LENGTH}자를 초과할 수 없습니다."
         }
@@ -120,6 +117,26 @@ class User protected constructor(
         this.name = normalizedName
         this.bankAccount = bankAccount
         this.onboardingCompletedAt = completedAt
+    }
+
+    fun updateNickname(nickname: String) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 닉네임을 수정할 수 있습니다." }
+
+        this.nickname = normalizeNickname(nickname)
+    }
+
+    fun updateProfileImage(profileImageObjectKey: ProfileImageObjectKey) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 프로필 이미지를 수정할 수 있습니다." }
+
+        this.profileImageObjectKey = profileImageObjectKey.value
+        this.profileImageSource = ProfileImageSource.CUSTOM
+    }
+
+    fun resetProfileImage() {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 프로필 이미지를 수정할 수 있습니다." }
+
+        this.profileImageObjectKey = null
+        this.profileImageSource = ProfileImageSource.DEFAULT
     }
 
     fun updateBankAccount(bankAccount: BankAccount) {
@@ -154,6 +171,14 @@ class User protected constructor(
                 provider = provider,
                 providerUserId = providerUserId,
             ).apply { updateSocialProfileImageUrl(socialProfileImageUrl) }
+        }
+
+        private fun normalizeNickname(value: String): String {
+            val normalizedValue = value.trim()
+            require(normalizedValue.length in NICKNAME_MIN_LENGTH..NICKNAME_MAX_LENGTH) {
+                "닉네임은 ${NICKNAME_MIN_LENGTH}자 이상 ${NICKNAME_MAX_LENGTH}자 이하여야 합니다."
+            }
+            return normalizedValue
         }
 
         private fun normalizeSocialProfileImageUrl(value: String): String {

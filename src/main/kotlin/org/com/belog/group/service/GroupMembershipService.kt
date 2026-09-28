@@ -34,15 +34,10 @@ class GroupMembershipService(
 
         return groupMemberRepository.findAllWithUserByGroupId(groupId).map { member ->
             val memberUser = member.user
-            val memberUserId = requireNotNull(memberUser.id)
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
                 nickname = requireNotNull(memberUser.nickname),
-                profileImageUrl =
-                    profileImageService.generateReadUrl(
-                        userId = memberUserId,
-                        profileImageObjectKey = memberUser.profileImageObjectKey,
-                    ) ?: memberUser.socialProfileImageUrl,
+                profileImageUrl = profileImageService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )
         }

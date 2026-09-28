@@ -4,8 +4,9 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.ProfileImageFormat
-import org.com.belog.user.domain.ProfileImageObjectKey
+import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.ProfileImageUpload
+import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.S3ProfileImageUploadUrlProvider
 import org.com.belog.user.repository.UserRepository
 import org.springframework.stereotype.Service
@@ -36,12 +37,16 @@ class ProfileImageService(
         return profileImageUploadUrlProvider.issueUploadUrl(userId, format, fileSize)
     }
 
-    fun generateReadUrl(
-        userId: Long,
-        profileImageObjectKey: String?,
-    ): String? =
-        profileImageObjectKey?.let { value ->
-            val objectKey = ProfileImageObjectKey.create(userId, value)
-            s3ObjectReadUrlProvider.generateReadUrl(objectKey.value)
+    fun resolveProfileImageUrl(user: User): String? =
+        when (user.profileImageSource) {
+            ProfileImageSource.SOCIAL -> user.socialProfileImageUrl
+            ProfileImageSource.CUSTOM -> {
+                val objectKey =
+                    checkNotNull(user.profileImageObjectKey) {
+                        "직접 업로드한 프로필 이미지의 object key가 없습니다."
+                    }
+                s3ObjectReadUrlProvider.generateReadUrl(objectKey)
+            }
+            ProfileImageSource.DEFAULT -> null
         }
 }
