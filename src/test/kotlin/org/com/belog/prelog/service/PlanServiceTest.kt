@@ -21,6 +21,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageRequest
+import org.springframework.test.util.ReflectionTestUtils
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -90,6 +91,48 @@ class PlanServiceTest {
         val result = getPlans()
 
         assertFalse(result.items.single().canDelete)
+    }
+
+    @Test
+    fun `일반 그룹 멤버는 다른 사용자의 계획을 핀 고정할 수 있다`() {
+        val plan = stubPlanPinTarget()
+
+        val result = planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+
+        assertEquals(20L, result.planId)
+        assertTrue(result.pinned)
+        assertTrue(plan.pinned)
+    }
+
+    @Test
+    fun `일반 그룹 멤버는 다른 사용자가 고정한 계획을 해제할 수 있다`() {
+        val plan = stubPlanPinTarget(initiallyPinned = true)
+
+        val result = planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+
+        assertEquals(20L, result.planId)
+        assertFalse(result.pinned)
+        assertFalse(plan.pinned)
+    }
+
+    @Test
+    fun `그룹 멤버가 아니면 계획을 핀 고정하거나 해제할 수 없다`() {
+        val context = meetingContext()
+        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, pinException.errorCode)
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unpinException.errorCode)
+        verifyNoInteractions(planRepository)
     }
 
     @Test
@@ -220,6 +263,35 @@ class PlanServiceTest {
                 pageable = PageRequest.of(0, 21),
             ),
         ).thenReturn(listOf(plan))
+    }
+
+    private fun stubPlanPinTarget(initiallyPinned: Boolean = false): Plan {
+        val context = meetingContext()
+        val loginGroupMember = mock(GroupMember::class.java)
+        val planCreator = mock(GroupMember::class.java)
+        `when`(loginGroupMember.role).thenReturn(GroupRole.MEMBER)
+        `when`(planCreator.group).thenReturn(context.group)
+        `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
+
+        val plan =
+            Plan.createLink(
+                meeting = context.meeting,
+                creator = planCreator,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = "https://example.com/place",
+                currentDate = LocalDate.of(2026, 9, 22),
+            )
+        ReflectionTestUtils.setField(plan, "id", 20L)
+        if (initiallyPinned) {
+            plan.pin()
+        }
+
+        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
+
+        return plan
     }
 
     private fun getPlans() =
