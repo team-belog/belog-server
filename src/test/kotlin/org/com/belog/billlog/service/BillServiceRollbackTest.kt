@@ -24,6 +24,7 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyList
@@ -79,6 +80,9 @@ class BillServiceRollbackTest {
 
     @MockitoBean
     private lateinit var settlementRequestRepository: SettlementRequestRepository
+
+    @MockitoBean
+    private lateinit var userService: UserService
 
     @AfterEach
     fun cleanUpFixtures() {
