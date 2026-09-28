@@ -70,6 +70,11 @@ class User protected constructor(
     var profileImageObjectKey: String? = null
         protected set
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "profile_image_source", nullable = false, length = 20)
+    var profileImageSource: ProfileImageSource = ProfileImageSource.SOCIAL
+        protected set
+
     @Column(name = "social_profile_image_url", length = SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH)
     var socialProfileImageUrl: String? = null
         protected set
@@ -105,6 +110,12 @@ class User protected constructor(
         }
 
         this.profileImageObjectKey = profileImageObjectKey?.value
+        this.profileImageSource =
+            if (profileImageObjectKey == null) {
+                ProfileImageSource.SOCIAL
+            } else {
+                ProfileImageSource.CUSTOM
+            }
         this.nickname = normalizedNickname
         this.name = normalizedName
         this.bankAccount = bankAccount

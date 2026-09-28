@@ -21,6 +21,7 @@ class UserTest {
         assertEquals(null, user.nickname)
         assertEquals(null, user.name)
         assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
         assertEquals(null, user.socialProfileImageUrl)
         assertEquals(null, user.bankAccount)
         assertFalse(user.isOnboardingCompleted)
@@ -70,12 +71,30 @@ class UserTest {
         )
 
         assertEquals("users/1/profile/image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
         assertEquals("빌로그", user.nickname)
         assertEquals("홍 길동", user.name)
         assertEquals(Bank.KB_KOOKMIN, user.bankAccount?.bank)
         assertEquals("123456789012", user.bankAccount?.accountNumber)
         assertEquals("홍길동", user.bankAccount?.accountHolderName)
         assertEquals(completedAt, user.onboardingCompletedAt)
+        assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `직접 업로드한 이미지 없이 온보딩하면 소셜 프로필 이미지를 유지한다`() {
+        val user = createUser()
+
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = "빌로그",
+            name = "홍길동",
+            bankAccount = createBankAccount(),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
         assertTrue(user.isOnboardingCompleted)
     }
 

@@ -5,6 +5,7 @@ import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
+import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.result.SocialUserResult
@@ -56,6 +57,7 @@ class UserServiceTest {
 
         assertTrue(result.onboardingRequired)
         assertEquals(1, userRepository.count())
+        assertEquals(ProfileImageSource.SOCIAL, userRepository.findById(result.userId).orElseThrow().profileImageSource)
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.com.belog.user.repository
 
 import jakarta.persistence.EntityManager
 import jakarta.persistence.LockModeType
+import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.springframework.transaction.annotation.Propagation
@@ -23,6 +24,7 @@ open class UserRepositoryCustomImpl(
             .setParameter("provider", provider.name)
             .setParameter("providerUserId", providerUserId)
             .setParameter("socialProfileImageUrl", socialProfileImageUrl)
+            .setParameter("profileImageSource", ProfileImageSource.SOCIAL.name)
             .executeUpdate()
 
         val user = findSocialUserForUpdate(provider, providerUserId)
@@ -61,6 +63,7 @@ open class UserRepositoryCustomImpl(
                 provider,
                 provider_user_id,
                 social_profile_image_url,
+                profile_image_source,
                 created_at,
                 updated_at
             ) VALUES (
@@ -68,6 +71,7 @@ open class UserRepositoryCustomImpl(
                 :provider,
                 :providerUserId,
                 :socialProfileImageUrl,
+                :profileImageSource,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )
