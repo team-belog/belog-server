@@ -1,0 +1,332 @@
+package org.com.belog.billlog.service
+
+import jakarta.persistence.EntityManager
+import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillShare
+import org.com.belog.billlog.domain.BillSplitType
+import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.billlog.repository.BillRepository
+import org.com.belog.billlog.repository.BillShareRepository
+import org.com.belog.billlog.repository.SettlementRequestRepository
+import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.user.config.AccountNumberEncryptionConfig
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
+import org.com.belog.user.repository.UserRepository
+import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
+import org.springframework.test.context.ActiveProfiles
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import(
+    SettlementRequestService::class,
+    SettlementRequestServiceTest.FixedClockConfig::class,
+    JpaAuditingConfig::class,
+    AccountNumberEncryptionConfig::class,
+    AccountNumberAttributeConverter::class,
+)
+class SettlementRequestServiceTest {
+    @Autowired
+    private lateinit var settlementRequestService: SettlementRequestService
+
+    @Autowired
+    private lateinit var settlementRequestRepository: SettlementRequestRepository
+
+    @Autowired
+    private lateinit var billRepository: BillRepository
+
+    @Autowired
+    private lateinit var billShareRepository: BillShareRepository
+
+    @Autowired
+    private lateinit var meetingRepository: MeetingRepository
+
+    @Autowired
+    private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @Test
+    fun `결제자가 정산 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
+        val context = saveSettlementContext()
+
+        settlementRequestService.updateStatus(
+            meetingId = context.meetingId,
+            settlementRequestId = context.settlementRequestId,
+            payerUserId = context.payerUserId,
+            status = SettlementRequestStatus.COMPLETED,
+        )
+        flushAndClear()
+
+        val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
+        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
+        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+    }
+
+    @Test
+    fun `결제자가 아닌 사용자는 정산 요청을 완료할 수 없다`() {
+        val context = saveSettlementContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.updateStatus(
+                    meetingId = context.meetingId,
+                    settlementRequestId = context.settlementRequestId,
+                    payerUserId = context.debtorUserId,
+                    status = SettlementRequestStatus.COMPLETED,
+                )
+            }
+        flushAndClear()
+
+        assertEquals(BillLogErrorCode.SETTLEMENT_REQUEST_ACCESS_DENIED, exception.errorCode)
+        assertSettlementIsPending(context.settlementRequestId)
+    }
+
+    @Test
+    fun `다른 만남에 속한 정산 요청은 완료할 수 없다`() {
+        val context = saveSettlementContext()
+        val otherMeeting =
+            meetingRepository.saveAndFlush(
+                createMeeting(
+                    group = context.group,
+                    creator = context.payerMember,
+                    name = "다른 만남",
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.updateStatus(
+                    meetingId = requireNotNull(otherMeeting.id),
+                    settlementRequestId = context.settlementRequestId,
+                    payerUserId = context.payerUserId,
+                    status = SettlementRequestStatus.COMPLETED,
+                )
+            }
+        flushAndClear()
+
+        assertEquals(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND, exception.errorCode)
+        assertSettlementIsPending(context.settlementRequestId)
+    }
+
+    @Test
+    fun `이미 완료된 정산 요청을 다시 완료해도 최초 완료 시각이 유지된다`() {
+        val context = saveSettlementContext()
+
+        settlementRequestService.updateStatus(
+            meetingId = context.meetingId,
+            settlementRequestId = context.settlementRequestId,
+            payerUserId = context.payerUserId,
+            status = SettlementRequestStatus.COMPLETED,
+        )
+        flushAndClear()
+        settlementRequestService.updateStatus(
+            meetingId = context.meetingId,
+            settlementRequestId = context.settlementRequestId,
+            payerUserId = context.payerUserId,
+            status = SettlementRequestStatus.COMPLETED,
+        )
+        flushAndClear()
+
+        val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
+        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
+        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+    }
+
+    @Test
+    fun `완료된 정산 요청을 대기 상태로 되돌릴 수 없다`() {
+        val context = saveSettlementContext()
+        settlementRequestService.updateStatus(
+            meetingId = context.meetingId,
+            settlementRequestId = context.settlementRequestId,
+            payerUserId = context.payerUserId,
+            status = SettlementRequestStatus.COMPLETED,
+        )
+        flushAndClear()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.updateStatus(
+                    meetingId = context.meetingId,
+                    settlementRequestId = context.settlementRequestId,
+                    payerUserId = context.payerUserId,
+                    status = SettlementRequestStatus.PENDING,
+                )
+            }
+        flushAndClear()
+
+        val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
+        assertEquals(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_STATUS, exception.errorCode)
+        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
+        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+    }
+
+    private fun saveSettlementContext(): SettlementContext {
+        val group = groupRepository.save(createGroup())
+        val payerMember = saveGroupMember(group, "payer-subject", "결제자")
+        val debtorMember = saveGroupMember(group, "debtor-subject", "정산자")
+        val meeting = meetingRepository.saveAndFlush(createMeeting(group, payerMember, "광주 여행"))
+        val payerParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, payerMember))
+        val debtorParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, debtorMember))
+        val bill =
+            billRepository.saveAndFlush(
+                Bill.create(
+                    meeting = meeting,
+                    creator = payerMember,
+                    payer = payerParticipant,
+                    title = "저녁 식사",
+                    totalAmount = 10_000L,
+                    splitType = BillSplitType.EQUAL_SPLIT,
+                ),
+            )
+        val share =
+            billShareRepository.saveAndFlush(
+                BillShare.create(
+                    bill = bill,
+                    participant = debtorParticipant,
+                    amount = 10_000L,
+                    allocationOrder = 0,
+                ),
+            )
+        val settlementRequest = settlementRequestRepository.saveAndFlush(SettlementRequest.create(share))
+
+        return SettlementContext(
+            group = group,
+            payerMember = payerMember,
+            meetingId = requireNotNull(meeting.id),
+            settlementRequestId = requireNotNull(settlementRequest.id),
+            payerUserId = requireNotNull(payerMember.user.id),
+            debtorUserId = requireNotNull(debtorMember.user.id),
+        )
+    }
+
+    private fun assertSettlementIsPending(settlementRequestId: Long) {
+        val settlementRequest = settlementRequestRepository.findById(settlementRequestId).orElseThrow()
+        assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
+        assertNull(settlementRequest.completedAt)
+    }
+
+    private fun flushAndClear() {
+        entityManager.flush()
+        entityManager.clear()
+    }
+
+    private fun createGroup(): Group =
+        Group.create(
+            name = "주말 여행 모임",
+            coverImageObjectKey = null,
+            inviteCode = InviteCode.create("AB12CD"),
+        )
+
+    private fun createMeeting(
+        group: Group,
+        creator: GroupMember,
+        name: String,
+    ): Meeting =
+        Meeting.createFixed(
+            group = group,
+            creator = creator,
+            name = name,
+            location = null,
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 29)),
+            confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
+            currentDate = LocalDate.of(2026, 9, 20),
+        )
+
+    private fun saveGroupMember(
+        group: Group,
+        providerUserId: String,
+        nickname: String,
+    ): GroupMember {
+        val user = saveCompletedUser(providerUserId, nickname)
+        return groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+    }
+
+    private fun saveCompletedUser(
+        providerUserId: String,
+        nickname: String,
+    ): User {
+        val user =
+            userRepository.save(
+                User.createSocialUser(
+                    email = "$providerUserId@example.com",
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = providerUserId,
+                ),
+            )
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = nickname,
+            name = "홍길동",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                    accountHolderName = "홍길동",
+                ),
+            completedAt = Instant.parse("2026-09-20T00:00:00Z"),
+        )
+        return userRepository.saveAndFlush(user)
+    }
+
+    private data class SettlementContext(
+        val group: Group,
+        val payerMember: GroupMember,
+        val meetingId: Long,
+        val settlementRequestId: Long,
+        val payerUserId: Long,
+        val debtorUserId: Long,
+    )
+
+    @TestConfiguration
+    class FixedClockConfig {
+        @Bean
+        @Primary
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+    }
+
+    companion object {
+        private val FIXED_INSTANT: Instant = Instant.parse("2026-09-28T00:00:00Z")
+    }
+}
