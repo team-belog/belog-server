@@ -8,8 +8,10 @@ import org.com.belog.global.response.code.CommonSuccessCode
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.code.UserSuccessCode
 import org.com.belog.user.controller.dto.request.CompleteOnboardingRequest
+import org.com.belog.user.controller.dto.request.ProfileImageUpdateType
 import org.com.belog.user.controller.dto.request.ProfileImageUploadUrlRequest
 import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
+import org.com.belog.user.controller.dto.request.UpdateUserProfileRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
@@ -18,9 +20,11 @@ import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.UserService
+import org.com.belog.user.service.command.ProfileImageChange
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -43,6 +47,22 @@ class UserController(
             .status(UserSuccessCode.PROFILE_RETRIEVED.status)
             .cacheControl(CacheControl.noStore())
             .body(CommonResponse.success(UserSuccessCode.PROFILE_RETRIEVED, response))
+    }
+
+    @PatchMapping("/me/profile")
+    override fun updateProfile(
+        @LoginUserId userId: Long,
+        @Valid @RequestBody request: UpdateUserProfileRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        userService.updateProfile(
+            userId = userId,
+            nickname = request.nickname,
+            profileImageChange = createProfileImageChange(userId, request),
+        )
+
+        return ResponseEntity
+            .status(CommonSuccessCode.OK.status)
+            .body(CommonResponse.success(CommonSuccessCode.OK))
     }
 
     @GetMapping("/me/bank-account")
@@ -149,5 +169,18 @@ class UserController(
             } catch (exception: IllegalArgumentException) {
                 throw BusinessException(UserErrorCode.INVALID_PROFILE_IMAGE_OBJECT_KEY, exception)
             }
+        }
+
+    private fun createProfileImageChange(
+        userId: Long,
+        request: UpdateUserProfileRequest,
+    ): ProfileImageChange? =
+        when (request.profileImageType) {
+            ProfileImageUpdateType.CUSTOM ->
+                ProfileImageChange.Update(
+                    requireNotNull(createProfileImageObjectKey(userId, request.profileImageObjectKey)),
+                )
+            ProfileImageUpdateType.DEFAULT -> ProfileImageChange.Reset
+            null -> null
         }
 }

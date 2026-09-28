@@ -16,6 +16,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.user.controller.dto.request.CompleteOnboardingRequest
 import org.com.belog.user.controller.dto.request.ProfileImageUploadUrlRequest
 import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
+import org.com.belog.user.controller.dto.request.UpdateUserProfileRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
@@ -82,6 +83,101 @@ interface UserSwagger {
         @LoginUserId
         userId: Long,
     ): ResponseEntity<CommonResponse<UserProfileResponse>>
+
+    @Operation(
+        summary = "내 프로필 수정",
+        description =
+            "로그인한 사용자의 닉네임 또는 프로필 이미지를 선택적으로 수정합니다. " +
+                "profileImageType이 CUSTOM이면 업로드 URL 발급 API로 이미지를 업로드한 뒤 받은 object key를 전달합니다. " +
+                "DEFAULT이면 앱 기본 이미지로 변경합니다. 닉네임만 전달하면 기존 프로필 이미지는 유지됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "프로필 수정 성공",
+                useReturnTypeSchema = true,
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값, 프로필 이미지 object key 또는 업로드된 이미지 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 프로필 이미지 object key", value = INVALID_PROFILE_IMAGE_OBJECT_KEY_EXAMPLE),
+                            ExampleObject(name = "업로드된 프로필 이미지 없음", value = PROFILE_IMAGE_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "잘못된 프로필 이미지 정보", value = INVALID_PROFILE_IMAGE_METADATA_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED,
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "온보딩 미완료",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ONBOARDING_REQUIRED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사용자를 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = USER_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "닉네임 중복",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NICKNAME_ALREADY_EXISTS_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun updateProfile(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            description =
+                "변경할 필드만 전달합니다. profileImageType은 CUSTOM 또는 DEFAULT이며, " +
+                    "CUSTOM일 때만 profileImageObjectKey를 함께 전달합니다.",
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = UpdateUserProfileRequest::class),
+                    examples = [
+                        ExampleObject(name = "닉네임만 변경", value = UPDATE_PROFILE_NICKNAME_REQUEST_EXAMPLE),
+                        ExampleObject(name = "업로드 이미지로 변경", value = UPDATE_PROFILE_CUSTOM_IMAGE_REQUEST_EXAMPLE),
+                        ExampleObject(name = "앱 기본 이미지로 변경", value = UPDATE_PROFILE_DEFAULT_IMAGE_REQUEST_EXAMPLE),
+                    ],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: UpdateUserProfileRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
         summary = "내 계좌 조회",
@@ -377,6 +473,15 @@ private const val PROFILE_SUCCESS_EXAMPLE =
 
 private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
     """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":null}}"""
+
+private const val UPDATE_PROFILE_NICKNAME_REQUEST_EXAMPLE =
+    """{"nickname":"피블"}"""
+
+private const val UPDATE_PROFILE_CUSTOM_IMAGE_REQUEST_EXAMPLE =
+    """{"profileImageType":"CUSTOM","profileImageObjectKey":"users/15/profile/550e8400-e29b-41d4-a716-446655440000.webp"}"""
+
+private const val UPDATE_PROFILE_DEFAULT_IMAGE_REQUEST_EXAMPLE =
+    """{"profileImageType":"DEFAULT"}"""
 
 private const val BANK_ACCOUNT_SUCCESS_EXAMPLE =
     """{"code":"CMN-S001","message":"요청이 성공했습니다.","data":{"bankCode":"SHINHAN","bankName":"신한은행","accountNumber":"110123456789","accountHolderName":"홍길동"}}"""
