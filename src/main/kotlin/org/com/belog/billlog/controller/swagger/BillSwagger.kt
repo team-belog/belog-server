@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.com.belog.billlog.controller.dto.request.RegisterBillRequest
+import org.com.belog.billlog.controller.dto.response.BillDetailResponse
 import org.com.belog.billlog.controller.dto.response.RegisterBillResponse
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
@@ -22,6 +23,76 @@ import org.springframework.web.bind.annotation.RequestBody
 
 @Tag(name = "Bill-log", description = "Bill-log 결제 내역 및 정산 요청 관련 API")
 interface BillSwagger {
+    @Operation(
+        summary = "결제 내역 상세 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 선택한 결제 내역의 기본 정보, " +
+                "결제 항목과 개인별 부담 금액을 조회합니다. 결제일은 결제 내역 등록 시각을 기준으로 합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "결제 내역 상세 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_BILL_DETAIL_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 결제 내역을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "결제 내역 없음", value = BILL_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 일정이 확정되지 않아 결제 회차를 계산할 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getBillDetail(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "결제 내역 ID", example = "45", required = true)
+        @PathVariable
+        billId: Long,
+    ): ResponseEntity<CommonResponse<BillDetailResponse>>
+
     @Operation(
         summary = "결제 내역 및 정산 요청 등록",
         description =
@@ -112,6 +183,9 @@ private const val REGISTER_BILL_REQUEST_EXAMPLE =
 private const val REGISTER_BILL_SUCCESS_EXAMPLE =
     """{"code":"BILL_LOG-S001","message":"결제 내역과 정산 요청이 등록되었습니다.","data":{"billId":1}}"""
 
+private const val GET_BILL_DETAIL_SUCCESS_EXAMPLE =
+    """{"code":"BILL_LOG-S002","message":"결제 내역 상세를 조회했습니다.","data":{"billId":45,"dayNumber":1,"paymentDate":"2026-08-06","title":"아랑이 카페","payerNickname":"정바미","settlementMethod":"EQUAL_SPLIT","items":[{"name":"아메리카노","amount":4000}],"totalAmount":11000,"shares":[{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","amount":4000,"payer":true},{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":null,"amount":7000,"payer":false}]}}"""
+
 private const val ITEM_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E005","message":"결제 항목 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
 
@@ -126,3 +200,9 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
+
+private const val BILL_NOT_FOUND_EXAMPLE =
+    """{"code":"BILL_LOG-E011","message":"결제 내역을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
+
+private const val MEETING_DATE_NOT_CONFIRMED_EXAMPLE =
+    """{"code":"BILL_LOG-E012","message":"만남 일정이 확정되지 않아 결제 회차를 계산할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""

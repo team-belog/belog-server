@@ -19,4 +19,5 @@ enum class BillLogErrorCode(
     INVALID_SHARE_PARTICIPANT(HttpStatus.BAD_REQUEST, "BILL_LOG-E009", "부담자는 해당 만남의 참여자여야 합니다."),
     AMOUNT_OVERFLOW(HttpStatus.BAD_REQUEST, "BILL_LOG-E010", "결제 금액 합계가 허용 범위를 초과했습니다."),
     BILL_NOT_FOUND(HttpStatus.NOT_FOUND, "BILL_LOG-E011", "결제 내역을 찾을 수 없습니다."),
+    MEETING_DATE_NOT_CONFIRMED(HttpStatus.CONFLICT, "BILL_LOG-E012", "만남 일정이 확정되지 않아 결제 회차를 계산할 수 없습니다."),
 }

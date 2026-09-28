@@ -85,7 +85,7 @@ class BillService(
                 .toBusinessDate()
         val meetingStartDate =
             meeting.startDate
-                ?: throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_CONFIRMED)
+                ?: throw BusinessException(BillLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
         val payerParticipantId = checkNotNull(bill.payer.id) { "조회된 결제자의 만남 참여자 ID가 없습니다." }
         val payerNickname = checkNotNull(bill.payer.groupMember.user.nickname) { "조회된 결제자의 닉네임이 없습니다." }
 
