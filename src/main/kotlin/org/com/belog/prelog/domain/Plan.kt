@@ -85,6 +85,18 @@ class Plan protected constructor(
     var id: Long? = null
         protected set
 
+    @Column(nullable = false)
+    var pinned: Boolean = false
+        protected set
+
+    fun pin() {
+        pinned = true
+    }
+
+    fun unpin() {
+        pinned = false
+    }
+
     companion object {
         const val TITLE_MIN_LENGTH = PLAN_TITLE_MIN_LENGTH
         const val TITLE_MAX_LENGTH = PLAN_TITLE_MAX_LENGTH
