@@ -21,6 +21,6 @@ enum class BillLogErrorCode(
     BILL_NOT_FOUND(HttpStatus.NOT_FOUND, "BILL_LOG-E011", "결제 내역을 찾을 수 없습니다."),
     MEETING_DATE_NOT_CONFIRMED(HttpStatus.CONFLICT, "BILL_LOG-E012", "만남 일정이 확정되지 않아 결제 회차를 계산할 수 없습니다."),
     SETTLEMENT_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "BILL_LOG-E013", "정산 요청을 찾을 수 없습니다."),
-    SETTLEMENT_REQUEST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "BILL_LOG-E014", "결제자만 정산을 완료할 수 있습니다."),
+    SETTLEMENT_REQUEST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "BILL_LOG-E014", "정산 요청 대상자만 완료할 수 있습니다."),
     INVALID_SETTLEMENT_REQUEST_STATUS(HttpStatus.BAD_REQUEST, "BILL_LOG-E015", "정산 요청은 완료 상태로만 변경할 수 있습니다."),
 }

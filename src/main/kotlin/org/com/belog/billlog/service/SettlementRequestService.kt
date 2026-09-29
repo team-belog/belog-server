@@ -18,14 +18,14 @@ class SettlementRequestService(
     fun updateStatus(
         meetingId: Long,
         settlementRequestId: Long,
-        payerUserId: Long,
+        requesterUserId: Long,
         status: SettlementRequestStatus,
     ) {
         val settlementRequest =
             settlementRequestRepository.findByIdAndMeetingIdForUpdate(settlementRequestId, meetingId)
                 ?: throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND)
 
-        if (settlementRequest.bill.payer.groupMember.user.id != payerUserId) {
+        if (settlementRequest.participant.groupMember.user.id != requesterUserId) {
             throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_ACCESS_DENIED)
         }
         if (status != SettlementRequestStatus.COMPLETED) {

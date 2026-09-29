@@ -27,7 +27,7 @@ class SettlementRequestController(
         settlementRequestService.updateStatus(
             meetingId = meetingId,
             settlementRequestId = settlementRequestId,
-            payerUserId = userId,
+            requesterUserId = userId,
             status = requireNotNull(request.status),
         )
 
