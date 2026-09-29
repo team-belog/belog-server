@@ -14,7 +14,9 @@ import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
+import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
+import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
@@ -99,6 +101,94 @@ interface PostLogSwagger {
         @RequestBody
         request: PostLogPhotoUploadUrlsRequest,
     ): ResponseEntity<CommonResponse<PostLogPhotoUploadUrlsResponse>>
+
+    @Operation(
+        summary = "Post-log 사진 메타데이터 일괄 등록",
+        description =
+            "S3 업로드가 완료된 최대 100개 사진의 object key와 촬영 시각을 등록합니다. " +
+                "Post-log가 없으면 자동으로 생성하며, 동일한 메타데이터의 재요청은 기존 등록 결과를 반환합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "사진 메타데이터 등록 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = REGISTER_PHOTOS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값, object key 또는 S3 사진 정보 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "동일한 object key가 다른 메타데이터로 이미 등록됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun registerPhotos(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = RegisterPostLogPhotosRequest::class),
+                    examples = [ExampleObject(value = REGISTER_PHOTOS_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: RegisterPostLogPhotosRequest,
+    ): ResponseEntity<CommonResponse<RegisterPostLogPhotosResponse>>
 }
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
@@ -107,8 +197,17 @@ private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
 private const val ISSUE_PHOTO_UPLOAD_URLS_SUCCESS_EXAMPLE =
     """{"code":"POST_LOG-S001","message":"사진 업로드 URL이 발급되었습니다.","data":{"uploads":[{"clientPhotoId":"photo-1","objectKey":"post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg","uploadUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg?...","method":"PUT","requiredHeaders":{"Content-Type":"image/jpeg","Content-Length":"2457600"},"expiresAt":"2026-09-28T03:15:00Z"}]}}"""
 
+private const val REGISTER_PHOTOS_REQUEST_EXAMPLE =
+    """{"photos":[{"objectKey":"post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg","capturedAt":"2026-09-28T14:37:21+09:00"}]}"""
+
+private const val REGISTER_PHOTOS_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S002","message":"사진 메타데이터가 등록되었습니다.","data":{"photos":[{"photoId":31,"objectKey":"post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg","capturedAt":"2026-09-28T14:37:21+09:00"}]}}"""
+
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":null}"""
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":null}"""
+
+private const val PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE =
+    """{"code":"POST_LOG-E008","message":"이미 다른 정보로 등록된 사진입니다.","data":null}"""

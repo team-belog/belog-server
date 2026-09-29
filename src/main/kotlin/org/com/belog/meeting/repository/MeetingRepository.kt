@@ -23,6 +23,19 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         @Param("meetingId") meetingId: Long,
     ): Meeting?
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
+        JOIN FETCH meeting.group
+        WHERE meeting.id = :meetingId
+        """,
+    )
+    fun findByIdWithGroupForUpdate(
+        @Param("meetingId") meetingId: Long,
+    ): Meeting?
+
     @Query(
         """
         SELECT meeting

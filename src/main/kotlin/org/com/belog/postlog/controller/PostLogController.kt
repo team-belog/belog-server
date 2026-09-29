@@ -5,7 +5,9 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.code.PostLogSuccessCode
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
+import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
+import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.com.belog.postlog.controller.swagger.PostLogSwagger
 import org.com.belog.postlog.service.PostLogPhotoService
 import org.springframework.http.ResponseEntity
@@ -39,6 +41,29 @@ class PostLogController(
                 CommonResponse.success(
                     PostLogSuccessCode.PHOTO_UPLOAD_URLS_ISSUED,
                     PostLogPhotoUploadUrlsResponse.from(results),
+                ),
+            )
+    }
+
+    @PostMapping("/photos")
+    override fun registerPhotos(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: RegisterPostLogPhotosRequest,
+    ): ResponseEntity<CommonResponse<RegisterPostLogPhotosResponse>> {
+        val photos =
+            photoService.registerPhotos(
+                meetingId = meetingId,
+                userId = userId,
+                targets = request.photos.map { photo -> photo.toTarget() },
+            )
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.PHOTOS_REGISTERED.status)
+            .body(
+                CommonResponse.success(
+                    PostLogSuccessCode.PHOTOS_REGISTERED,
+                    RegisterPostLogPhotosResponse.from(photos),
                 ),
             )
     }

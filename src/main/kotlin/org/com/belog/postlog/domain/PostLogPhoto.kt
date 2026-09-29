@@ -17,6 +17,8 @@ import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
 
 const val POST_LOG_PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_NAME = "uk_post_log_photos_object_key"
 
@@ -69,6 +71,11 @@ class PostLogPhoto protected constructor(
     var id: Long? = null
         protected set
 
+    fun capturedAtWithOffset(): OffsetDateTime =
+        capturedAt.atOffset(
+            ZoneOffset.ofTotalSeconds(capturedOffsetMinutes * SECONDS_PER_MINUTE),
+        )
+
     companion object {
         const val MAX_UPLOAD_COUNT = 100
 
@@ -90,11 +97,11 @@ class PostLogPhoto protected constructor(
                 postLog = postLog,
                 uploadedBy = uploader,
                 objectKey = objectKey.value,
-                capturedAt = capturedAt.toInstant(),
+                capturedAt = capturedAt.toInstant().truncatedTo(ChronoUnit.MICROS),
                 capturedOffsetMinutes = offsetTotalSeconds / SECONDS_PER_MINUTE,
             )
         }
 
-        private const val SECONDS_PER_MINUTE = 60
+        internal const val SECONDS_PER_MINUTE = 60
     }
 }

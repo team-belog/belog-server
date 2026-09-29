@@ -13,4 +13,7 @@ enum class PostLogErrorCode(
     INVALID_PHOTO_SIZE(HttpStatus.BAD_REQUEST, "POST_LOG-E003", "사진은 5MB 이하여야 합니다."),
     PHOTO_NOT_FOUND(HttpStatus.BAD_REQUEST, "POST_LOG-E004", "업로드된 사진을 찾을 수 없습니다."),
     INVALID_PHOTO_METADATA(HttpStatus.BAD_REQUEST, "POST_LOG-E005", "업로드된 사진 정보가 올바르지 않습니다."),
+    INVALID_PHOTO_OBJECT_KEY(HttpStatus.BAD_REQUEST, "POST_LOG-E006", "사진 object key가 올바르지 않습니다."),
+    INVALID_CAPTURED_AT(HttpStatus.BAD_REQUEST, "POST_LOG-E007", "사진 촬영 시각이 올바르지 않습니다."),
+    PHOTO_OBJECT_KEY_CONFLICT(HttpStatus.CONFLICT, "POST_LOG-E008", "이미 다른 정보로 등록된 사진입니다."),
 }
