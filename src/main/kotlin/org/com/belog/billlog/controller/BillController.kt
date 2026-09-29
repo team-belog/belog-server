@@ -1,30 +1,65 @@
 package org.com.belog.billlog.controller
 
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.com.belog.billlog.code.BillLogSuccessCode
 import org.com.belog.billlog.controller.dto.request.RegisterBillRequest
 import org.com.belog.billlog.controller.dto.response.BillDetailResponse
+import org.com.belog.billlog.controller.dto.response.BillListResponse
 import org.com.belog.billlog.controller.dto.response.RegisterBillResponse
 import org.com.belog.billlog.controller.swagger.BillSwagger
+import org.com.belog.billlog.service.BillLogService
 import org.com.belog.billlog.service.BillService
 import org.com.belog.billlog.service.command.BillItemCommand
 import org.com.belog.billlog.service.command.BillShareCommand
 import org.com.belog.billlog.service.command.RegisterBillCommand
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.LocalDate
 
 @RestController
 @RequestMapping("/api/v1/meetings/{meetingId}/bill-log/bills")
 class BillController(
     private val billService: BillService,
+    private val billLogService: BillLogService,
 ) : BillSwagger {
+    @GetMapping
+    override fun getBills(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+        cursorDate: LocalDate?,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(50) size: Int,
+    ): ResponseEntity<CommonResponse<BillListResponse>> {
+        val result =
+            billLogService.getBills(
+                meetingId = meetingId,
+                userId = userId,
+                cursorDate = cursorDate,
+                size = size,
+            )
+
+        return ResponseEntity
+            .status(BillLogSuccessCode.BILL_LIST_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    BillLogSuccessCode.BILL_LIST_RETRIEVED,
+                    BillListResponse.from(result),
+                ),
+            )
+    }
+
     @GetMapping("/{billId}")
     override fun getBillDetail(
         @LoginUserId userId: Long,

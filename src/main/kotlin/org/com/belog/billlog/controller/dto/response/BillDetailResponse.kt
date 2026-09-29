@@ -12,7 +12,10 @@ import java.time.LocalDate
 data class BillDetailResponse(
     @field:Schema(description = "결제 내역 ID", example = "45")
     val billId: Long,
-    @field:Schema(description = "만남 시작일을 1일 차로 계산한 결제 회차", example = "1")
+    @field:Schema(
+        description = "만남 시작일을 1일 차로 계산한 결제 회차. 시작일 이전은 -1, -2 순으로 계산",
+        example = "1",
+    )
     val dayNumber: Int,
     @field:Schema(description = "결제 내역 등록일", example = "2026-08-06")
     val paymentDate: LocalDate,

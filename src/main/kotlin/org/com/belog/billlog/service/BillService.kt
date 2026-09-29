@@ -5,6 +5,7 @@ import org.com.belog.billlog.domain.Bill
 import org.com.belog.billlog.domain.BillItem
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.domain.calculateBillDayNumber
 import org.com.belog.billlog.repository.BillItemRepository
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
@@ -27,7 +28,6 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.temporal.ChronoUnit
 
 @Service
 class BillService(
@@ -86,14 +86,12 @@ class BillService(
         val meetingStartDate =
             meeting.startDate
                 ?: throw BusinessException(BillLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
-        val daysFromMeetingStart = ChronoUnit.DAYS.between(meetingStartDate, paymentDate)
-        val dayNumber = if (daysFromMeetingStart < 0) daysFromMeetingStart else daysFromMeetingStart + 1
         val payerParticipantId = checkNotNull(bill.payer.id) { "조회된 결제자의 만남 참여자 ID가 없습니다." }
         val payerNickname = checkNotNull(bill.payer.groupMember.user.nickname) { "조회된 결제자의 닉네임이 없습니다." }
 
         return BillDetailResult(
             billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
-            dayNumber = Math.toIntExact(dayNumber),
+            dayNumber = calculateBillDayNumber(meetingStartDate, paymentDate),
             paymentDate = paymentDate,
             title = bill.title,
             payerNickname = payerNickname,
