@@ -10,6 +10,17 @@ interface BillRepository : JpaRepository<Bill, Long> {
 
     @Query(
         """
+        SELECT COALESCE(SUM(bill.totalAmount), 0)
+        FROM Bill bill
+        WHERE bill.meeting.id = :meetingId
+        """,
+    )
+    fun sumTotalAmountByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): Long
+
+    @Query(
+        """
         SELECT bill
         FROM Bill bill
         JOIN FETCH bill.meeting meeting
