@@ -49,7 +49,17 @@ storage:
     bucket: "${AWS_S3_BUCKET}"
     region: "${AWS_REGION:ap-northeast-2}"
     presign-expiration: 5m
+    connection-timeout: "${AWS_S3_CONNECTION_TIMEOUT:2s}"
+    socket-timeout: "${AWS_S3_SOCKET_TIMEOUT:5s}"
+    api-call-attempt-timeout: "${AWS_S3_API_CALL_ATTEMPT_TIMEOUT:5s}"
+    api-call-timeout: "${AWS_S3_API_CALL_TIMEOUT:10s}"
 
 group:
   invite:
     base-url: "${GROUP_INVITE_BASE_URL}"
+
+post-log:
+  photo-verification:
+    max-concurrent-head-requests: "${POST_LOG_PHOTO_MAX_CONCURRENT_HEAD_REQUESTS:10}"
+    queue-capacity: "${POST_LOG_PHOTO_VERIFICATION_QUEUE_CAPACITY:100}"
+    timeout: "${POST_LOG_PHOTO_VERIFICATION_TIMEOUT:15s}"
