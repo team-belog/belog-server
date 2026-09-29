@@ -14,8 +14,8 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         SELECT settlementRequest
         FROM SettlementRequest settlementRequest
         JOIN FETCH settlementRequest.bill bill
-        JOIN FETCH bill.payer payer
-        JOIN FETCH payer.groupMember groupMember
+        JOIN FETCH settlementRequest.participant participant
+        JOIN FETCH participant.groupMember groupMember
         JOIN FETCH groupMember.user
         WHERE settlementRequest.id = :settlementRequestId
           AND bill.meeting.id = :meetingId

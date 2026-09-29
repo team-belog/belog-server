@@ -1,7 +1,6 @@
 package org.com.belog.billlog.service
 
 import org.com.belog.billlog.code.BillLogErrorCode
-import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.global.error.BusinessException
 import org.springframework.stereotype.Service
@@ -15,21 +14,17 @@ class SettlementRequestService(
     private val clock: Clock,
 ) {
     @Transactional
-    fun updateStatus(
+    fun complete(
         meetingId: Long,
         settlementRequestId: Long,
-        payerUserId: Long,
-        status: SettlementRequestStatus,
+        requesterUserId: Long,
     ) {
         val settlementRequest =
             settlementRequestRepository.findByIdAndMeetingIdForUpdate(settlementRequestId, meetingId)
                 ?: throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND)
 
-        if (settlementRequest.bill.payer.groupMember.user.id != payerUserId) {
+        if (settlementRequest.participant.groupMember.user.id != requesterUserId) {
             throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_ACCESS_DENIED)
-        }
-        if (status != SettlementRequestStatus.COMPLETED) {
-            throw BusinessException(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_STATUS)
         }
 
         settlementRequest.complete(Instant.now(clock))
