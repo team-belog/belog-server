@@ -89,11 +89,10 @@ class SettlementRequestServiceTest {
     fun `정산 요청 대상자가 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
         val context = saveSettlementContext()
 
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
-            status = SettlementRequestStatus.COMPLETED,
         )
         flushAndClear()
 
@@ -108,11 +107,10 @@ class SettlementRequestServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
+                settlementRequestService.complete(
                     meetingId = context.meetingId,
                     settlementRequestId = context.settlementRequestId,
                     requesterUserId = context.payerUserId,
-                    status = SettlementRequestStatus.COMPLETED,
                 )
             }
         flushAndClear()
@@ -135,11 +133,10 @@ class SettlementRequestServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
+                settlementRequestService.complete(
                     meetingId = requireNotNull(otherMeeting.id),
                     settlementRequestId = context.settlementRequestId,
                     requesterUserId = context.settlementTargetUserId,
-                    status = SettlementRequestStatus.COMPLETED,
                 )
             }
         flushAndClear()
@@ -152,50 +149,20 @@ class SettlementRequestServiceTest {
     fun `이미 완료된 정산 요청을 다시 완료해도 최초 완료 시각이 유지된다`() {
         val context = saveSettlementContext()
 
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
-            status = SettlementRequestStatus.COMPLETED,
         )
         flushAndClear()
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
-            status = SettlementRequestStatus.COMPLETED,
         )
         flushAndClear()
 
         val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
-        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
-        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
-    }
-
-    @Test
-    fun `완료된 정산 요청을 대기 상태로 되돌릴 수 없다`() {
-        val context = saveSettlementContext()
-        settlementRequestService.updateStatus(
-            meetingId = context.meetingId,
-            settlementRequestId = context.settlementRequestId,
-            requesterUserId = context.settlementTargetUserId,
-            status = SettlementRequestStatus.COMPLETED,
-        )
-        flushAndClear()
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
-                    meetingId = context.meetingId,
-                    settlementRequestId = context.settlementRequestId,
-                    requesterUserId = context.settlementTargetUserId,
-                    status = SettlementRequestStatus.PENDING,
-                )
-            }
-        flushAndClear()
-
-        val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
-        assertEquals(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_STATUS, exception.errorCode)
         assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
         assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
     }
