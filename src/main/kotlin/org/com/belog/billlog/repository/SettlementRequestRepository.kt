@@ -3,12 +3,54 @@ package org.com.belog.billlog.repository
 import jakarta.persistence.LockModeType
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
+    @Query(
+        """
+        SELECT settlementRequest
+        FROM SettlementRequest settlementRequest
+        JOIN FETCH settlementRequest.bill bill
+        JOIN FETCH bill.payer payer
+        JOIN FETCH payer.groupMember payerMember
+        JOIN FETCH payerMember.user
+        JOIN FETCH settlementRequest.participant participant
+        JOIN FETCH participant.groupMember participantMember
+        JOIN FETCH participantMember.user
+        WHERE bill.meeting.id = :meetingId
+          AND (
+              :cursorId IS NULL
+              OR (
+                  :cursorStatus = :pendingStatus
+                  AND (
+                      (settlementRequest.status = :pendingStatus AND settlementRequest.id < :cursorId)
+                      OR settlementRequest.status = :completedStatus
+                  )
+              )
+              OR (
+                  :cursorStatus = :completedStatus
+                  AND settlementRequest.status = :completedStatus
+                  AND settlementRequest.id < :cursorId
+              )
+          )
+        ORDER BY
+            CASE WHEN settlementRequest.status = :pendingStatus THEN 0 ELSE 1 END ASC,
+            settlementRequest.id DESC
+        """,
+    )
+    fun findPageWithParticipants(
+        @Param("meetingId") meetingId: Long,
+        @Param("cursorStatus") cursorStatus: SettlementRequestStatus?,
+        @Param("cursorId") cursorId: Long?,
+        @Param("pendingStatus") pendingStatus: SettlementRequestStatus,
+        @Param("completedStatus") completedStatus: SettlementRequestStatus,
+        pageable: Pageable,
+    ): List<SettlementRequest>
+
     @Query(
         """
         SELECT COUNT(DISTINCT settlementRequest.participant.id)
