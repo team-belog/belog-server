@@ -11,6 +11,34 @@ interface PostLogPhotoLikeRepository :
     PostLogPhotoLikeRepositoryCustom {
     fun countByPhotoId(photoId: Long): Long
 
+    @Query(
+        """
+        SELECT new org.com.belog.postlog.repository.PostLogPhotoLikeCount(
+            photoLike.photo.id,
+            COUNT(photoLike.id)
+        )
+        FROM PostLogPhotoLike photoLike
+        WHERE photoLike.photo.id IN :photoIds
+        GROUP BY photoLike.photo.id
+        """,
+    )
+    fun countByPhotoIds(
+        @Param("photoIds") photoIds: Collection<Long>,
+    ): List<PostLogPhotoLikeCount>
+
+    @Query(
+        """
+        SELECT photoLike.photo.id
+        FROM PostLogPhotoLike photoLike
+        WHERE photoLike.photo.id IN :photoIds
+          AND photoLike.groupMember.id = :groupMemberId
+        """,
+    )
+    fun findLikedPhotoIds(
+        @Param("photoIds") photoIds: Collection<Long>,
+        @Param("groupMemberId") groupMemberId: Long,
+    ): List<Long>
+
     @Modifying
     @Query(
         """
