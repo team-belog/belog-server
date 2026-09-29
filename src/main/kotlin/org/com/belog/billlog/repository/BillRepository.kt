@@ -24,14 +24,14 @@ interface BillRepository : JpaRepository<Bill, Long> {
 
     @Query(
         """
-        SELECT DISTINCT CAST(bill.createdAt AS LocalDate)
+        SELECT DISTINCT CAST(bill.createdAt + 9 hour AS LocalDate)
         FROM Bill bill
         WHERE bill.meeting.id = :meetingId
           AND (
               :cursorDate IS NULL
-              OR CAST(bill.createdAt AS LocalDate) < :cursorDate
+              OR CAST(bill.createdAt + 9 hour AS LocalDate) < :cursorDate
           )
-        ORDER BY CAST(bill.createdAt AS LocalDate) DESC
+        ORDER BY CAST(bill.createdAt + 9 hour AS LocalDate) DESC
         """,
     )
     fun findPaymentDatePage(
