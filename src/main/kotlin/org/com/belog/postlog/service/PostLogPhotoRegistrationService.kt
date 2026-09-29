@@ -6,11 +6,9 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
-import org.com.belog.postlog.domain.PostLog
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
@@ -20,7 +18,6 @@ import java.time.temporal.ChronoUnit
 class PostLogPhotoRegistrationService(
     private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
-    private val postLogRepository: PostLogRepository,
     private val photoRepository: PostLogPhotoRepository,
 ) {
     @Transactional
@@ -36,9 +33,6 @@ class PostLogPhotoRegistrationService(
         val uploader =
             groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        val postLog =
-            postLogRepository.findByMeetingId(meetingId)
-                ?: postLogRepository.save(PostLog.create(meeting))
         val existingPhotosByObjectKey =
             photoRepository
                 .findAllByObjectKeyIn(targets.map { target -> target.objectKey.value })
@@ -56,7 +50,7 @@ class PostLogPhotoRegistrationService(
                 .filterNot { target -> existingPhotosByObjectKey.containsKey(target.objectKey.value) }
                 .map { target ->
                     PostLogPhoto.create(
-                        postLog = postLog,
+                        meeting = meeting,
                         uploader = uploader,
                         objectKey = target.objectKey,
                         capturedAt = target.capturedAt,
@@ -79,7 +73,7 @@ class PostLogPhotoRegistrationService(
         meetingId: Long,
         target: ValidatedPostLogPhotoRegistrationTarget,
     ): Boolean =
-        postLog.meeting.id == meetingId &&
+        meeting.id == meetingId &&
             capturedAt == target.capturedAt.toInstant().truncatedTo(ChronoUnit.MICROS) &&
             capturedOffsetMinutes == target.capturedAt.offset.totalSeconds / PostLogPhoto.SECONDS_PER_MINUTE
 }

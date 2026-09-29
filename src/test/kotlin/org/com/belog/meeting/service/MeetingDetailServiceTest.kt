@@ -11,6 +11,7 @@ import org.com.belog.meeting.domain.MeetingLogStatus
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
@@ -27,35 +28,42 @@ class MeetingDetailServiceTest {
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
     private val planRepository = mock(PlanRepository::class.java)
     private val billRepository = mock(BillRepository::class.java)
+    private val postLogPhotoRepository = mock(PostLogPhotoRepository::class.java)
     private val meetingDetailService =
         MeetingDetailService(
             meetingRepository = meetingRepository,
             groupMemberRepository = groupMemberRepository,
             planRepository = planRepository,
             billRepository = billRepository,
+            postLogPhotoRepository = postLogPhotoRepository,
         )
 
     @ParameterizedTest
     @CsvSource(
-        "false, false, NOT_STARTED, NOT_STARTED",
-        "true, false, IN_PROGRESS, NOT_STARTED",
-        "false, true, NOT_STARTED, IN_PROGRESS",
-        "true, true, IN_PROGRESS, IN_PROGRESS",
+        "false, false, false, NOT_STARTED, NOT_STARTED, NOT_STARTED",
+        "true, false, false, IN_PROGRESS, NOT_STARTED, NOT_STARTED",
+        "false, true, false, NOT_STARTED, IN_PROGRESS, NOT_STARTED",
+        "false, false, true, NOT_STARTED, NOT_STARTED, IN_PROGRESS",
+        "true, true, true, IN_PROGRESS, IN_PROGRESS, IN_PROGRESS",
     )
     fun `그룹 멤버가 조회하면 데이터 존재 여부에 따라 로그 상태를 반환한다`(
         hasPreLog: Boolean,
         hasBillLog: Boolean,
+        hasPostLog: Boolean,
         expectedPreLogStatus: MeetingLogStatus,
         expectedBillLogStatus: MeetingLogStatus,
+        expectedPostLogStatus: MeetingLogStatus,
     ) {
         stubMeetingDetail()
         `when`(planRepository.existsByMeetingId(MEETING_ID)).thenReturn(hasPreLog)
         `when`(billRepository.existsByMeetingId(MEETING_ID)).thenReturn(hasBillLog)
+        `when`(postLogPhotoRepository.existsByMeetingId(MEETING_ID)).thenReturn(hasPostLog)
 
         val result = meetingDetailService.getMeetingDetail(meetingId = MEETING_ID, userId = USER_ID)
 
         assertEquals(expectedPreLogStatus, result.preLogStatus)
         assertEquals(expectedBillLogStatus, result.billLogStatus)
+        assertEquals(expectedPostLogStatus, result.postLogStatus)
     }
 
     @Test
@@ -73,7 +81,7 @@ class MeetingDetailServiceTest {
             }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
-        verifyNoInteractions(planRepository, billRepository)
+        verifyNoInteractions(planRepository, billRepository, postLogPhotoRepository)
     }
 
     private fun stubMeetingDetail() {

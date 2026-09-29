@@ -10,12 +10,14 @@ import java.time.Instant
 interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
     fun findAllByObjectKeyIn(objectKeys: Collection<String>): List<PostLogPhoto>
 
+    fun existsByMeetingId(meetingId: Long): Boolean
+
     @Query(
         """
         SELECT photo
         FROM PostLogPhoto photo
         WHERE photo.id = :photoId
-          AND photo.postLog.meeting.id = :meetingId
+          AND photo.meeting.id = :meetingId
         """,
     )
     fun findByIdAndMeetingId(
@@ -27,7 +29,7 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
         """
         SELECT photo
         FROM PostLogPhoto photo
-        WHERE photo.postLog.meeting.id = :meetingId
+        WHERE photo.meeting.id = :meetingId
         ORDER BY photo.capturedAt ASC, photo.id ASC
         """,
     )
@@ -40,7 +42,7 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
         """
         SELECT photo
         FROM PostLogPhoto photo
-        WHERE photo.postLog.meeting.id = :meetingId
+        WHERE photo.meeting.id = :meetingId
           AND (
             photo.capturedAt > :capturedAt
             OR (photo.capturedAt = :capturedAt AND photo.id > :photoId)

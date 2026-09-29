@@ -10,7 +10,6 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -43,9 +42,6 @@ class PostLogPhotoRegistrationConcurrencyTest {
     private lateinit var registrationService: PostLogPhotoRegistrationService
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
-
-    @Autowired
     private lateinit var photoRepository: PostLogPhotoRepository
 
     @Autowired
@@ -63,7 +59,6 @@ class PostLogPhotoRegistrationConcurrencyTest {
     @AfterEach
     fun cleanUp() {
         photoRepository.deleteAll()
-        postLogRepository.deleteAll()
         meetingRepository.deleteAll()
         groupMemberRepository.deleteAll()
         groupRepository.deleteAll()
@@ -71,7 +66,7 @@ class PostLogPhotoRegistrationConcurrencyTest {
     }
 
     @Test
-    fun `동일한 모임에 첫 사진을 동시에 등록해도 Post-log는 하나만 생성된다`() {
+    fun `동일한 만남에 사진을 동시에 등록해도 모두 저장된다`() {
         val group = groupRepository.save(createGroup())
         val member = saveGroupMember(group)
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, member))
@@ -98,7 +93,6 @@ class PostLogPhotoRegistrationConcurrencyTest {
             val photoIds = requests.map { request -> request.get(10, TimeUnit.SECONDS) }
 
             assertEquals(2, photoIds.distinct().size)
-            assertEquals(1L, postLogRepository.count())
             assertEquals(2L, photoRepository.count())
         } finally {
             executor.shutdownNow()

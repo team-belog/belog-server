@@ -11,13 +11,11 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
-import org.com.belog.postlog.domain.PostLog
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -56,9 +54,6 @@ class PostLogPhotoLikeServiceIntegrationTest {
     private lateinit var photoRepository: PostLogPhotoRepository
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
-
-    @Autowired
     private lateinit var meetingRepository: MeetingRepository
 
     @Autowired
@@ -74,7 +69,6 @@ class PostLogPhotoLikeServiceIntegrationTest {
     fun cleanUp() {
         photoLikeRepository.deleteAll()
         photoRepository.deleteAll()
-        postLogRepository.deleteAll()
         meetingRepository.deleteAll()
         groupMemberRepository.deleteAll()
         groupRepository.deleteAll()
@@ -177,11 +171,10 @@ class PostLogPhotoLikeServiceIntegrationTest {
         val groupMember = saveGroupMember(group, userKey)
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, groupMember, userKey))
         val meetingId = requireNotNull(meeting.id)
-        val postLog = postLogRepository.saveAndFlush(PostLog.create(meeting))
         val photo =
             photoRepository.saveAndFlush(
                 PostLogPhoto.create(
-                    postLog = postLog,
+                    meeting = meeting,
                     uploader = groupMember,
                     objectKey = PostLogPhotoObjectKey.create(meetingId, "post-logs/$meetingId/photos/$userKey.jpg"),
                     capturedAt = OffsetDateTime.parse("2026-09-28T14:37:21+09:00"),

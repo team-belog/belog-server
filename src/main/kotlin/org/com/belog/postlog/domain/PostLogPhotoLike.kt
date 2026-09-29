@@ -58,7 +58,7 @@ class PostLogPhotoLike protected constructor(
             photo: PostLogPhoto,
             groupMember: GroupMember,
         ): PostLogPhotoLike {
-            require(groupMember.belongsTo(photo.postLog.meeting.group)) {
+            require(groupMember.belongsTo(photo.meeting.group)) {
                 "좋아요를 등록하는 사용자는 사진이 속한 그룹의 멤버여야 합니다."
             }
 
