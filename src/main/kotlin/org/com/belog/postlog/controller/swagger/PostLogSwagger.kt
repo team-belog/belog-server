@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
@@ -16,15 +18,96 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
+import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Post-log", description = "Post-log 관련 API")
 interface PostLogSwagger {
+    @Operation(
+        summary = "Post-log 사진 목록 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 등록된 사진을 촬영 시각과 사진 ID 오름차순으로 조회합니다. " +
+                "각 사진의 Presigned GET URL, 좋아요 수와 로그인 사용자의 좋아요 여부를 반환합니다. " +
+                "다음 페이지 조회에는 이전 응답의 nextCursor를 그대로 사용합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "사진 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [
+                            ExampleObject(name = "사진 목록", value = GET_PHOTOS_SUCCESS_EXAMPLE),
+                            ExampleObject(name = "빈 사진 목록", value = GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "조회 개수 또는 커서 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "입력값 오류", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "커서 오류", value = INVALID_PHOTO_CURSOR_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPhotos(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "이전 응답의 다음 페이지 커서. 첫 요청에서는 생략")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 및 최대 50개", example = "50")
+        @RequestParam(defaultValue = "50")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<PostLogPhotoListResponse>>
+
     @Operation(
         summary = "Post-log 사진 업로드 URL 일괄 발급",
         description =
@@ -353,3 +436,12 @@ private const val UNLIKE_PHOTO_SUCCESS_EXAMPLE =
 
 private const val POST_LOG_PHOTO_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E010","message":"사진을 찾을 수 없습니다.","data":null}"""
+
+private const val GET_PHOTOS_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}],"nextCursor":"MjAyNi0wOS0yOFQwMzowMDowMFp8MzE","hasNext":true}}"""
+
+private const val GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[],"nextCursor":null,"hasNext":false}}"""
+
+private const val INVALID_PHOTO_CURSOR_EXAMPLE =
+    """{"code":"POST_LOG-E011","message":"사진 목록 커서가 올바르지 않습니다.","data":null}"""

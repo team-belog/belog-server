@@ -12,4 +12,5 @@ enum class PostLogSuccessCode(
     PHOTOS_REGISTERED(HttpStatus.CREATED, "POST_LOG-S002", "사진 메타데이터가 등록되었습니다."),
     PHOTO_LIKED(HttpStatus.OK, "POST_LOG-S003", "사진에 좋아요를 등록했습니다."),
     PHOTO_LIKE_CANCELED(HttpStatus.OK, "POST_LOG-S004", "사진 좋아요를 취소했습니다."),
+    PHOTOS_RETRIEVED(HttpStatus.OK, "POST_LOG-S005", "사진 목록이 조회되었습니다."),
 }
