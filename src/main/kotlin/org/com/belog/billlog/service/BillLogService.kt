@@ -1,18 +1,25 @@
 package org.com.belog.billlog.service
 
+import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
+import org.com.belog.billlog.service.result.BillDayResult
+import org.com.belog.billlog.service.result.BillListItemResult
+import org.com.belog.billlog.service.result.BillListResult
 import org.com.belog.billlog.service.result.BillLogSummaryResult
 import org.com.belog.billlog.service.result.SettlementParticipantResult
 import org.com.belog.billlog.service.result.SettlementRequestAction
 import org.com.belog.billlog.service.result.SettlementRequestListItemResult
 import org.com.belog.billlog.service.result.SettlementRequestListResult
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.atStartOfBusinessDay
+import org.com.belog.global.time.toBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.user.domain.User
@@ -21,6 +28,8 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
+import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import java.util.Base64
 
 @Service
@@ -36,14 +45,7 @@ class BillLogService(
         meetingId: Long,
         userId: Long,
     ): BillLogSummaryResult {
-        val meeting =
-            meetingRepository.findByIdWithGroup(meetingId)
-                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Bill-log 대상 만남의 그룹 ID가 없습니다." }
-
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        findAccessibleMeeting(meetingId, userId)
 
         return BillLogSummaryResult(
             totalSpentAmount = billRepository.sumTotalAmountByMeetingId(meetingId),
@@ -61,6 +63,71 @@ class BillLogService(
     }
 
     @Transactional(readOnly = true)
+    fun getBills(
+        meetingId: Long,
+        userId: Long,
+        cursorDate: LocalDate?,
+        size: Int = DEFAULT_PAGE_SIZE,
+    ): BillListResult {
+        require(size in 1..MAX_PAGE_SIZE) { "조회 날짜 수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
+
+        val meeting = findAccessibleMeeting(meetingId, userId)
+        val meetingStartDate =
+            meeting.startDate
+                ?: throw BusinessException(BillLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
+        val paymentDates =
+            billRepository.findPaymentDatePage(
+                meetingId = meetingId,
+                cursorDate = cursorDate,
+                pageable = PageRequest.of(0, size + 1),
+            )
+        val hasNext = paymentDates.size > size
+        val pageDates = if (hasNext) paymentDates.take(size) else paymentDates
+
+        if (pageDates.isEmpty()) {
+            return BillListResult(days = emptyList(), nextCursorDate = null, hasNext = false)
+        }
+
+        val oldestDate = pageDates.last()
+        val newestDate = pageDates.first()
+        val billsByDate =
+            billRepository
+                .findAllWithPayerByMeetingIdAndCreatedAtRange(
+                    meetingId = meetingId,
+                    fromInclusive = oldestDate.atStartOfBusinessDay(),
+                    toExclusive = newestDate.plusDays(1).atStartOfBusinessDay(),
+                ).groupBy { bill ->
+                    checkNotNull(bill.createdAt) { "조회된 결제 내역의 생성 시각이 없습니다." }.toBusinessDate()
+                }
+
+        return BillListResult(
+            days =
+                pageDates.map { paymentDate ->
+                    val bills = billsByDate[paymentDate].orEmpty()
+                    BillDayResult(
+                        dayNumber = calculateDayNumber(meetingStartDate, paymentDate),
+                        paymentDate = paymentDate,
+                        dailyTotalAmount = sumAmounts(bills.map { bill -> bill.totalAmount }),
+                        bills =
+                            bills.map { bill ->
+                                BillListItemResult(
+                                    billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
+                                    title = bill.title,
+                                    payerNickname =
+                                        checkNotNull(bill.payer.groupMember.user.nickname) {
+                                            "조회된 결제자의 닉네임이 없습니다."
+                                        },
+                                    totalAmount = bill.totalAmount,
+                                )
+                            },
+                    )
+                },
+            nextCursorDate = pageDates.lastOrNull()?.takeIf { hasNext },
+            hasNext = hasNext,
+        )
+    }
+
+    @Transactional(readOnly = true)
     fun getSettlementRequests(
         meetingId: Long,
         userId: Long,
@@ -69,7 +136,7 @@ class BillLogService(
     ): SettlementRequestListResult {
         require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
 
-        validateGroupMember(meetingId, userId)
+        findAccessibleMeeting(meetingId, userId)
         val decodedCursor = cursor?.let(::decodeSettlementRequestCursor)
 
         val settlementRequests =
@@ -91,10 +158,10 @@ class BillLogService(
         )
     }
 
-    private fun validateGroupMember(
+    private fun findAccessibleMeeting(
         meetingId: Long,
         userId: Long,
-    ) {
+    ): Meeting {
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
@@ -102,7 +169,24 @@ class BillLogService(
         if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
+        return meeting
     }
+
+    private fun calculateDayNumber(
+        meetingStartDate: LocalDate,
+        paymentDate: LocalDate,
+    ): Int {
+        val daysFromMeetingStart = ChronoUnit.DAYS.between(meetingStartDate, paymentDate)
+        val dayNumber = if (daysFromMeetingStart < 0) daysFromMeetingStart else daysFromMeetingStart + 1
+        return Math.toIntExact(dayNumber)
+    }
+
+    private fun sumAmounts(amounts: List<Long>): Long =
+        try {
+            amounts.fold(0L) { total, amount -> Math.addExact(total, amount) }
+        } catch (_: ArithmeticException) {
+            throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
+        }
 
     private fun SettlementRequest.toListItemResult(userId: Long): SettlementRequestListItemResult {
         val senderParticipant = participant
