@@ -86,14 +86,13 @@ class SettlementRequestServiceTest {
     private lateinit var entityManager: EntityManager
 
     @Test
-    fun `결제자가 정산 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
+    fun `정산 요청 대상자가 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
         val context = saveSettlementContext()
 
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
-            payerUserId = context.payerUserId,
-            status = SettlementRequestStatus.COMPLETED,
+            requesterUserId = context.settlementTargetUserId,
         )
         flushAndClear()
 
@@ -103,16 +102,15 @@ class SettlementRequestServiceTest {
     }
 
     @Test
-    fun `결제자가 아닌 사용자는 정산 요청을 완료할 수 없다`() {
+    fun `정산 요청 대상자가 아닌 결제자는 요청을 완료할 수 없다`() {
         val context = saveSettlementContext()
 
         val exception =
             assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
+                settlementRequestService.complete(
                     meetingId = context.meetingId,
                     settlementRequestId = context.settlementRequestId,
-                    payerUserId = context.debtorUserId,
-                    status = SettlementRequestStatus.COMPLETED,
+                    requesterUserId = context.payerUserId,
                 )
             }
         flushAndClear()
@@ -135,11 +133,10 @@ class SettlementRequestServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
+                settlementRequestService.complete(
                     meetingId = requireNotNull(otherMeeting.id),
                     settlementRequestId = context.settlementRequestId,
-                    payerUserId = context.payerUserId,
-                    status = SettlementRequestStatus.COMPLETED,
+                    requesterUserId = context.settlementTargetUserId,
                 )
             }
         flushAndClear()
@@ -152,50 +149,20 @@ class SettlementRequestServiceTest {
     fun `이미 완료된 정산 요청을 다시 완료해도 최초 완료 시각이 유지된다`() {
         val context = saveSettlementContext()
 
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
-            payerUserId = context.payerUserId,
-            status = SettlementRequestStatus.COMPLETED,
+            requesterUserId = context.settlementTargetUserId,
         )
         flushAndClear()
-        settlementRequestService.updateStatus(
+        settlementRequestService.complete(
             meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
-            payerUserId = context.payerUserId,
-            status = SettlementRequestStatus.COMPLETED,
+            requesterUserId = context.settlementTargetUserId,
         )
         flushAndClear()
 
         val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
-        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
-        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
-    }
-
-    @Test
-    fun `완료된 정산 요청을 대기 상태로 되돌릴 수 없다`() {
-        val context = saveSettlementContext()
-        settlementRequestService.updateStatus(
-            meetingId = context.meetingId,
-            settlementRequestId = context.settlementRequestId,
-            payerUserId = context.payerUserId,
-            status = SettlementRequestStatus.COMPLETED,
-        )
-        flushAndClear()
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                settlementRequestService.updateStatus(
-                    meetingId = context.meetingId,
-                    settlementRequestId = context.settlementRequestId,
-                    payerUserId = context.payerUserId,
-                    status = SettlementRequestStatus.PENDING,
-                )
-            }
-        flushAndClear()
-
-        val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
-        assertEquals(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_STATUS, exception.errorCode)
         assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
         assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
     }
@@ -203,12 +170,12 @@ class SettlementRequestServiceTest {
     private fun saveSettlementContext(): SettlementContext {
         val group = groupRepository.save(createGroup())
         val payerMember = saveGroupMember(group, "payer-subject", "결제자")
-        val debtorMember = saveGroupMember(group, "debtor-subject", "정산자")
+        val settlementTargetMember = saveGroupMember(group, "settlement-target-subject", "정산자")
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, payerMember, "광주 여행"))
         val payerParticipant =
             meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, payerMember))
-        val debtorParticipant =
-            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, debtorMember))
+        val settlementTargetParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, settlementTargetMember))
         val bill =
             billRepository.saveAndFlush(
                 Bill.create(
@@ -224,7 +191,7 @@ class SettlementRequestServiceTest {
             billShareRepository.saveAndFlush(
                 BillShare.create(
                     bill = bill,
-                    participant = debtorParticipant,
+                    participant = settlementTargetParticipant,
                     amount = 10_000L,
                     allocationOrder = 0,
                 ),
@@ -237,7 +204,7 @@ class SettlementRequestServiceTest {
             meetingId = requireNotNull(meeting.id),
             settlementRequestId = requireNotNull(settlementRequest.id),
             payerUserId = requireNotNull(payerMember.user.id),
-            debtorUserId = requireNotNull(debtorMember.user.id),
+            settlementTargetUserId = requireNotNull(settlementTargetMember.user.id),
         )
     }
 
@@ -316,7 +283,7 @@ class SettlementRequestServiceTest {
         val meetingId: Long,
         val settlementRequestId: Long,
         val payerUserId: Long,
-        val debtorUserId: Long,
+        val settlementTargetUserId: Long,
     )
 
     @TestConfiguration
