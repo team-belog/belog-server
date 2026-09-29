@@ -10,6 +10,7 @@ import org.com.belog.group.service.GroupMembershipService
 import org.com.belog.group.service.GroupService
 import org.com.belog.group.service.result.CreatedGroup
 import org.com.belog.group.service.result.GroupMemberResult
+import org.com.belog.meeting.service.MeetingService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verifyNoInteractions
@@ -44,6 +45,9 @@ class GroupControllerTest {
 
     @MockitoBean
     private lateinit var groupMembershipService: GroupMembershipService
+
+    @MockitoBean
+    private lateinit var meetingService: MeetingService
 
     @Test
     fun `그룹 멤버 목록을 조회한다`() {
