@@ -27,7 +27,10 @@ data class BillListResponse(
 
 @Schema(description = "결제일별 결제 내역")
 data class BillDayResponse(
-    @field:Schema(description = "만남 시작일을 1일 차로 계산한 일차", example = "1")
+    @field:Schema(
+        description = "만남 시작일을 1일 차로 계산한 일차. 시작일 이전은 -1, -2 순으로 계산",
+        example = "1",
+    )
     val dayNumber: Int,
     @field:Schema(description = "결제일", example = "2026-08-06")
     val paymentDate: LocalDate,

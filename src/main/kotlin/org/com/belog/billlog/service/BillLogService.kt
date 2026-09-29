@@ -3,6 +3,7 @@ package org.com.belog.billlog.service
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.billlog.domain.calculateBillDayNumber
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.billlog.service.result.BillDayResult
@@ -29,7 +30,6 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 import java.util.Base64
 
 @Service
@@ -105,7 +105,7 @@ class BillLogService(
                 pageDates.map { paymentDate ->
                     val bills = billsByDate[paymentDate].orEmpty()
                     BillDayResult(
-                        dayNumber = calculateDayNumber(meetingStartDate, paymentDate),
+                        dayNumber = calculateBillDayNumber(meetingStartDate, paymentDate),
                         paymentDate = paymentDate,
                         dailyTotalAmount = sumAmounts(bills.map { bill -> bill.totalAmount }),
                         bills =
@@ -170,15 +170,6 @@ class BillLogService(
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
         return meeting
-    }
-
-    private fun calculateDayNumber(
-        meetingStartDate: LocalDate,
-        paymentDate: LocalDate,
-    ): Int {
-        val daysFromMeetingStart = ChronoUnit.DAYS.between(meetingStartDate, paymentDate)
-        val dayNumber = if (daysFromMeetingStart < 0) daysFromMeetingStart else daysFromMeetingStart + 1
-        return Math.toIntExact(dayNumber)
     }
 
     private fun sumAmounts(amounts: List<Long>): Long =
