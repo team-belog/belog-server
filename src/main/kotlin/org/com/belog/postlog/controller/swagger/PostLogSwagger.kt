@@ -166,6 +166,17 @@ interface PostLogSwagger {
                     ),
                 ],
             ),
+            ApiResponse(
+                responseCode = "503",
+                description = "S3 객체 검증 제한 시간 초과 또는 검증 요청 과부하",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PHOTO_VERIFICATION_UNAVAILABLE_EXAMPLE)],
+                    ),
+                ],
+            ),
         ],
     )
     fun registerPhotos(
@@ -211,3 +222,6 @@ private const val MEETING_NOT_FOUND_EXAMPLE =
 
 private const val PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE =
     """{"code":"POST_LOG-E008","message":"이미 다른 정보로 등록된 사진입니다.","data":null}"""
+
+private const val PHOTO_VERIFICATION_UNAVAILABLE_EXAMPLE =
+    """{"code":"POST_LOG-E009","message":"업로드된 사진을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":null}"""

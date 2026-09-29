@@ -16,4 +16,5 @@ enum class PostLogErrorCode(
     INVALID_PHOTO_OBJECT_KEY(HttpStatus.BAD_REQUEST, "POST_LOG-E006", "사진 object key가 올바르지 않습니다."),
     INVALID_CAPTURED_AT(HttpStatus.BAD_REQUEST, "POST_LOG-E007", "사진 촬영 시각이 올바르지 않습니다."),
     PHOTO_OBJECT_KEY_CONFLICT(HttpStatus.CONFLICT, "POST_LOG-E008", "이미 다른 정보로 등록된 사진입니다."),
+    PHOTO_VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "POST_LOG-E009", "업로드된 사진을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
 }

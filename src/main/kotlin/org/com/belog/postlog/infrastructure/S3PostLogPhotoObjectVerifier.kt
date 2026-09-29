@@ -5,21 +5,38 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
 import org.com.belog.postlog.code.PostLogErrorCode
+import org.com.belog.postlog.config.PostLogPhotoVerificationProperties
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoFormat
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.springframework.stereotype.Component
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorCompletionService
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 @Component
 class S3PostLogPhotoObjectVerifier(
     private val s3ObjectMetadataProvider: S3ObjectMetadataProvider,
+    private val properties: PostLogPhotoVerificationProperties,
 ) {
-    private val executor: ExecutorService = Executors.newFixedThreadPool(MAX_CONCURRENT_HEAD_REQUESTS)
+    private val executor =
+        ThreadPoolExecutor(
+            properties.maxConcurrentHeadRequests,
+            properties.maxConcurrentHeadRequests,
+            0L,
+            TimeUnit.MILLISECONDS,
+            ArrayBlockingQueue(properties.queueCapacity),
+            Thread
+                .ofPlatform()
+                .name("post-log-photo-verifier-", 0)
+                .daemon(true)
+                .factory(),
+            ThreadPoolExecutor.AbortPolicy(),
+        )
 
     fun verifyAll(objectKeys: List<PostLogPhotoObjectKey>) {
         if (
@@ -30,15 +47,28 @@ class S3PostLogPhotoObjectVerifier(
         }
 
         val completionService = ExecutorCompletionService<Unit>(executor)
-        val futures = objectKeys.map { objectKey -> completionService.submit { verify(objectKey) } }
+        val futures = mutableListOf<Future<Unit>>()
+        val deadlineNanos = System.nanoTime() + properties.timeout.toNanos()
 
         try {
-            repeat(futures.size) {
-                completionService.take().get()
+            objectKeys.forEach { objectKey ->
+                futures += completionService.submit { verify(objectKey) }
             }
+            repeat(futures.size) {
+                val remainingNanos = deadlineNanos - System.nanoTime()
+                if (remainingNanos <= 0L) {
+                    throw verificationUnavailable()
+                }
+                val completedFuture =
+                    completionService.poll(remainingNanos, TimeUnit.NANOSECONDS)
+                        ?: throw verificationUnavailable()
+                completedFuture.get()
+            }
+        } catch (exception: RejectedExecutionException) {
+            throw verificationUnavailable(exception)
         } catch (exception: InterruptedException) {
             Thread.currentThread().interrupt()
-            throw IllegalStateException("Post-log 사진 객체 검증이 중단되었습니다.", exception)
+            throw verificationUnavailable(exception)
         } catch (exception: ExecutionException) {
             val cause = exception.cause
             if (cause is RuntimeException) {
@@ -47,6 +77,7 @@ class S3PostLogPhotoObjectVerifier(
             throw IllegalStateException("Post-log 사진 객체를 검증할 수 없습니다.", cause)
         } finally {
             futures.forEach(::cancel)
+            executor.purge()
         }
     }
 
@@ -77,10 +108,9 @@ class S3PostLogPhotoObjectVerifier(
 
     @PreDestroy
     fun shutdown() {
-        executor.shutdown()
+        executor.shutdownNow()
     }
 
-    companion object {
-        private const val MAX_CONCURRENT_HEAD_REQUESTS = 10
-    }
+    private fun verificationUnavailable(cause: Throwable? = null): BusinessException =
+        BusinessException(PostLogErrorCode.PHOTO_VERIFICATION_UNAVAILABLE, cause)
 }

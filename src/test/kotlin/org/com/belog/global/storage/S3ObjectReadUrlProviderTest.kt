@@ -18,6 +18,10 @@ class S3ObjectReadUrlProviderTest {
             bucket = "belog-test-storage",
             region = "ap-northeast-2",
             presignExpiration = Duration.ofMinutes(5),
+            connectionTimeout = Duration.ofSeconds(2),
+            socketTimeout = Duration.ofSeconds(5),
+            apiCallAttemptTimeout = Duration.ofSeconds(5),
+            apiCallTimeout = Duration.ofSeconds(10),
         )
     private val presigner =
         S3Presigner
