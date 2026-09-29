@@ -15,6 +15,7 @@ import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
+import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.springframework.http.MediaType
@@ -200,6 +201,124 @@ interface PostLogSwagger {
         @RequestBody
         request: RegisterPostLogPhotosRequest,
     ): ResponseEntity<CommonResponse<RegisterPostLogPhotosResponse>>
+
+    @Operation(
+        summary = "Post-log 사진 좋아요 등록",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 사진에 좋아요를 등록합니다. " +
+                "이미 좋아요가 등록된 경우에도 성공하며 현재 좋아요 상태와 전체 좋아요 수를 반환합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "사진 좋아요 등록 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = LIKE_PHOTO_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 해당 만남의 사진을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "사진 없음", value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun likePhoto(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "사진 ID", example = "31", required = true)
+        @PathVariable
+        photoId: Long,
+    ): ResponseEntity<CommonResponse<PostLogPhotoLikeResponse>>
+
+    @Operation(
+        summary = "Post-log 사진 좋아요 취소",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 자신이 등록한 사진 좋아요를 취소합니다. " +
+                "등록된 좋아요가 없어도 성공하며 현재 좋아요 상태와 전체 좋아요 수를 반환합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "사진 좋아요 취소 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = UNLIKE_PHOTO_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 해당 만남의 사진을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "사진 없음", value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun unlikePhoto(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "사진 ID", example = "31", required = true)
+        @PathVariable
+        photoId: Long,
+    ): ResponseEntity<CommonResponse<PostLogPhotoLikeResponse>>
 }
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
@@ -225,3 +344,12 @@ private const val PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE =
 
 private const val PHOTO_VERIFICATION_UNAVAILABLE_EXAMPLE =
     """{"code":"POST_LOG-E009","message":"업로드된 사진을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":null}"""
+
+private const val LIKE_PHOTO_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S003","message":"사진에 좋아요를 등록했습니다.","data":{"photoId":31,"likedByMe":true,"likeCount":3}}"""
+
+private const val UNLIKE_PHOTO_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S004","message":"사진 좋아요를 취소했습니다.","data":{"photoId":31,"likedByMe":false,"likeCount":2}}"""
+
+private const val POST_LOG_PHOTO_NOT_FOUND_EXAMPLE =
+    """{"code":"POST_LOG-E010","message":"사진을 찾을 수 없습니다.","data":null}"""
