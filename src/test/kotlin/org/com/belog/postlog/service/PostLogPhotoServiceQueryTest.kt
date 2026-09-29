@@ -14,7 +14,6 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
-import org.com.belog.postlog.domain.PostLog
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
@@ -22,7 +21,6 @@ import org.com.belog.postlog.infrastructure.S3PostLogPhotoObjectVerifier
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoUploadUrlProvider
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -71,9 +69,6 @@ class PostLogPhotoServiceQueryTest {
 
     @Autowired
     private lateinit var photoRepository: PostLogPhotoRepository
-
-    @Autowired
-    private lateinit var postLogRepository: PostLogRepository
 
     @Autowired
     private lateinit var meetingRepository: MeetingRepository
@@ -257,12 +252,10 @@ class PostLogPhotoServiceQueryTest {
                     currentDate = LocalDate.of(2026, 9, 20),
                 ),
             )
-        val postLog = postLogRepository.saveAndFlush(PostLog.create(meeting))
-
         return MeetingContext(
             group = group,
             groupMember = groupMember,
-            postLog = postLog,
+            meeting = meeting,
             meetingId = requireNotNull(meeting.id),
             userId = requireNotNull(groupMember.user.id),
         )
@@ -275,7 +268,7 @@ class PostLogPhotoServiceQueryTest {
     ): PostLogPhoto =
         photoRepository.saveAndFlush(
             PostLogPhoto.create(
-                postLog = context.postLog,
+                meeting = context.meeting,
                 uploader = context.groupMember,
                 objectKey =
                     PostLogPhotoObjectKey.create(
@@ -321,7 +314,7 @@ class PostLogPhotoServiceQueryTest {
     private data class MeetingContext(
         val group: Group,
         val groupMember: GroupMember,
-        val postLog: PostLog,
+        val meeting: Meeting,
         val meetingId: Long,
         val userId: Long,
     )

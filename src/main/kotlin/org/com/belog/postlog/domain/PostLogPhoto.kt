@@ -15,6 +15,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
+import org.com.belog.meeting.domain.Meeting
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -33,8 +34,8 @@ const val POST_LOG_PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_NAME = "uk_post_log_photos
     ],
     indexes = [
         Index(
-            name = "idx_post_log_photos_post_log_captured_id",
-            columnList = "post_log_id, captured_at_utc, id",
+            name = "idx_post_log_photos_meeting_captured_id",
+            columnList = "meeting_id, captured_at_utc, id",
         ),
     ],
     check = [
@@ -47,11 +48,11 @@ const val POST_LOG_PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_NAME = "uk_post_log_photos
 class PostLogPhoto protected constructor(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "post_log_id",
+        name = "meeting_id",
         nullable = false,
-        foreignKey = ForeignKey(name = "fk_post_log_photos_post_log_id"),
+        foreignKey = ForeignKey(name = "fk_post_log_photos_meeting_id"),
     )
-    val postLog: PostLog,
+    val meeting: Meeting,
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
         name = "uploaded_by_group_member_id",
@@ -80,12 +81,12 @@ class PostLogPhoto protected constructor(
         const val MAX_UPLOAD_COUNT = 100
 
         fun create(
-            postLog: PostLog,
+            meeting: Meeting,
             uploader: GroupMember,
             objectKey: PostLogPhotoObjectKey,
             capturedAt: OffsetDateTime,
         ): PostLogPhoto {
-            require(uploader.belongsTo(postLog.meeting.group)) {
+            require(uploader.belongsTo(meeting.group)) {
                 "Post-log 사진 업로더는 해당 만남이 속한 그룹의 멤버여야 합니다."
             }
             val offsetTotalSeconds = capturedAt.offset.totalSeconds
@@ -94,7 +95,7 @@ class PostLogPhoto protected constructor(
             }
 
             return PostLogPhoto(
-                postLog = postLog,
+                meeting = meeting,
                 uploadedBy = uploader,
                 objectKey = objectKey.value,
                 capturedAt = capturedAt.toInstant().truncatedTo(ChronoUnit.MICROS),

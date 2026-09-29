@@ -13,7 +13,6 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -34,7 +33,6 @@ import java.time.LocalDate
 import java.time.OffsetDateTime
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -48,9 +46,6 @@ import kotlin.test.assertNotNull
 class PostLogPhotoRegistrationServiceTest {
     @Autowired
     private lateinit var registrationService: PostLogPhotoRegistrationService
-
-    @Autowired
-    private lateinit var postLogRepository: PostLogRepository
 
     @Autowired
     private lateinit var photoRepository: PostLogPhotoRepository
@@ -70,7 +65,6 @@ class PostLogPhotoRegistrationServiceTest {
     @AfterEach
     fun cleanUp() {
         photoRepository.deleteAllInBatch()
-        postLogRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
         groupRepository.deleteAllInBatch()
@@ -78,7 +72,7 @@ class PostLogPhotoRegistrationServiceTest {
     }
 
     @Test
-    fun `Post-log가 없으면 생성하고 사진 메타데이터를 요청 순서대로 일괄 저장한다`() {
+    fun `사진 메타데이터를 만남에 연결하고 요청 순서대로 일괄 저장한다`() {
         val context = saveMeetingContext()
         val targets =
             listOf(
@@ -88,16 +82,13 @@ class PostLogPhotoRegistrationServiceTest {
 
         val photos = registrationService.register(context.meetingId, context.userId, targets)
 
-        val postLog = postLogRepository.findByMeetingId(context.meetingId)
-        assertNotNull(postLog)
-        assertEquals(1L, postLogRepository.count())
         assertEquals(2L, photoRepository.count())
         assertEquals(targets.map { it.objectKey.value }, photos.map { it.objectKey })
         assertEquals(targets.map { it.capturedAt }, photos.map { it.capturedAtWithOffset() })
     }
 
     @Test
-    fun `기존 Post-log에는 새 사진만 추가한다`() {
+    fun `기존 사진이 있는 만남에는 새 사진만 추가한다`() {
         val context = saveMeetingContext()
         registrationService.register(
             context.meetingId,
@@ -111,7 +102,6 @@ class PostLogPhotoRegistrationServiceTest {
             listOf(target(context.meetingId, "second.png", "2026-09-28T15:10:00+09:00")),
         )
 
-        assertEquals(1L, postLogRepository.count())
         assertEquals(2L, photoRepository.count())
     }
 
@@ -124,7 +114,6 @@ class PostLogPhotoRegistrationServiceTest {
 
         val photos = registrationService.register(context.meetingId, context.userId, listOf(existingTarget, newTarget))
 
-        assertEquals(1L, postLogRepository.count())
         assertEquals(2L, photoRepository.count())
         assertEquals(existingPhoto.id, photos.first().id)
         assertEquals(listOf(existingTarget.objectKey.value, newTarget.objectKey.value), photos.map { it.objectKey })
@@ -148,7 +137,6 @@ class PostLogPhotoRegistrationServiceTest {
             }
 
         assertEquals(PostLogErrorCode.PHOTO_OBJECT_KEY_CONFLICT, exception.errorCode)
-        assertEquals(1L, postLogRepository.count())
         assertEquals(1L, photoRepository.count())
         assertEquals(listOf(existingTarget.objectKey.value), photoRepository.findAll().map { it.objectKey })
     }

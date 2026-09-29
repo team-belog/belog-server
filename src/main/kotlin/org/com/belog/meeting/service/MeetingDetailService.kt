@@ -8,6 +8,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.MeetingLogStatus
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.result.MeetingDetailResult
+import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -18,6 +19,7 @@ class MeetingDetailService(
     private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
     private val billRepository: BillRepository,
+    private val postLogPhotoRepository: PostLogPhotoRepository,
 ) {
     @Transactional(readOnly = true)
     fun getMeetingDetail(
@@ -45,7 +47,7 @@ class MeetingDetailService(
             canEditMeeting = meeting.isCreatedBy(groupMember),
             preLogStatus = toLogStatus(planRepository.existsByMeetingId(meetingId)),
             billLogStatus = toLogStatus(billRepository.existsByMeetingId(meetingId)),
-            postLogStatus = MeetingLogStatus.NOT_STARTED,
+            postLogStatus = toLogStatus(postLogPhotoRepository.existsByMeetingId(meetingId)),
         )
     }
 
