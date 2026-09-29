@@ -9,6 +9,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.Positive
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
@@ -20,10 +23,12 @@ import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
 import org.com.belog.group.controller.dto.response.GroupDetailResponse
 import org.com.belog.group.controller.dto.response.GroupMembersResponse
+import org.com.belog.group.controller.dto.response.PastMeetingListResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Group", description = "그룹 관련 API")
 interface GroupSwagger {
@@ -79,6 +84,79 @@ interface GroupSwagger {
         @PathVariable
         groupId: Long,
     ): ResponseEntity<CommonResponse<GroupDetailResponse>>
+
+    @Operation(
+        summary = "지난 만남 목록 조회",
+        description =
+            "종료일이 현재 영업일보다 이전인 확정 만남을 최신 생성순으로 조회합니다. " +
+                "만남 ID 기반 커서 페이지네이션을 사용하며 해당 그룹에 참여한 사용자만 조회할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "지난 만남 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_PAST_MEETINGS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "쿼리 파라미터 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPastMeetings(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+        @Parameter(description = "마지막으로 조회한 지난 만남 ID. 첫 요청에서는 생략", example = "8")
+        @RequestParam(required = false)
+        @Positive
+        cursor: Long?,
+        @Parameter(description = "조회 개수. 기본 10개, 최대 50개", example = "10")
+        @RequestParam(defaultValue = "10")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<PastMeetingListResponse>>
 
     @Operation(
         summary = "그룹 멤버 목록 조회",
@@ -439,3 +517,6 @@ private const val GROUP_NOT_FOUND_EXAMPLE =
 
 private const val GET_GROUP_SUCCESS_EXAMPLE =
     """{"code":"GROUP-S005","message":"그룹을 조회했습니다.","data":{"groupId":1,"name":"피놀리와 기니휘기","coverImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/group-covers/15/image.webp?...","inviteCode":"QCRJNN","memberCount":15,"canEditCoverImage":true,"canDeleteGroup":true,"schedulingMeetings":[{"meetingId":10,"name":"1박 2일 광주 여행","participantNicknames":["이정원","정다빈","김성연"],"participantCount":3}],"activeMeetings":[{"meetingId":11,"name":"여름 부산 여행","startDate":"2026-09-25","endDate":"2026-09-26"}]}}"""
+
+private const val GET_PAST_MEETINGS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S007","message":"지난 만남 목록을 조회했습니다.","data":{"items":[{"meetingId":7,"name":"2025 연말 파티","startDate":"2025-12-30","endDate":"2025-12-30"}],"nextCursor":7,"hasNext":true}}"""

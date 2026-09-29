@@ -1,4 +1,4 @@
-package org.com.belog.meeting.controller.dto.response
+package org.com.belog.group.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.meeting.service.result.PastMeetingListResult
