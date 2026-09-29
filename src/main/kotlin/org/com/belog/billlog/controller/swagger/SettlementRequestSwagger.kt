@@ -54,6 +54,17 @@ interface SettlementRequestSwagger {
                 ],
             ),
             ApiResponse(
+                responseCode = "400",
+                description = "정산 현황 커서가 올바르지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_CURSOR_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
                 responseCode = "404",
                 description = "만남을 찾을 수 없음",
                 content = [
@@ -138,6 +149,9 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
+
+private const val INVALID_CURSOR_EXAMPLE =
+    """{"code":"BILL_LOG-E015","message":"정산 현황 커서가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
 
 private const val ACCESS_DENIED_EXAMPLE =
     """{"code":"BILL_LOG-E014","message":"정산 요청 대상자만 완료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""

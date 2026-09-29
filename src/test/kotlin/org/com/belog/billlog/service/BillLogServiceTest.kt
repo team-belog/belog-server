@@ -1,6 +1,7 @@
 package org.com.belog.billlog.service
 
 import jakarta.persistence.EntityManager
+import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.Bill
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
@@ -11,6 +12,7 @@ import org.com.belog.billlog.repository.BillShareRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.billlog.service.result.SettlementRequestAction
 import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
@@ -40,6 +42,7 @@ import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -185,6 +188,18 @@ class BillLogServiceTest {
         assertTrue(secondPage.hasNext)
         assertFalse(thirdPage.hasNext)
         assertNull(thirdPage.nextCursor)
+    }
+
+    @Test
+    fun `정산 현황 커서가 올바르지 않으면 입력 오류를 반환한다`() {
+        val context = saveMeetingContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                getSettlementRequestPage(context, cursor = "invalid-cursor", size = 10)
+            }
+
+        assertEquals(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_CURSOR, exception.errorCode)
     }
 
     @Test

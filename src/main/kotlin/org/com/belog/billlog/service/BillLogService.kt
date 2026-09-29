@@ -221,7 +221,7 @@ class BillLogService(
             require(settlementRequestId > 0)
             SettlementRequestCursor(status = status, settlementRequestId = settlementRequestId)
         } catch (exception: IllegalArgumentException) {
-            throw IllegalArgumentException("정산 현황 커서가 올바르지 않습니다.", exception)
+            throw BusinessException(BillLogErrorCode.INVALID_SETTLEMENT_REQUEST_CURSOR, exception)
         }
 
     private fun MeetingParticipant.toResult(
