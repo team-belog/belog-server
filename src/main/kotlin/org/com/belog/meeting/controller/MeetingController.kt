@@ -17,6 +17,7 @@ import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.service.MeetingDetailService
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -88,6 +89,18 @@ class MeetingController(
         return ResponseEntity
             .status(MeetingSuccessCode.MEETING_UPDATED.status)
             .body(CommonResponse.success(MeetingSuccessCode.MEETING_UPDATED))
+    }
+
+    @DeleteMapping("/api/v1/meetings/{meetingId}")
+    override fun deleteMeeting(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        meetingService.deleteMeeting(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_DELETED.status)
+            .build()
     }
 
     @GetMapping("/api/v1/meetings/{meetingId}")

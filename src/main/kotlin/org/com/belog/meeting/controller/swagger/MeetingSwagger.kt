@@ -228,6 +228,53 @@ interface MeetingSwagger {
     ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
+        summary = "만남 삭제",
+        description =
+            "만남 생성자가 만남을 삭제합니다. 삭제 시각을 기록하는 soft delete 방식이며, " +
+                "연관 데이터와 S3 객체는 보존됩니다. 이미 삭제된 만남은 찾을 수 없는 만남으로 처리합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "만남 삭제 성공",
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 생성자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_CREATOR_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun deleteMeeting(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "만남 상세 조회",
         description =
             "만남 기본 정보와 로그인 사용자의 수정 권한, " +

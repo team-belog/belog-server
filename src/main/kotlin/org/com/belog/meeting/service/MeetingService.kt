@@ -252,6 +252,16 @@ class MeetingService(
         meeting.updateDetails(name = name, location = location)
     }
 
+    @Transactional
+    fun deleteMeeting(
+        meetingId: Long,
+        userId: Long,
+    ) {
+        val meeting = findMeetingForUpdate(meetingId)
+        validateScheduleManager(meeting, userId)
+        meeting.delete(Instant.now(clock))
+    }
+
     private fun updateConfirmedDate(
         meeting: Meeting,
         dateRange: MeetingDateRange,

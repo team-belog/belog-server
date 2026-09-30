@@ -16,4 +16,5 @@ enum class MeetingSuccessCode(
     MEETING_DETAIL_RETRIEVED(HttpStatus.OK, "MEETING-S006", "만남 상세 정보를 조회했습니다."),
     PAST_MEETINGS_RETRIEVED(HttpStatus.OK, "MEETING-S007", "지난 만남 목록을 조회했습니다."),
     MEETING_UPDATED(HttpStatus.OK, "MEETING-S008", "만남이 수정되었습니다."),
+    MEETING_DELETED(HttpStatus.NO_CONTENT, "MEETING-S009", "만남이 삭제되었습니다."),
 }
