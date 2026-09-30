@@ -12,6 +12,7 @@ import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleResponse
+import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -24,11 +25,15 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.ActiveProfiles
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -146,6 +151,45 @@ class MeetingRepositoryTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `삭제된 만남은 모든 활성 만남 조회에서 제외된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val confirmedMeeting = meetingRepository.save(createMeeting(group, creator))
+        val schedulingMeeting = meetingRepository.save(createPollMeeting(group, creator))
+        meetingRepository.flush()
+
+        confirmedMeeting.delete(Instant.parse("2026-09-23T00:00:00Z"))
+        schedulingMeeting.delete(Instant.parse("2026-09-23T00:00:00Z"))
+        meetingRepository.flush()
+
+        val confirmedMeetingId = requireNotNull(confirmedMeeting.id)
+        val groupId = requireNotNull(group.id)
+
+        assertNull(meetingRepository.findActiveById(confirmedMeetingId))
+        assertFalse(meetingRepository.existsByIdAndDeletedAtIsNull(confirmedMeetingId))
+        assertNull(meetingRepository.findByIdWithGroup(confirmedMeetingId))
+        assertNull(meetingRepository.findByIdWithGroupForUpdate(confirmedMeetingId))
+        assertNull(meetingRepository.findByIdWithGroupAndCreator(confirmedMeetingId))
+        assertNull(meetingRepository.findByIdForUpdate(confirmedMeetingId))
+        assertTrue(meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING).isEmpty())
+        assertTrue(
+            meetingRepository
+                .findActiveMeetings(groupId, LocalDate.of(2026, 9, 21), MeetingStatus.CONFIRMED)
+                .isEmpty(),
+        )
+        assertTrue(
+            meetingRepository
+                .findPastMeetingPage(
+                    groupId = groupId,
+                    currentDate = LocalDate.of(2026, 9, 23),
+                    cursor = null,
+                    status = MeetingStatus.CONFIRMED,
+                    pageable = PageRequest.of(0, 10),
+                ).isEmpty(),
+        )
     }
 
     private fun createMeeting(
