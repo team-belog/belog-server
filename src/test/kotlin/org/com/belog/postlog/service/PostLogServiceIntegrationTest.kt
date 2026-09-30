@@ -231,7 +231,7 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `그룹 멤버가 티켓을 최초 생성하면 추억 문구와 생성 상태가 저장된다`() {
+    fun `만남 참여자가 티켓을 최초 생성하면 추억 문구와 생성 상태가 저장된다`() {
         val context = saveMeetingContext()
 
         val result =
@@ -273,30 +273,28 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `만남 참여자가 아니어도 같은 그룹 멤버면 티켓을 생성할 수 있다`() {
+    fun `같은 그룹 멤버여도 만남 참여자가 아니면 티켓을 생성할 수 없다`() {
         val context = saveMeetingContext()
         val nonParticipant = saveGroupMember(context.group, "writer")
 
-        postLogService.createTicket(
-            meetingId = context.meetingId,
-            userId = checkNotNull(nonParticipant.user.id),
-            memory = "그룹 멤버가 만든 추억",
-        )
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.createTicket(
+                    meetingId = context.meetingId,
+                    userId = checkNotNull(nonParticipant.user.id),
+                    memory = "비참여 그룹 멤버의 추억",
+                )
+            }
 
-        assertTrue(
-            checkNotNull(
-                postLogRepository.findByMeetingIdAndCreatedById(
-                    context.meetingId,
-                    checkNotNull(nonParticipant.id),
-                ),
-            ).isTicketCreated,
-        )
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        assertEquals(0L, postLogRepository.count())
     }
 
     @Test
-    fun `서로 다른 그룹 멤버는 같은 만남에 각자의 티켓을 생성할 수 있다`() {
+    fun `서로 다른 만남 참여자는 같은 만남에 각자의 티켓을 생성할 수 있다`() {
         val context = saveMeetingContext()
         val otherMember = saveGroupMember(context.group, "member2")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, otherMember))
 
         val creatorResult =
             postLogService.createTicket(
@@ -331,7 +329,7 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `그룹 멤버가 아닌 사용자는 티켓을 생성할 수 없다`() {
+    fun `만남 참여자가 아닌 외부 사용자는 티켓을 생성할 수 없다`() {
         val context = saveMeetingContext()
         val outsider = saveCompletedUser("outsider")
 
@@ -344,7 +342,7 @@ class PostLogServiceIntegrationTest {
                 )
             }
 
-        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
         assertEquals(0L, postLogRepository.count())
     }
 
@@ -398,6 +396,7 @@ class PostLogServiceIntegrationTest {
     fun `서로 다른 그룹 멤버는 같은 만남에서 본인 티켓만 조회한다`() {
         val context = saveMeetingContext()
         val otherMember = saveGroupMember(context.group, "member2")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, otherMember))
         val otherUserId = checkNotNull(otherMember.user.id)
         val creatorTicket =
             postLogService.createTicket(context.meetingId, context.creatorUserId, "생성자의 추억")
@@ -467,13 +466,13 @@ class PostLogServiceIntegrationTest {
     fun `티켓에는 그룹 전체가 아닌 만남 참여 멤버만 반환한다`() {
         val context = saveMeetingContext()
         val participant = saveGroupMember(context.group, "member2")
-        val nonParticipant = saveGroupMember(context.group, "member3")
+        saveGroupMember(context.group, "member3")
         meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, participant))
 
         val result =
             postLogService.createTicket(
                 meetingId = context.meetingId,
-                userId = checkNotNull(nonParticipant.user.id),
+                userId = context.creatorUserId,
                 memory = "참여 멤버와 함께한 추억",
             )
 
