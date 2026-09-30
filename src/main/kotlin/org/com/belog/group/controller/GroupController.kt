@@ -69,20 +69,24 @@ class GroupController(
     override fun pinGroup(
         @LoginUserId userId: Long,
         @PathVariable groupId: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<CommonResponse<Nothing>> {
         groupService.pinGroup(groupId = groupId, userId = userId)
 
-        return ResponseEntity.noContent().build()
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_PINNED.status)
+            .body(CommonResponse.success(GroupSuccessCode.GROUP_PINNED))
     }
 
     @DeleteMapping("/{groupId}/pin")
     override fun unpinGroup(
         @LoginUserId userId: Long,
         @PathVariable groupId: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<CommonResponse<Nothing>> {
         groupService.unpinGroup(groupId = groupId, userId = userId)
 
-        return ResponseEntity.noContent().build()
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_UNPINNED.status)
+            .body(CommonResponse.success(GroupSuccessCode.GROUP_UNPINNED))
     }
 
     @GetMapping("/{groupId}")

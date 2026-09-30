@@ -179,10 +179,12 @@ class PreLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @PathVariable planId: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<CommonResponse<Nothing>> {
         planService.pinPlan(meetingId = meetingId, planId = planId, userId = userId)
 
-        return ResponseEntity.noContent().build()
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_PINNED.status)
+            .body(CommonResponse.success(PreLogSuccessCode.PLAN_PINNED))
     }
 
     @DeleteMapping("/plans/{planId}/pin")
@@ -190,10 +192,12 @@ class PreLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @PathVariable planId: Long,
-    ): ResponseEntity<Void> {
+    ): ResponseEntity<CommonResponse<Nothing>> {
         planService.unpinPlan(meetingId = meetingId, planId = planId, userId = userId)
 
-        return ResponseEntity.noContent().build()
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_UNPINNED.status)
+            .body(CommonResponse.success(PreLogSuccessCode.PLAN_UNPINNED))
     }
 
     @PutMapping("/plans/{planId}/likes/me")
