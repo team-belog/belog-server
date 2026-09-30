@@ -310,6 +310,128 @@ class GroupServiceTest {
         assertNull(result.nextCursor)
     }
 
+    @Test
+    fun `참여 중인 그룹을 고정한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+
+        groupService.pinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertTrue(savedMembership.pinned)
+    }
+
+    @Test
+    fun `고정된 그룹을 해제한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        groupService.pinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        groupService.unpinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertFalse(savedMembership.pinned)
+    }
+
+    @Test
+    fun `여러 그룹을 각각 고정할 수 있다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val firstMembership = saveGroupOwner(createGroup("AB12CD"), user)
+        val secondMembership = saveGroupOwner(createGroup("EF34GH"), user)
+
+        groupService.pinGroup(
+            groupId = requireNotNull(firstMembership.group.id),
+            userId = requireNotNull(user.id),
+        )
+        groupService.pinGroup(
+            groupId = requireNotNull(secondMembership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val memberships =
+            groupMemberRepository.findAllById(
+                listOf(requireNotNull(firstMembership.id), requireNotNull(secondMembership.id)),
+            )
+        assertEquals(2, memberships.size)
+        assertTrue(memberships.all { membership -> membership.pinned })
+    }
+
+    @Test
+    fun `이미 고정된 그룹을 다시 고정해도 고정 상태를 유지한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        val groupId = requireNotNull(membership.group.id)
+        val userId = requireNotNull(user.id)
+
+        groupService.pinGroup(groupId = groupId, userId = userId)
+        groupService.pinGroup(groupId = groupId, userId = userId)
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertTrue(savedMembership.pinned)
+    }
+
+    @Test
+    fun `고정되지 않은 그룹을 다시 해제해도 해제 상태를 유지한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        val groupId = requireNotNull(membership.group.id)
+        val userId = requireNotNull(user.id)
+
+        groupService.unpinGroup(groupId = groupId, userId = userId)
+        groupService.unpinGroup(groupId = groupId, userId = userId)
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertFalse(savedMembership.pinned)
+    }
+
+    @Test
+    fun `그룹 멤버가 아니면 그룹을 고정하거나 해제할 수 없다`() {
+        val owner = saveCompletedUser("owner-subject", "방장")
+        val requester = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), owner)
+        val groupId = requireNotNull(membership.group.id)
+        val requesterId = requireNotNull(requester.id)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                groupService.pinGroup(groupId = groupId, userId = requesterId)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                groupService.unpinGroup(groupId = groupId, userId = requesterId)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, pinException.errorCode)
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unpinException.errorCode)
+    }
+
+    @Test
+    fun `존재하지 않는 그룹은 고정하거나 해제할 수 없다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val userId = requireNotNull(user.id)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                groupService.pinGroup(groupId = 999_999L, userId = userId)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                groupService.unpinGroup(groupId = 999_999L, userId = userId)
+            }
+
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, pinException.errorCode)
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, unpinException.errorCode)
+    }
+
     private fun createGroup(inviteCode: String): Group =
         Group.create(
             name = "기존 그룹",
