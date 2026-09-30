@@ -182,7 +182,7 @@ class GroupMembershipServiceTest {
             }
         }
 
-        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), ownerId)
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), ownerId, null)
 
         assertEquals(2, results.size)
         assertEquals(requireNotNull(savedOwner.id), results[0].groupMemberId)
@@ -202,7 +202,7 @@ class GroupMembershipServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                groupMembershipService.getGroupMembers(999L, requireNotNull(user.id))
+                groupMembershipService.getGroupMembers(999L, requireNotNull(user.id), null)
             }
 
         assertEquals(GroupErrorCode.GROUP_NOT_FOUND, exception.errorCode)
@@ -217,7 +217,7 @@ class GroupMembershipServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(outsider.id))
+                groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(outsider.id), null)
             }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)

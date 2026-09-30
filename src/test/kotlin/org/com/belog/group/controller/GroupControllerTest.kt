@@ -51,7 +51,7 @@ class GroupControllerTest {
 
     @Test
     fun `그룹 멤버 목록을 조회한다`() {
-        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
             .thenReturn(
                 listOf(
                     GroupMemberResult(
@@ -88,7 +88,7 @@ class GroupControllerTest {
 
     @Test
     fun `그룹에 참여하지 않은 사용자는 멤버 목록을 조회할 수 없다`() {
-        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
             .thenThrow(BusinessException(GroupErrorCode.NOT_GROUP_MEMBER))
 
         mockMvc
@@ -101,7 +101,7 @@ class GroupControllerTest {
 
     @Test
     fun `존재하지 않는 그룹의 멤버 목록을 조회하면 404 응답을 반환한다`() {
-        `when`(groupMembershipService.getGroupMembers(999L, 15L))
+        `when`(groupMembershipService.getGroupMembers(999L, 15L, null))
             .thenThrow(BusinessException(GroupErrorCode.GROUP_NOT_FOUND))
 
         mockMvc
