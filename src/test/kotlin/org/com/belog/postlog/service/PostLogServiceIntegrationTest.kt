@@ -8,6 +8,7 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
@@ -345,6 +346,96 @@ class PostLogServiceIntegrationTest {
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
         assertEquals(0L, postLogRepository.count())
+    }
+
+    @Test
+    fun `티켓을 생성한 그룹 멤버는 본인 티켓을 조회한다`() {
+        val context = saveMeetingContext()
+        val createdTicket =
+            postLogService.createTicket(
+                meetingId = context.meetingId,
+                userId = context.creatorUserId,
+                memory = "함께한 광주 여행",
+            )
+
+        val result = postLogService.getTicket(context.meetingId, context.creatorUserId)
+
+        assertEquals(createdTicket.postLogId, result.postLogId)
+        assertEquals(context.meetingId, result.meetingId)
+        assertEquals("광주 여행", result.meetingName)
+        assertEquals("함께한 광주 여행", result.memory)
+        assertEquals(LocalDate.of(2026, 9, 28), result.startDate)
+        assertEquals(LocalDate.of(2026, 9, 29), result.endDate)
+        assertEquals("광주", result.location)
+    }
+
+    @Test
+    fun `임시저장만 한 Post-log는 티켓으로 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getTicket(context.meetingId, context.creatorUserId)
+            }
+
+        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `Post-log가 없으면 티켓을 조회할 수 없다`() {
+        val context = saveMeetingContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getTicket(context.meetingId, context.creatorUserId)
+            }
+
+        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `서로 다른 그룹 멤버는 같은 만남에서 본인 티켓만 조회한다`() {
+        val context = saveMeetingContext()
+        val otherMember = saveGroupMember(context.group, "member2")
+        val otherUserId = checkNotNull(otherMember.user.id)
+        val creatorTicket =
+            postLogService.createTicket(context.meetingId, context.creatorUserId, "생성자의 추억")
+        val otherMemberTicket =
+            postLogService.createTicket(context.meetingId, otherUserId, "다른 멤버의 추억")
+
+        val creatorResult = postLogService.getTicket(context.meetingId, context.creatorUserId)
+        val otherMemberResult = postLogService.getTicket(context.meetingId, otherUserId)
+
+        assertEquals(creatorTicket.postLogId, creatorResult.postLogId)
+        assertEquals("생성자의 추억", creatorResult.memory)
+        assertEquals(otherMemberTicket.postLogId, otherMemberResult.postLogId)
+        assertEquals("다른 멤버의 추억", otherMemberResult.memory)
+    }
+
+    @Test
+    fun `그룹 멤버가 아닌 사용자는 티켓을 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        val outsider = saveCompletedUser("outsider")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getTicket(context.meetingId, checkNotNull(outsider.id))
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `존재하지 않는 만남의 티켓은 조회할 수 없다`() {
+        val context = saveMeetingContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getTicket(Long.MAX_VALUE, context.creatorUserId)
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
     }
 
     @Test
