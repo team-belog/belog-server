@@ -5,8 +5,8 @@ import org.com.belog.postlog.service.result.PostLogTicketMemberResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
 import java.time.LocalDate
 
-@Schema(description = "Post-log 티켓 생성 결과")
-data class CreatePostLogTicketResponse(
+@Schema(description = "Post-log 티켓 생성 및 조회 결과")
+data class PostLogTicketResponse(
     @field:Schema(description = "개인 Post-log 티켓 ID", example = "11")
     val postLogId: Long,
     @field:Schema(description = "만남 ID", example = "7")
@@ -27,8 +27,8 @@ data class CreatePostLogTicketResponse(
     val members: List<PostLogTicketMemberResponse>,
 ) {
     companion object {
-        fun from(result: PostLogTicketResult): CreatePostLogTicketResponse =
-            CreatePostLogTicketResponse(
+        fun from(result: PostLogTicketResult): PostLogTicketResponse =
+            PostLogTicketResponse(
                 postLogId = result.postLogId,
                 meetingId = result.meetingId,
                 meetingName = result.meetingName,

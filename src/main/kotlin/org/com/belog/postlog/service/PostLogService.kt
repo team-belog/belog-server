@@ -8,6 +8,7 @@ import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
@@ -99,33 +100,29 @@ class PostLogService(
                 }
                 throw exception
             }
-        val members =
-            meetingParticipantRepository
-                .findAllWithMemberAndUserByMeetingId(meetingId)
-                .map { participant ->
-                    val groupMember = participant.groupMember
-                    PostLogTicketMemberResult(
-                        groupMemberId = checkNotNull(groupMember.id) { "조회된 그룹 멤버의 ID가 없습니다." },
-                        nickname = checkNotNull(groupMember.user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
-                    )
-                }
-        val coverPhotoUrl =
-            postLogPhotoRepository
-                .findRepresentativeObjectKeys(meetingId, PageRequest.of(0, REPRESENTATIVE_PHOTO_COUNT))
-                .firstOrNull()
-                ?.let(objectReadUrlProvider::generateReadUrl)
+        return toTicketResult(meeting, savedPostLog)
+    }
 
-        return PostLogTicketResult(
-            postLogId = checkNotNull(savedPostLog.id) { "생성된 Post-log의 ID가 없습니다." },
-            meetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." },
-            meetingName = meeting.name,
-            memory = checkNotNull(savedPostLog.memory) { "생성된 티켓의 추억 문구가 없습니다." },
-            coverPhotoUrl = coverPhotoUrl,
-            startDate = meeting.startDate,
-            endDate = meeting.endDate,
-            location = meeting.location,
-            members = members,
-        )
+    @Transactional(readOnly = true)
+    fun getTicket(
+        meetingId: Long,
+        userId: Long,
+    ): PostLogTicketResult {
+        val meeting =
+            meetingRepository.findByIdWithGroup(meetingId)
+                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
+        val viewer =
+            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val viewerId = checkNotNull(viewer.id) { "티켓 조회자의 그룹 멤버 ID가 없습니다." }
+        val postLog =
+            postLogRepository
+                .findByMeetingIdAndCreatedById(meetingId, viewerId)
+                ?.takeIf(PostLog::isTicketCreated)
+                ?: throw BusinessException(PostLogErrorCode.TICKET_NOT_FOUND)
+
+        return toTicketResult(meeting, postLog)
     }
 
     @Transactional(readOnly = true)
@@ -176,6 +173,40 @@ class PostLogService(
 
     companion object {
         private const val REPRESENTATIVE_PHOTO_COUNT = 1
+    }
+
+    private fun toTicketResult(
+        meeting: Meeting,
+        postLog: PostLog,
+    ): PostLogTicketResult {
+        val meetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." }
+        val members =
+            meetingParticipantRepository
+                .findAllWithMemberAndUserByMeetingId(meetingId)
+                .map { participant ->
+                    val groupMember = participant.groupMember
+                    PostLogTicketMemberResult(
+                        groupMemberId = checkNotNull(groupMember.id) { "조회된 그룹 멤버의 ID가 없습니다." },
+                        nickname = checkNotNull(groupMember.user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
+                    )
+                }
+        val coverPhotoUrl =
+            postLogPhotoRepository
+                .findRepresentativeObjectKeys(meetingId, PageRequest.of(0, REPRESENTATIVE_PHOTO_COUNT))
+                .firstOrNull()
+                ?.let(objectReadUrlProvider::generateReadUrl)
+
+        return PostLogTicketResult(
+            postLogId = checkNotNull(postLog.id) { "Post-log 티켓의 ID가 없습니다." },
+            meetingId = meetingId,
+            meetingName = meeting.name,
+            memory = checkNotNull(postLog.memory) { "티켓의 추억 문구가 없습니다." },
+            coverPhotoUrl = coverPhotoUrl,
+            startDate = meeting.startDate,
+            endDate = meeting.endDate,
+            location = meeting.location,
+            members = members,
+        )
     }
 
     private fun DataIntegrityViolationException.isMeetingMemberUniqueConstraintViolation(): Boolean {

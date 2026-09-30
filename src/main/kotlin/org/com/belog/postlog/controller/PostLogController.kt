@@ -10,11 +10,11 @@ import org.com.belog.postlog.controller.dto.request.CreatePostLogTicketRequest
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.request.SavePostLogDraftRequest
-import org.com.belog.postlog.controller.dto.response.CreatePostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
 import org.com.belog.postlog.controller.dto.response.PostLogSummaryResponse
+import org.com.belog.postlog.controller.dto.response.PostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.com.belog.postlog.controller.swagger.PostLogSwagger
 import org.com.belog.postlog.service.PostLogPhotoLikeService
@@ -60,7 +60,7 @@ class PostLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @Valid @RequestBody request: CreatePostLogTicketRequest,
-    ): ResponseEntity<CommonResponse<CreatePostLogTicketResponse>> {
+    ): ResponseEntity<CommonResponse<PostLogTicketResponse>> {
         val result =
             postLogService.createTicket(
                 meetingId = meetingId,
@@ -73,7 +73,24 @@ class PostLogController(
             .body(
                 CommonResponse.success(
                     PostLogSuccessCode.TICKET_CREATED,
-                    CreatePostLogTicketResponse.from(result),
+                    PostLogTicketResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/ticket")
+    override fun getTicket(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<PostLogTicketResponse>> {
+        val result = postLogService.getTicket(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.TICKET_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PostLogSuccessCode.TICKET_RETRIEVED,
+                    PostLogTicketResponse.from(result),
                 ),
             )
     }
