@@ -20,6 +20,7 @@ import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
+import org.com.belog.postlog.controller.dto.response.PostLogSummaryResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -29,6 +30,59 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Post-log", description = "Post-log 관련 API")
 interface PostLogSwagger {
+    @Operation(
+        summary = "Post-log 만남 정리 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 만남 정보, 추억 문구, 정산 요약과 참여 멤버를 조회합니다. " +
+                "Post-log가 아직 생성되지 않은 경우에도 조회에 성공하며 추억 문구와 티켓 생성 시각은 null입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 정리 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_POST_LOG_SUMMARY_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getSummary(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<PostLogSummaryResponse>>
+
     @Operation(
         summary = "Post-log 사진 목록 조회",
         description =
@@ -406,6 +460,9 @@ interface PostLogSwagger {
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
     """{"photos":[{"clientPhotoId":"photo-1","contentType":"image/jpeg","fileSize":2457600},{"clientPhotoId":"photo-2","contentType":"image/webp","fileSize":1843200}]}"""
+
+private const val GET_POST_LOG_SUMMARY_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S006","message":"Post-log 만남 정리 정보가 조회되었습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","memory":null,"settlement":{"completedParticipantCount":1,"totalAmount":11000},"participantCount":3,"participants":[{"groupMemberId":21,"nickname":"이정원","meetingCreator":true},{"groupMemberId":22,"nickname":"정다빈","meetingCreator":false},{"groupMemberId":23,"nickname":"김성연","meetingCreator":false}],"ticketCreated":false}}"""
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_SUCCESS_EXAMPLE =
     """{"code":"POST_LOG-S001","message":"사진 업로드 URL이 발급되었습니다.","data":{"uploads":[{"clientPhotoId":"photo-1","objectKey":"post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg","uploadUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg?...","method":"PUT","requiredHeaders":{"Content-Type":"image/jpeg","Content-Length":"2457600"},"expiresAt":"2026-09-28T03:15:00Z"}]}}"""

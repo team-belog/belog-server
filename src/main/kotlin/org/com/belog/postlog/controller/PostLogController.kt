@@ -11,10 +11,12 @@ import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
+import org.com.belog.postlog.controller.dto.response.PostLogSummaryResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.com.belog.postlog.controller.swagger.PostLogSwagger
 import org.com.belog.postlog.service.PostLogPhotoLikeService
 import org.com.belog.postlog.service.PostLogPhotoService
+import org.com.belog.postlog.service.PostLogService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -29,9 +31,27 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/meetings/{meetingId}/post-log")
 class PostLogController(
+    private val postLogService: PostLogService,
     private val photoService: PostLogPhotoService,
     private val photoLikeService: PostLogPhotoLikeService,
 ) : PostLogSwagger {
+    @GetMapping
+    override fun getSummary(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<PostLogSummaryResponse>> {
+        val result = postLogService.getSummary(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.SUMMARY_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PostLogSuccessCode.SUMMARY_RETRIEVED,
+                    PostLogSummaryResponse.from(result),
+                ),
+            )
+    }
+
     @GetMapping("/photos")
     override fun getPhotos(
         @LoginUserId userId: Long,
