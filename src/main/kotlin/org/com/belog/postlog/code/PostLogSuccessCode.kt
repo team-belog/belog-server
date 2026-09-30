@@ -15,4 +15,5 @@ enum class PostLogSuccessCode(
     PHOTOS_RETRIEVED(HttpStatus.OK, "POST_LOG-S005", "사진 목록이 조회되었습니다."),
     SUMMARY_RETRIEVED(HttpStatus.OK, "POST_LOG-S006", "Post-log 만남 정리 정보가 조회되었습니다."),
     TICKET_CREATED(HttpStatus.CREATED, "POST_LOG-S007", "Post-log 티켓이 생성되었습니다."),
+    DRAFT_SAVED(HttpStatus.OK, "POST_LOG-S008", "Post-log 추억 문구가 임시저장되었습니다."),
 }

@@ -18,6 +18,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.controller.dto.request.CreatePostLogTicketRequest
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
+import org.com.belog.postlog.controller.dto.request.SavePostLogDraftRequest
 import org.com.belog.postlog.controller.dto.response.CreatePostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
@@ -32,6 +33,94 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Post-log", description = "Post-log 관련 API")
 interface PostLogSwagger {
+    @Operation(
+        summary = "Post-log 추억 문구 임시저장",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 본인의 Post-log 추억 문구를 임시저장합니다. " +
+                "기존 임시저장 문구가 있으면 새 문구로 교체하며, 티켓이 이미 생성된 경우에는 변경할 수 없습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "임시저장 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = SAVE_POST_LOG_DRAFT_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "추억 문구 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "로그인한 그룹 멤버가 해당 만남의 티켓을 이미 생성함",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = TICKET_ALREADY_CREATED_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun saveDraft(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = SavePostLogDraftRequest::class),
+                    examples = [ExampleObject(value = SAVE_POST_LOG_DRAFT_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: SavePostLogDraftRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
     @Operation(
         summary = "Post-log 티켓 생성",
         description =
@@ -554,6 +643,12 @@ private const val CREATE_POST_LOG_TICKET_REQUEST_EXAMPLE =
 
 private const val CREATE_POST_LOG_TICKET_SUCCESS_EXAMPLE =
     """{"code":"POST_LOG-S007","message":"Post-log 티켓이 생성되었습니다.","data":{"postLogId":11,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","members":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
+
+private const val SAVE_POST_LOG_DRAFT_REQUEST_EXAMPLE =
+    """{"memory":"함께한 광주 여행을 오래 기억하자"}"""
+
+private const val SAVE_POST_LOG_DRAFT_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S008","message":"Post-log 추억 문구가 임시저장되었습니다.","data":null}"""
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
     """{"photos":[{"clientPhotoId":"photo-1","contentType":"image/jpeg","fileSize":2457600},{"clientPhotoId":"photo-2","contentType":"image/webp","fileSize":1843200}]}"""
