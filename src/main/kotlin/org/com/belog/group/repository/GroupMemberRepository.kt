@@ -2,6 +2,7 @@ package org.com.belog.group.repository
 
 import jakarta.persistence.LockModeType
 import org.com.belog.group.domain.GroupMember
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
@@ -39,6 +40,40 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         groupId: Long,
         userId: Long,
     ): Boolean
+
+    @EntityGraph(attributePaths = ["group"])
+    @Query(
+        """
+        SELECT member
+        FROM GroupMember member
+        WHERE member.user.id = :userId
+          AND (
+              :cursorId IS NULL
+              OR (:cursorPinned = TRUE AND member.pinned = FALSE)
+              OR (member.pinned = :cursorPinned AND member.id < :cursorId)
+          )
+        ORDER BY member.pinned DESC, member.id DESC
+        """,
+    )
+    fun findMyGroupPage(
+        @Param("userId") userId: Long,
+        @Param("cursorPinned") cursorPinned: Boolean?,
+        @Param("cursorId") cursorId: Long?,
+        pageable: Pageable,
+    ): List<GroupMember>
+
+    @EntityGraph(attributePaths = ["group", "user"])
+    @Query(
+        """
+        SELECT member
+        FROM GroupMember member
+        WHERE member.group.id IN :groupIds
+        ORDER BY member.group.id ASC, member.role DESC, member.id ASC
+        """,
+    )
+    fun findAllWithUserByGroupIdIn(
+        @Param("groupIds") groupIds: Collection<Long>,
+    ): List<GroupMember>
 
     @EntityGraph(attributePaths = ["user"])
     @Query(

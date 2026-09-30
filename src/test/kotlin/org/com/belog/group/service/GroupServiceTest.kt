@@ -4,12 +4,14 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupCoverImageObjectKey
+import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
 import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.query.GroupListCursor
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -32,12 +34,16 @@ import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+import org.springframework.test.util.ReflectionTestUtils
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -237,6 +243,73 @@ class GroupServiceTest {
         verify(inviteCodeGenerator, times(GroupService.MAX_INVITE_CODE_ATTEMPTS)).generate()
     }
 
+    @Test
+    fun `내 그룹 목록에 전체 멤버와 미리보기 및 사용자별 권한을 조합한다`() {
+        val requester = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+        val firstMember = saveCompletedUser("first-subject", "첫멤버", hasUploadedProfileImage = false)
+        val secondMember = saveCompletedUser("second-subject", "둘째멤버", hasUploadedProfileImage = false)
+        val thirdMember = saveCompletedUser("third-subject", "셋째멤버", hasUploadedProfileImage = false)
+        val otherOwner = saveCompletedUser("other-owner-subject", "다른방장", hasUploadedProfileImage = false)
+        val ownedGroup = groupRepository.save(createGroup("AB12CD"))
+        val joinedGroup = groupRepository.save(createGroup("EF34GH"))
+        val firstMembership = groupMemberRepository.save(GroupMember.createMember(ownedGroup, firstMember))
+        val ownerMembership = saveGroupMember(GroupMember.createOwner(ownedGroup, requester), pinned = true)
+        val secondMembership = groupMemberRepository.save(GroupMember.createMember(ownedGroup, secondMember))
+        groupMemberRepository.save(GroupMember.createMember(ownedGroup, thirdMember))
+        groupMemberRepository.save(GroupMember.createOwner(joinedGroup, otherOwner))
+        val requesterMembership = groupMemberRepository.save(GroupMember.createMember(joinedGroup, requester))
+        groupMemberRepository.flush()
+
+        val result = groupService.getMyGroups(requireNotNull(requester.id), cursor = null, size = 10)
+
+        assertEquals(2, result.items.size)
+        val ownedGroupResult = result.items[0]
+        assertEquals(ownedGroup.id, ownedGroupResult.groupId)
+        assertEquals(4, ownedGroupResult.memberCount)
+        assertEquals(
+            listOf(ownerMembership.id, firstMembership.id, secondMembership.id),
+            ownedGroupResult.previewMembers.map { member -> member.groupMemberId },
+        )
+        assertEquals(listOf("요청자", "첫멤버", "둘째멤버"), ownedGroupResult.previewMembers.map { member -> member.nickname })
+        assertTrue(ownedGroupResult.pinned)
+        assertTrue(ownedGroupResult.canDeleteGroup)
+
+        val joinedGroupResult = result.items[1]
+        assertEquals(joinedGroup.id, joinedGroupResult.groupId)
+        assertFalse(joinedGroupResult.pinned)
+        assertFalse(joinedGroupResult.canDeleteGroup)
+        assertTrue(joinedGroupResult.previewMembers.any { member -> member.groupMemberId == requesterMembership.id })
+    }
+
+    @Test
+    fun `내 그룹 목록의 다음 페이지 여부와 커서를 계산한다`() {
+        val requester = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+        val oldest = saveGroupOwner(createGroup("AB12CD"), requester)
+        val middle = saveGroupOwner(createGroup("EF34GH"), requester)
+        val newest = saveGroupOwner(createGroup("IJ56KL"), requester)
+
+        val firstPage = groupService.getMyGroups(requireNotNull(requester.id), cursor = null, size = 2)
+        val secondPage = groupService.getMyGroups(requireNotNull(requester.id), cursor = firstPage.nextCursor, size = 2)
+
+        assertEquals(listOf(newest.group.id, middle.group.id), firstPage.items.map { group -> group.groupId })
+        assertTrue(firstPage.hasNext)
+        assertEquals(GroupListCursor(pinned = false, groupMemberId = requireNotNull(middle.id)), firstPage.nextCursor)
+        assertEquals(listOf(oldest.group.id), secondPage.items.map { group -> group.groupId })
+        assertFalse(secondPage.hasNext)
+        assertNull(secondPage.nextCursor)
+    }
+
+    @Test
+    fun `참여한 그룹이 없으면 빈 마지막 페이지를 반환한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+
+        val result = groupService.getMyGroups(requireNotNull(user.id), cursor = null, size = 10)
+
+        assertTrue(result.items.isEmpty())
+        assertFalse(result.hasNext)
+        assertNull(result.nextCursor)
+    }
+
     private fun createGroup(inviteCode: String): Group =
         Group.create(
             name = "기존 그룹",
@@ -247,11 +320,17 @@ class GroupServiceTest {
     private fun saveCompletedUser(
         providerUserId: String,
         nickname: String,
+        hasUploadedProfileImage: Boolean = true,
     ): User {
         val user = saveUser(providerUserId)
         val userId = requireNotNull(user.id)
         user.completeOnboarding(
-            profileImageObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp"),
+            profileImageObjectKey =
+                if (hasUploadedProfileImage) {
+                    ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp")
+                } else {
+                    null
+                },
             nickname = nickname,
             name = "홍길동",
             bankAccount =
@@ -263,6 +342,22 @@ class GroupServiceTest {
             completedAt = Instant.parse("2026-09-15T00:00:00Z"),
         )
         return userRepository.saveAndFlush(user)
+    }
+
+    private fun saveGroupOwner(
+        group: Group,
+        user: User,
+    ): GroupMember {
+        val savedGroup = groupRepository.save(group)
+        return groupMemberRepository.saveAndFlush(GroupMember.createOwner(savedGroup, user))
+    }
+
+    private fun saveGroupMember(
+        member: GroupMember,
+        pinned: Boolean,
+    ): GroupMember {
+        ReflectionTestUtils.setField(member, "pinned", pinned)
+        return groupMemberRepository.save(member)
     }
 
     private fun saveUser(providerUserId: String): User =

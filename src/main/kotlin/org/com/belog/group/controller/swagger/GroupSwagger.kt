@@ -23,6 +23,7 @@ import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
 import org.com.belog.group.controller.dto.response.GroupDetailResponse
 import org.com.belog.group.controller.dto.response.GroupMembersResponse
+import org.com.belog.group.controller.dto.response.MyGroupListResponse
 import org.com.belog.group.controller.dto.response.PastMeetingListResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -32,6 +33,53 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Group", description = "그룹 관련 API")
 interface GroupSwagger {
+    @Operation(
+        summary = "내 그룹 목록 조회",
+        description =
+            "로그인 사용자가 참여 중인 그룹을 고정 그룹 우선, 최근 가입 순으로 조회합니다. " +
+                "그룹별 전체 멤버 수와 OWNER 우선, 가입 순으로 정렬된 최대 3명의 멤버 미리보기를 제공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "내 그룹 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_MY_GROUPS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "커서 또는 조회 개수 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+        ],
+    )
+    fun getMyGroups(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "다음 페이지 커서. 첫 요청에서는 생략", example = "MTo0Mg")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 10개, 최대 50개", example = "10")
+        @RequestParam(defaultValue = "10")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<MyGroupListResponse>>
+
     @Operation(
         summary = "그룹 조회",
         description =
@@ -511,6 +559,9 @@ private const val INVITE_CODE_ISSUANCE_FAILED_EXAMPLE =
 
 private const val GET_GROUP_MEMBERS_SUCCESS_EXAMPLE =
     """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER"},{"groupMemberId":22,"nickname":"멤버","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER"}]}}"""
+
+private const val GET_MY_GROUPS_SUCCESS_EXAMPLE =
+    """{"code":"GROUP-S007","message":"내 그룹 목록을 조회했습니다.","data":{"items":[{"groupId":1,"name":"피놀리와 기니휘기","coverImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/group-covers/15/image.webp?...","memberCount":3,"previewMembers":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."},{"groupMemberId":22,"nickname":"정다빈","profileImageUrl":null},{"groupMemberId":23,"nickname":"김성연","profileImageUrl":"https://lh3.googleusercontent.com/profile"}],"pinned":true,"canDeleteGroup":true}],"nextCursor":"MTo0Mg","hasNext":true}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""

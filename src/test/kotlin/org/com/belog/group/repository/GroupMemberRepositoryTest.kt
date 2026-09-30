@@ -18,7 +18,9 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
+import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.util.ReflectionTestUtils
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -44,6 +46,54 @@ class GroupMemberRepositoryTest {
 
     @Autowired
     private lateinit var entityManager: EntityManager
+
+    @Test
+    fun `내 그룹을 고정 우선 최근 가입 순으로 조회하고 다른 사용자의 그룹은 제외한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val otherUser = saveCompletedUser("other-subject", "다른사용자")
+        val unpinnedOlder = saveOwner(createGroup("AB12CD"), user)
+        val pinnedOlder = saveOwner(createGroup("EF34GH"), user, pinned = true)
+        saveOwner(createGroup("IJ56KL"), otherUser, pinned = true)
+        val unpinnedNewer = saveOwner(createGroup("MN78OP"), user)
+        val pinnedNewer = saveOwner(createGroup("QR90ST"), user, pinned = true)
+        entityManager.clear()
+
+        val memberships =
+            groupMemberRepository.findMyGroupPage(
+                userId = requireNotNull(user.id),
+                cursorPinned = null,
+                cursorId = null,
+                pageable = PageRequest.of(0, 10),
+            )
+
+        assertEquals(
+            listOf(pinnedNewer.id, pinnedOlder.id, unpinnedNewer.id, unpinnedOlder.id),
+            memberships.map { membership -> membership.id },
+        )
+    }
+
+    @Test
+    fun `고정 그룹의 마지막 커서부터 일반 그룹 끝까지 중복과 누락 없이 조회한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val unpinnedOldest = saveOwner(createGroup("AB12CD"), user)
+        val pinnedOlder = saveOwner(createGroup("EF34GH"), user, pinned = true)
+        val unpinnedOlder = saveOwner(createGroup("IJ56KL"), user)
+        val pinnedNewer = saveOwner(createGroup("MN78OP"), user, pinned = true)
+        val unpinnedNewest = saveOwner(createGroup("QR90ST"), user)
+        entityManager.clear()
+
+        val firstPage = findMyGroupPage(user, cursor = null, size = 2)
+        val secondPage = findMyGroupPage(user, cursor = firstPage.last(), size = 2)
+        val thirdPage = findMyGroupPage(user, cursor = secondPage.last(), size = 2)
+
+        assertEquals(listOf(pinnedNewer.id, pinnedOlder.id), firstPage.map { membership -> membership.id })
+        assertEquals(listOf(unpinnedNewest.id, unpinnedOlder.id), secondPage.map { membership -> membership.id })
+        assertEquals(listOf(unpinnedOldest.id), thirdPage.map { membership -> membership.id })
+        assertEquals(
+            listOf(pinnedNewer.id, pinnedOlder.id, unpinnedNewest.id, unpinnedOlder.id, unpinnedOldest.id),
+            (firstPage + secondPage + thirdPage).map { membership -> membership.id },
+        )
+    }
 
     @Test
     fun `그룹 ID와 사용자 ID로 그룹 멤버를 조회한다`() {
@@ -207,6 +257,29 @@ class GroupMemberRepositoryTest {
             name = "주말 러닝 모임",
             coverImageObjectKey = null,
             inviteCode = InviteCode.create(inviteCode),
+        )
+
+    private fun saveOwner(
+        group: Group,
+        user: User,
+        pinned: Boolean = false,
+    ): GroupMember {
+        val savedGroup = groupRepository.save(group)
+        val member = GroupMember.createOwner(savedGroup, user)
+        ReflectionTestUtils.setField(member, "pinned", pinned)
+        return groupMemberRepository.saveAndFlush(member)
+    }
+
+    private fun findMyGroupPage(
+        user: User,
+        cursor: GroupMember?,
+        size: Int,
+    ): List<GroupMember> =
+        groupMemberRepository.findMyGroupPage(
+            userId = requireNotNull(user.id),
+            cursorPinned = cursor?.pinned,
+            cursorId = cursor?.id,
+            pageable = PageRequest.of(0, size),
         )
 
     private fun saveCompletedUser(

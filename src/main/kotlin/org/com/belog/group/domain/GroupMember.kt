@@ -30,6 +30,7 @@ const val GROUP_MEMBER_UNIQUE_CONSTRAINT_NAME = "uk_group_members_group_user"
     ],
     indexes = [
         Index(name = "idx_group_members_user_id", columnList = "user_id"),
+        Index(name = "idx_group_members_user_pinned_id", columnList = "user_id, pinned, id"),
     ],
 )
 class GroupMember protected constructor(
@@ -51,6 +52,10 @@ class GroupMember protected constructor(
     @Column(nullable = false, length = 20)
     val role: GroupRole,
 ) : BaseEntity() {
+    @Column(nullable = false)
+    var pinned: Boolean = false
+        protected set
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
