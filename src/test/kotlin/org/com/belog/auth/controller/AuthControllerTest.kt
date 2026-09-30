@@ -10,6 +10,8 @@ import org.com.belog.auth.service.AuthService
 import org.com.belog.global.config.WebConfig
 import org.com.belog.global.error.BusinessException
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -80,7 +82,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.isNewUser").doesNotExist())
             .andExpect(cookie().value("refresh_token", "refresh-token"))
             .andExpect(cookie().httpOnly("refresh_token", true))
-            .andExpect(cookie().path("refresh_token", "/api/v1/auth/refresh"))
+            .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
     }
 
     @Test
@@ -121,7 +123,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.data.expiresIn").value(1800))
             .andExpect(cookie().value("refresh_token", "new-refresh-token"))
             .andExpect(cookie().httpOnly("refresh_token", true))
-            .andExpect(cookie().path("refresh_token", "/api/v1/auth/refresh"))
+            .andExpect(cookie().path("refresh_token", "/api/v1/auth"))
     }
 
     @Test
@@ -167,6 +169,48 @@ class AuthControllerTest {
                     .cookie(Cookie("refresh_token", "refresh-token")),
             ).andExpect(status().isForbidden)
             .andExpect(jsonPath("$.code").value("AUTH-E006"))
+    }
+
+    @Test
+    fun `허용된 Origin과 유효한 Refresh Token 쿠키로 로그아웃하면 204 응답을 반환한다`() {
+        `when`(jwtProperties.refreshCookieSecure).thenReturn(false)
+        `when`(jwtProperties.refreshCookieSameSite).thenReturn("Lax")
+
+        mockMvc
+            .perform(
+                post("/api/v1/auth/logout")
+                    .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                    .cookie(Cookie("refresh_token", "refresh-token")),
+            ).andExpect(status().isNoContent)
+            .andExpect(cookie().value("refresh_token", ""))
+            .andExpect(cookie().maxAge("refresh_token", 0))
+
+        verify(authService).logout("refresh-token")
+    }
+
+    @Test
+    fun `허용되지 않은 Origin의 로그아웃 요청은 403 응답을 반환한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/logout")
+                    .header(HttpHeaders.ORIGIN, "https://attacker.example")
+                    .cookie(Cookie("refresh_token", "refresh-token")),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("AUTH-E006"))
+
+        verify(authService, never()).logout("refresh-token")
+    }
+
+    @Test
+    fun `Origin이 없는 로그아웃 요청은 403 응답을 반환한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/auth/logout")
+                    .cookie(Cookie("refresh_token", "refresh-token")),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("AUTH-E006"))
+
+        verify(authService, never()).logout("refresh-token")
     }
 
     companion object {
