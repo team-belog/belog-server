@@ -11,6 +11,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
+import org.com.belog.postlog.domain.POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.postlog.domain.PostLog
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
@@ -18,6 +19,8 @@ import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import org.com.belog.postlog.service.result.PostLogTicketMemberResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
+import org.hibernate.exception.ConstraintViolationException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -43,14 +46,17 @@ class PostLogService(
         memory: String,
     ): PostLogTicketResult {
         val meeting =
-            meetingRepository.findByIdWithGroupForUpdate(meetingId)
+            meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        val creator =
+            groupMemberRepository.findByGroupIdAndUserIdForUpdate(groupId, userId)
+                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val creatorId = checkNotNull(creator.id) { "티켓 생성자의 그룹 멤버 ID가 없습니다." }
 
-        val postLog = postLogRepository.findByMeetingId(meetingId) ?: PostLog.create(meeting)
+        val postLog =
+            postLogRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)
+                ?: PostLog.create(meeting, creator)
         if (postLog.isTicketCreated) {
             throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED)
         }
@@ -58,7 +64,15 @@ class PostLogService(
         postLog.updateMemory(memory)
         check(postLog.createTicket(Instant.now(clock))) { "티켓 생성 상태를 변경할 수 없습니다." }
 
-        val savedPostLog = postLogRepository.save(postLog)
+        val savedPostLog =
+            try {
+                postLogRepository.saveAndFlush(postLog)
+            } catch (exception: DataIntegrityViolationException) {
+                if (exception.isMeetingMemberUniqueConstraintViolation()) {
+                    throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED, exception)
+                }
+                throw exception
+            }
         val members =
             meetingParticipantRepository
                 .findAllWithMemberAndUserByMeetingId(meetingId)
@@ -76,6 +90,7 @@ class PostLogService(
                 ?.let(objectReadUrlProvider::generateReadUrl)
 
         return PostLogTicketResult(
+            postLogId = checkNotNull(savedPostLog.id) { "생성된 Post-log의 ID가 없습니다." },
             meetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." },
             meetingName = meeting.name,
             memory = checkNotNull(savedPostLog.memory) { "생성된 티켓의 추억 문구가 없습니다." },
@@ -96,9 +111,10 @@ class PostLogService(
             meetingRepository.findByIdWithGroupAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        val viewer =
+            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val viewerId = checkNotNull(viewer.id) { "조회자의 그룹 멤버 ID가 없습니다." }
 
         val participants =
             meetingParticipantRepository
@@ -111,9 +127,10 @@ class PostLogService(
                         meetingCreator = meeting.isCreatedBy(groupMember),
                     )
                 }
-        val postLog = postLogRepository.findByMeetingId(meetingId)
+        val postLog = postLogRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)
 
         return PostLogSummaryResult(
+            postLogId = postLog?.id,
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
             meetingName = meeting.name,
             startDate = meeting.startDate,
@@ -133,5 +150,16 @@ class PostLogService(
 
     companion object {
         private const val REPRESENTATIVE_PHOTO_COUNT = 1
+    }
+
+    private fun DataIntegrityViolationException.isMeetingMemberUniqueConstraintViolation(): Boolean {
+        val constraintName =
+            generateSequence(this as Throwable?) { throwable -> throwable.cause }
+                .filterIsInstance<ConstraintViolationException>()
+                .firstOrNull()
+                ?.constraintName
+
+        val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
+        return unqualifiedConstraintName.equals(POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
     }
 }

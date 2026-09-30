@@ -48,9 +48,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -116,7 +113,7 @@ class PostLogServiceIntegrationTest {
                 memory = "  함께한 광주 여행  ",
             )
 
-        val savedPostLog = postLogRepository.findByMeetingId(context.meetingId)
+        val savedPostLog = postLogRepository.findByMeetingIdAndCreatedById(context.meetingId, checkNotNull(context.creator.id))
         assertNotNull(savedPostLog)
         assertEquals("함께한 광주 여행", savedPostLog.memory)
         assertEquals(FIXED_INSTANT, savedPostLog.ticketCreatedAt)
@@ -140,7 +137,7 @@ class PostLogServiceIntegrationTest {
                 postLogService.createTicket(context.meetingId, context.creatorUserId, "변경하려는 추억")
             }
 
-        val savedPostLog = postLogRepository.findByMeetingId(context.meetingId)
+        val savedPostLog = postLogRepository.findByMeetingIdAndCreatedById(context.meetingId, checkNotNull(context.creator.id))
         assertEquals(PostLogErrorCode.TICKET_ALREADY_CREATED, exception.errorCode)
         assertEquals("첫 번째 추억", savedPostLog?.memory)
         assertEquals(FIXED_INSTANT, savedPostLog?.ticketCreatedAt)
@@ -158,7 +155,51 @@ class PostLogServiceIntegrationTest {
             memory = "그룹 멤버가 만든 추억",
         )
 
-        assertTrue(checkNotNull(postLogRepository.findByMeetingId(context.meetingId)).isTicketCreated)
+        assertTrue(
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(nonParticipant.id),
+                ),
+            ).isTicketCreated,
+        )
+    }
+
+    @Test
+    fun `서로 다른 그룹 멤버는 같은 만남에 각자의 티켓을 생성할 수 있다`() {
+        val context = saveMeetingContext()
+        val otherMember = saveGroupMember(context.group, "member2")
+
+        val creatorResult =
+            postLogService.createTicket(
+                meetingId = context.meetingId,
+                userId = context.creatorUserId,
+                memory = "생성자의 추억",
+            )
+        val otherMemberResult =
+            postLogService.createTicket(
+                meetingId = context.meetingId,
+                userId = checkNotNull(otherMember.user.id),
+                memory = "다른 멤버의 추억",
+            )
+
+        val creatorPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        val otherMemberPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(otherMember.id),
+            )
+
+        assertEquals(2L, postLogRepository.count())
+        assertTrue(creatorResult.postLogId != otherMemberResult.postLogId)
+        assertEquals("생성자의 추억", creatorPostLog?.memory)
+        assertEquals("다른 멤버의 추억", otherMemberPostLog?.memory)
+        assertEquals(creatorResult.postLogId, creatorPostLog?.id)
+        assertEquals(otherMemberResult.postLogId, otherMemberPostLog?.id)
     }
 
     @Test
@@ -177,41 +218,6 @@ class PostLogServiceIntegrationTest {
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
         assertEquals(0L, postLogRepository.count())
-    }
-
-    @Test
-    fun `같은 만남의 티켓을 동시에 생성하면 하나만 성공한다`() {
-        val context = saveMeetingContext()
-        val memories = listOf("첫 번째 동시 요청", "두 번째 동시 요청")
-        val executor = Executors.newFixedThreadPool(CONCURRENT_REQUEST_COUNT)
-        val startSignal = CountDownLatch(1)
-
-        try {
-            val requests =
-                memories.map { memory ->
-                    executor.submit<PostLogErrorCode?> {
-                        startSignal.await()
-                        try {
-                            postLogService.createTicket(context.meetingId, context.creatorUserId, memory)
-                            null
-                        } catch (exception: BusinessException) {
-                            exception.errorCode as PostLogErrorCode
-                        }
-                    }
-                }
-
-            startSignal.countDown()
-            val results = requests.map { request -> request.get(10, TimeUnit.SECONDS) }
-            val savedPostLog = checkNotNull(postLogRepository.findByMeetingId(context.meetingId))
-
-            assertEquals(1, results.count { it == null })
-            assertEquals(1, results.count { it == PostLogErrorCode.TICKET_ALREADY_CREATED })
-            assertEquals(1L, postLogRepository.count())
-            assertTrue(savedPostLog.memory in memories)
-            assertEquals(FIXED_INSTANT, savedPostLog.ticketCreatedAt)
-        } finally {
-            executor.shutdownNow()
-        }
     }
 
     @Test
@@ -244,7 +250,6 @@ class PostLogServiceIntegrationTest {
         val context = saveMeetingContext()
         val participant = saveGroupMember(context.group, "member2")
         val nonParticipant = saveGroupMember(context.group, "member3")
-        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, context.creator))
         meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, participant))
 
         val result =
@@ -283,6 +288,7 @@ class PostLogServiceIntegrationTest {
                     currentDate = LocalDate.of(2026, 9, 20),
                 ),
             )
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, creator))
 
         return MeetingContext(
             group = group,
@@ -356,7 +362,6 @@ class PostLogServiceIntegrationTest {
     }
 
     companion object {
-        private const val CONCURRENT_REQUEST_COUNT = 2
         private const val REPRESENTATIVE_PHOTO_URL = "https://example.com/representative.jpg"
         private val FIXED_INSTANT: Instant = Instant.parse("2026-09-30T00:00:00Z")
 

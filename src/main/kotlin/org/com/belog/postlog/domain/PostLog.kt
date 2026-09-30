@@ -9,23 +9,25 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.JoinColumn
-import jakarta.persistence.OneToOne
+import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
+import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
 import java.time.Instant
 
 private const val POST_LOG_MEMORY_MIN_LENGTH = 1
 private const val POST_LOG_MEMORY_MAX_LENGTH = 80
+const val POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME = "uk_post_logs_meeting_member"
 
 @Entity
 @Table(
     name = "post_logs",
     uniqueConstraints = [
         UniqueConstraint(
-            name = "uk_post_logs_meeting_id",
-            columnNames = ["meeting_id"],
+            name = POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME,
+            columnNames = ["meeting_id", "created_by_group_member_id"],
         ),
     ],
     check = [
@@ -42,13 +44,20 @@ private const val POST_LOG_MEMORY_MAX_LENGTH = 80
     ],
 )
 class PostLog protected constructor(
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
         name = "meeting_id",
         nullable = false,
         foreignKey = ForeignKey(name = "fk_post_logs_meeting_id"),
     )
     val meeting: Meeting,
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "created_by_group_member_id",
+        nullable = false,
+        foreignKey = ForeignKey(name = "fk_post_logs_created_by_group_member_id"),
+    )
+    val createdBy: GroupMember,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -89,6 +98,15 @@ class PostLog protected constructor(
         const val MEMORY_MIN_LENGTH = POST_LOG_MEMORY_MIN_LENGTH
         const val MEMORY_MAX_LENGTH = POST_LOG_MEMORY_MAX_LENGTH
 
-        fun create(meeting: Meeting): PostLog = PostLog(meeting = meeting)
+        fun create(
+            meeting: Meeting,
+            createdBy: GroupMember,
+        ): PostLog {
+            require(createdBy.belongsTo(meeting.group)) {
+                "Post-log 작성자는 해당 만남이 속한 그룹의 멤버여야 합니다."
+            }
+
+            return PostLog(meeting = meeting, createdBy = createdBy)
+        }
     }
 }
