@@ -6,6 +6,7 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.code.GroupSuccessCode
+import org.com.belog.group.controller.cursor.GroupListCursorCodec
 import org.com.belog.group.controller.dto.request.CreateGroupRequest
 import org.com.belog.group.controller.dto.request.GroupCoverImageUploadUrlRequest
 import org.com.belog.group.controller.dto.request.UpdateGroupCoverImageRequest
@@ -13,6 +14,7 @@ import org.com.belog.group.controller.dto.response.CreateGroupResponse
 import org.com.belog.group.controller.dto.response.GroupCoverImageUploadUrlResponse
 import org.com.belog.group.controller.dto.response.GroupDetailResponse
 import org.com.belog.group.controller.dto.response.GroupMembersResponse
+import org.com.belog.group.controller.dto.response.MyGroupListResponse
 import org.com.belog.group.controller.dto.response.PastMeetingListResponse
 import org.com.belog.group.controller.swagger.GroupSwagger
 import org.com.belog.group.domain.GroupCoverImageObjectKey
@@ -39,6 +41,29 @@ class GroupController(
     private val groupMembershipService: GroupMembershipService,
     private val meetingService: MeetingService,
 ) : GroupSwagger {
+    @GetMapping
+    override fun getMyGroups(
+        @LoginUserId userId: Long,
+        @RequestParam(required = false) cursor: String?,
+        @RequestParam(defaultValue = "10") size: Int,
+    ): ResponseEntity<CommonResponse<MyGroupListResponse>> {
+        val result =
+            groupService.getMyGroups(
+                userId = userId,
+                cursor = GroupListCursorCodec.decode(cursor),
+                size = size,
+            )
+
+        return ResponseEntity
+            .status(GroupSuccessCode.MY_GROUPS_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    GroupSuccessCode.MY_GROUPS_RETRIEVED,
+                    MyGroupListResponse.from(result),
+                ),
+            )
+    }
+
     @GetMapping("/{groupId}")
     override fun getGroup(
         @LoginUserId userId: Long,

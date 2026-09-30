@@ -14,16 +14,22 @@ import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
 import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.query.GroupListCursor
 import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup
 import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupPreviewMemberResult
+import org.com.belog.group.service.result.MyGroupListResult
+import org.com.belog.group.service.result.MyGroupSummaryResult
 import org.com.belog.group.service.result.SchedulingMeetingResult
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -39,6 +45,7 @@ class GroupService(
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val s3ObjectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val userService: UserService,
     private val clock: Clock,
 ) {
     fun createGroup(
@@ -78,6 +85,49 @@ class GroupService(
     }
 
     @Transactional(readOnly = true)
+    fun getMyGroups(
+        userId: Long,
+        cursor: GroupListCursor?,
+        size: Int,
+    ): MyGroupListResult {
+        require(size in MIN_GROUP_LIST_PAGE_SIZE..MAX_GROUP_LIST_PAGE_SIZE) {
+            "그룹 목록 조회 개수는 ${MIN_GROUP_LIST_PAGE_SIZE}개 이상 ${MAX_GROUP_LIST_PAGE_SIZE}개 이하여야 합니다."
+        }
+
+        val memberships =
+            groupMemberRepository.findMyGroupPage(
+                userId = userId,
+                cursorPinned = cursor?.pinned,
+                cursorId = cursor?.groupMemberId,
+                pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT),
+            )
+        val hasNext = memberships.size > size
+        val pageMemberships = memberships.take(size)
+        val membersByGroupId = findMembersByGroupId(pageMemberships)
+
+        return MyGroupListResult(
+            items =
+                pageMemberships.map { membership ->
+                    createMyGroupSummary(
+                        membership = membership,
+                        members = membersByGroupId.getValue(requireNotNull(membership.group.id)),
+                    )
+                },
+            nextCursor =
+                pageMemberships
+                    .lastOrNull()
+                    ?.takeIf { hasNext }
+                    ?.let { membership ->
+                        GroupListCursor(
+                            pinned = membership.pinned,
+                            groupMemberId = requireNotNull(membership.id),
+                        )
+                    },
+            hasNext = hasNext,
+        )
+    }
+
+    @Transactional(readOnly = true)
     fun getGroup(
         groupId: Long,
         userId: Long,
@@ -113,6 +163,43 @@ class GroupService(
     ): GroupMember =
         groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+
+    private fun findMembersByGroupId(memberships: List<GroupMember>): Map<Long, List<GroupMember>> {
+        if (memberships.isEmpty()) {
+            return emptyMap()
+        }
+
+        val groupIds = memberships.map { membership -> requireNotNull(membership.group.id) }
+        return groupMemberRepository
+            .findAllWithUserByGroupIdIn(groupIds)
+            .groupBy { member -> requireNotNull(member.group.id) }
+    }
+
+    private fun createMyGroupSummary(
+        membership: GroupMember,
+        members: List<GroupMember>,
+    ): MyGroupSummaryResult {
+        val group = membership.group
+
+        return MyGroupSummaryResult(
+            groupId = requireNotNull(group.id),
+            name = group.name,
+            coverImageUrl = group.coverImageObjectKey?.let(s3ObjectReadUrlProvider::generateReadUrl),
+            memberCount = members.size,
+            previewMembers = members.take(PREVIEW_MEMBER_COUNT).map(::createGroupPreviewMemberResult),
+            pinned = membership.pinned,
+            canDeleteGroup = membership.role == GroupRole.OWNER,
+        )
+    }
+
+    private fun createGroupPreviewMemberResult(member: GroupMember): GroupPreviewMemberResult {
+        val user = member.user
+        return GroupPreviewMemberResult(
+            groupMemberId = requireNotNull(member.id),
+            nickname = requireNotNull(user.nickname),
+            profileImageUrl = userService.resolveProfileImageUrl(user),
+        )
+    }
 
     private fun createSchedulingMeetingResults(meetings: List<Meeting>): List<SchedulingMeetingResult> {
         if (meetings.isEmpty()) {
@@ -162,5 +249,9 @@ class GroupService(
     companion object {
         const val MAX_INVITE_CODE_ATTEMPTS = 5
         private const val INITIAL_MEMBER_COUNT = 1
+        private const val MIN_GROUP_LIST_PAGE_SIZE = 1
+        private const val MAX_GROUP_LIST_PAGE_SIZE = 50
+        private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
+        private const val PREVIEW_MEMBER_COUNT = 3
     }
 }
