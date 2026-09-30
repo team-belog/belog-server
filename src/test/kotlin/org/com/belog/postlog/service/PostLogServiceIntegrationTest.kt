@@ -50,7 +50,9 @@ import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -100,6 +102,131 @@ class PostLogServiceIntegrationTest {
         groupRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
         reset(objectReadUrlProvider)
+    }
+
+    @Test
+    fun `그룹 멤버가 최초 임시저장하면 미발행 Post-log가 생성된다`() {
+        val context = saveMeetingContext()
+
+        postLogService.saveDraft(
+            meetingId = context.meetingId,
+            userId = context.creatorUserId,
+            memory = "  함께한 광주 여행  ",
+        )
+
+        val savedPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        assertNotNull(savedPostLog)
+        assertEquals("함께한 광주 여행", savedPostLog.memory)
+        assertNull(savedPostLog.ticketCreatedAt)
+        assertFalse(savedPostLog.isTicketCreated)
+        assertEquals(1L, postLogRepository.count())
+    }
+
+    @Test
+    fun `같은 사용자가 다시 임시저장하면 기존 Post-log의 문구만 변경된다`() {
+        val context = saveMeetingContext()
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "첫 번째 초안")
+        val initialPostLog =
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(context.creator.id),
+                ),
+            )
+
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "두 번째 초안")
+
+        val updatedPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        assertNotNull(updatedPostLog)
+        assertEquals(initialPostLog.id, updatedPostLog.id)
+        assertEquals("두 번째 초안", updatedPostLog.memory)
+        assertNull(updatedPostLog.ticketCreatedAt)
+        assertEquals(1L, postLogRepository.count())
+    }
+
+    @Test
+    fun `서로 다른 그룹 멤버는 같은 만남에 각자의 초안을 저장한다`() {
+        val context = saveMeetingContext()
+        val otherMember = saveGroupMember(context.group, "member2")
+
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "생성자의 초안")
+        postLogService.saveDraft(
+            meetingId = context.meetingId,
+            userId = checkNotNull(otherMember.user.id),
+            memory = "다른 멤버의 초안",
+        )
+
+        val creatorPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        val otherMemberPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(otherMember.id),
+            )
+        assertEquals(2L, postLogRepository.count())
+        assertEquals("생성자의 초안", creatorPostLog?.memory)
+        assertEquals("다른 멤버의 초안", otherMemberPostLog?.memory)
+        assertTrue(creatorPostLog?.id != otherMemberPostLog?.id)
+    }
+
+    @Test
+    fun `티켓을 생성한 사용자는 추억 문구를 임시저장할 수 없다`() {
+        val context = saveMeetingContext()
+        postLogService.createTicket(context.meetingId, context.creatorUserId, "최종 티켓 문구")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.saveDraft(context.meetingId, context.creatorUserId, "변경하려는 초안")
+            }
+
+        val savedPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        assertEquals(PostLogErrorCode.TICKET_ALREADY_CREATED, exception.errorCode)
+        assertEquals("최종 티켓 문구", savedPostLog?.memory)
+        assertEquals(FIXED_INSTANT, savedPostLog?.ticketCreatedAt)
+        assertEquals(1L, postLogRepository.count())
+    }
+
+    @Test
+    fun `임시저장된 Post-log로 티켓을 생성하면 같은 행이 발행 상태로 변경된다`() {
+        val context = saveMeetingContext()
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
+        val draftPostLog =
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(context.creator.id),
+                ),
+            )
+
+        val result = postLogService.createTicket(context.meetingId, context.creatorUserId, "최종 티켓 문구")
+
+        val createdPostLog =
+            postLogRepository.findByMeetingIdAndCreatedById(
+                context.meetingId,
+                checkNotNull(context.creator.id),
+            )
+        assertNotNull(createdPostLog)
+        assertEquals(draftPostLog.id, createdPostLog.id)
+        assertEquals(result.postLogId, createdPostLog.id)
+        assertEquals("최종 티켓 문구", createdPostLog.memory)
+        assertEquals(FIXED_INSTANT, createdPostLog.ticketCreatedAt)
+        assertTrue(createdPostLog.isTicketCreated)
+        assertEquals(1L, postLogRepository.count())
     }
 
     @Test
