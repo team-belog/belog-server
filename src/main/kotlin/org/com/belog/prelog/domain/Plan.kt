@@ -67,22 +67,37 @@ class Plan protected constructor(
         foreignKey = ForeignKey(name = "fk_pre_log_plans_created_by_group_member_id"),
     )
     val createdBy: GroupMember,
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    val type: PlanType,
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
-    val category: PlanCategory,
-    @Column(nullable = false, length = PLAN_TITLE_MAX_LENGTH)
-    val title: String,
-    @Column(length = PLAN_URL_MAX_LENGTH)
-    val url: String?,
-    @Column(length = PLAN_CONTENT_MAX_LENGTH)
-    val content: String?,
+    type: PlanType,
+    category: PlanCategory,
+    title: String,
+    url: String?,
+    content: String?,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    var type: PlanType = type
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    var category: PlanCategory = category
+        protected set
+
+    @Column(nullable = false, length = PLAN_TITLE_MAX_LENGTH)
+    var title: String = title
+        protected set
+
+    @Column(length = PLAN_URL_MAX_LENGTH)
+    var url: String? = url
+        protected set
+
+    @Column(length = PLAN_CONTENT_MAX_LENGTH)
+    var content: String? = content
         protected set
 
     @Column(nullable = false)
@@ -95,6 +110,46 @@ class Plan protected constructor(
 
     fun unpin() {
         pinned = false
+    }
+
+    fun updateLink(
+        category: PlanCategory,
+        title: String,
+        url: String,
+    ) {
+        val normalizedTitle = normalizeTitle(title)
+        val normalizedUrl = normalizeUrl(url)
+
+        this.type = PlanType.LINK
+        this.category = category
+        this.title = normalizedTitle
+        this.url = normalizedUrl
+        this.content = null
+    }
+
+    fun updateMemo(
+        category: PlanCategory,
+        title: String,
+        content: String,
+    ) {
+        val normalizedTitle = normalizeTitle(title)
+        val normalizedContent = normalizeContent(content)
+
+        this.type = PlanType.MEMO
+        this.category = category
+        this.title = normalizedTitle
+        this.url = null
+        this.content = normalizedContent
+    }
+
+    fun isCreatedBy(groupMember: GroupMember): Boolean {
+        if (createdBy === groupMember) {
+            return true
+        }
+
+        val creatorId = createdBy.id
+        val groupMemberId = groupMember.id
+        return creatorId != null && groupMemberId != null && creatorId == groupMemberId
     }
 
     companion object {

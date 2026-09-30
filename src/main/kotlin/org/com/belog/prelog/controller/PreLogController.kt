@@ -8,11 +8,13 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.code.PreLogSuccessCode
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
+import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PlanPinResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
+import org.com.belog.prelog.controller.dto.response.UpdatePlanResponse
 import org.com.belog.prelog.controller.swagger.PreLogSwagger
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
@@ -116,6 +118,46 @@ class PreLogController(
                 CommonResponse.success(
                     PreLogSuccessCode.PLAN_CREATED,
                     CreatePlanResponse.from(plan),
+                ),
+            )
+    }
+
+    @PutMapping("/plans/{planId}")
+    override fun updatePlan(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @PathVariable planId: Long,
+        @Valid @RequestBody request: UpdatePlanRequest,
+    ): ResponseEntity<CommonResponse<UpdatePlanResponse>> {
+        val plan =
+            when (request.type) {
+                PlanType.LINK ->
+                    planService.updateLinkPlan(
+                        meetingId = meetingId,
+                        planId = planId,
+                        userId = userId,
+                        category = request.category,
+                        title = request.title,
+                        url = checkNotNull(request.url),
+                    )
+
+                PlanType.MEMO ->
+                    planService.updateMemoPlan(
+                        meetingId = meetingId,
+                        planId = planId,
+                        userId = userId,
+                        category = request.category,
+                        title = request.title,
+                        content = checkNotNull(request.content),
+                    )
+            }
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_UPDATED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.PLAN_UPDATED,
+                    UpdatePlanResponse.from(plan),
                 ),
             )
     }

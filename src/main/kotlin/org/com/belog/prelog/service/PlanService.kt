@@ -123,6 +123,32 @@ class PlanService(
     }
 
     @Transactional
+    fun updateLinkPlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+        category: PlanCategory,
+        title: String,
+        url: String,
+    ): Plan =
+        updatePlan(meetingId, planId, userId) { plan ->
+            plan.updateLink(category = category, title = title, url = url)
+        }
+
+    @Transactional
+    fun updateMemoPlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+        category: PlanCategory,
+        title: String,
+        content: String,
+    ): Plan =
+        updatePlan(meetingId, planId, userId) { plan ->
+            plan.updateMemo(category = category, title = title, content = content)
+        }
+
+    @Transactional
     fun pinPlan(
         meetingId: Long,
         planId: Long,
@@ -170,6 +196,31 @@ class PlanService(
 
         return planRepository.findByIdAndMeetingId(planId, meetingId)
             ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
+    }
+
+    private fun updatePlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+        update: (Plan) -> Unit,
+    ): Plan {
+        val meeting = findMeeting(meetingId)
+        val groupMember = findGroupMember(meeting, userId)
+        val plan =
+            planRepository.findByIdAndMeetingId(planId, meetingId)
+                ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
+
+        if (!plan.isCreatedBy(groupMember)) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
+        }
+
+        try {
+            update(plan)
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(PreLogErrorCode.INVALID_PLAN, exception)
+        }
+
+        return plan
     }
 
     private fun validateMeetingNotEnded(
