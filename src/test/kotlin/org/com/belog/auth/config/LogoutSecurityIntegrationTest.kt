@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
 import org.springframework.security.oauth2.jwt.JwtClaimsSet
 import org.springframework.security.oauth2.jwt.JwtEncoder
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters
@@ -17,7 +18,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 
@@ -61,6 +64,11 @@ class LogoutSecurityIntegrationTest {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer $expiredAccessToken")
                     .cookie(Cookie("refresh_token", "refresh-token")),
             ).andExpect(status().isForbidden)
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+            .andExpect(jsonPath("$.code").value("AUTH-E006"))
+            .andExpect(jsonPath("$.message").value("허용되지 않은 요청 출처입니다."))
+            .andExpect(jsonPath("$.data.fieldErrors").isEmpty)
+            .andExpect(jsonPath("$.data.timestamp").isNotEmpty)
 
         verifyNoInteractions(authService)
     }

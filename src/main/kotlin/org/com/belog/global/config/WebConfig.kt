@@ -1,16 +1,21 @@
 package org.com.belog.global.config
 
+import org.com.belog.auth.config.AuthCorsProcessor
 import org.com.belog.auth.config.RefreshTokenOriginInterceptor
 import org.com.belog.global.resolver.LoginUserIdArgumentResolver
+import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
+import org.springframework.boot.web.servlet.FilterRegistrationBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
+import org.springframework.web.filter.CorsFilter
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @EnableConfigurationProperties(CorsProperties::class)
@@ -34,6 +39,24 @@ class WebConfig(
             registerCorsConfiguration("/**", configuration)
         }
     }
+
+    @Bean
+    fun authCorsProcessor(objectMapper: ObjectMapper): AuthCorsProcessor = AuthCorsProcessor(objectMapper)
+
+    @Bean
+    fun corsFilter(
+        @Qualifier("corsConfigurationSource") corsConfigurationSource: CorsConfigurationSource,
+        authCorsProcessor: AuthCorsProcessor,
+    ): CorsFilter =
+        CorsFilter(corsConfigurationSource).apply {
+            setCorsProcessor(authCorsProcessor)
+        }
+
+    @Bean
+    fun corsFilterRegistration(corsFilter: CorsFilter): FilterRegistrationBean<CorsFilter> =
+        FilterRegistrationBean(corsFilter).apply {
+            isEnabled = false
+        }
 
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry
