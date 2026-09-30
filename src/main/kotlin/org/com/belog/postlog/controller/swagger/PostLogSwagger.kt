@@ -15,11 +15,14 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
+import org.com.belog.postlog.controller.dto.request.CreatePostLogTicketRequest
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
+import org.com.belog.postlog.controller.dto.response.CreatePostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
+import org.com.belog.postlog.controller.dto.response.PostLogSummaryResponse
 import org.com.belog.postlog.controller.dto.response.RegisterPostLogPhotosResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -29,6 +32,147 @@ import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Post-log", description = "Post-log 관련 API")
 interface PostLogSwagger {
+    @Operation(
+        summary = "Post-log 티켓 생성",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 추억 문구를 작성하고 티켓을 생성합니다. " +
+                "한 만남에는 하나의 티켓만 생성할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "티켓 생성 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = CREATE_POST_LOG_TICKET_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "추억 문구 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 해당 만남의 티켓이 생성됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = TICKET_ALREADY_CREATED_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun createTicket(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = CreatePostLogTicketRequest::class),
+                    examples = [ExampleObject(value = CREATE_POST_LOG_TICKET_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: CreatePostLogTicketRequest,
+    ): ResponseEntity<CommonResponse<CreatePostLogTicketResponse>>
+
+    @Operation(
+        summary = "Post-log 만남 정리 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 만남 정보, 추억 문구, 정산 요약과 참여 멤버를 조회합니다. " +
+                "Post-log가 아직 생성되지 않은 경우에도 조회에 성공하며 추억 문구는 null, 티켓 생성 여부는 false입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 정리 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_POST_LOG_SUMMARY_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getSummary(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<PostLogSummaryResponse>>
+
     @Operation(
         summary = "Post-log 사진 목록 조회",
         description =
@@ -404,8 +548,17 @@ interface PostLogSwagger {
     ): ResponseEntity<CommonResponse<PostLogPhotoLikeResponse>>
 }
 
+private const val CREATE_POST_LOG_TICKET_REQUEST_EXAMPLE =
+    """{"memory":"함께한 광주 여행을 오래 기억하자"}"""
+
+private const val CREATE_POST_LOG_TICKET_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S007","message":"Post-log 티켓이 생성되었습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","members":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
+
 private const val ISSUE_PHOTO_UPLOAD_URLS_REQUEST_EXAMPLE =
     """{"photos":[{"clientPhotoId":"photo-1","contentType":"image/jpeg","fileSize":2457600},{"clientPhotoId":"photo-2","contentType":"image/webp","fileSize":1843200}]}"""
+
+private const val GET_POST_LOG_SUMMARY_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S006","message":"Post-log 만남 정리 정보가 조회되었습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","memory":null,"settlement":{"completedParticipantCount":1,"totalAmount":11000},"participantCount":3,"participants":[{"groupMemberId":21,"nickname":"이정원","meetingCreator":true},{"groupMemberId":22,"nickname":"정다빈","meetingCreator":false},{"groupMemberId":23,"nickname":"김성연","meetingCreator":false}],"ticketCreated":false}}"""
 
 private const val ISSUE_PHOTO_UPLOAD_URLS_SUCCESS_EXAMPLE =
     """{"code":"POST_LOG-S001","message":"사진 업로드 URL이 발급되었습니다.","data":{"uploads":[{"clientPhotoId":"photo-1","objectKey":"post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg","uploadUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/550e8400-e29b-41d4-a716-446655440000.jpg?...","method":"PUT","requiredHeaders":{"Content-Type":"image/jpeg","Content-Length":"2457600"},"expiresAt":"2026-09-28T03:15:00Z"}]}}"""
@@ -445,3 +598,6 @@ private const val GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE =
 
 private const val INVALID_PHOTO_CURSOR_EXAMPLE =
     """{"code":"POST_LOG-E011","message":"사진 목록 커서가 올바르지 않습니다.","data":null}"""
+
+private const val TICKET_ALREADY_CREATED_EXAMPLE =
+    """{"code":"POST_LOG-E012","message":"이미 티켓이 생성된 만남입니다.","data":null}"""
