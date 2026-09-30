@@ -29,14 +29,24 @@ class GroupMembershipService(
     fun getGroupMembers(
         groupId: Long,
         userId: Long,
+        query: String?,
     ): List<GroupMemberResult> {
         validateGroupMember(groupId, userId)
 
-        return groupMemberRepository.findAllWithUserByGroupId(groupId).map { member ->
+        val normalizedQuery = query?.trim().orEmpty()
+        val members =
+            if (normalizedQuery.isEmpty()) {
+                groupMemberRepository.findAllWithUserByGroupId(groupId)
+            } else {
+                groupMemberRepository.searchAllWithUserByGroupId(groupId, normalizedQuery)
+            }
+
+        return members.map { member ->
             val memberUser = member.user
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
                 nickname = requireNotNull(memberUser.nickname),
+                name = requireNotNull(memberUser.name),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )

@@ -51,18 +51,20 @@ class GroupControllerTest {
 
     @Test
     fun `그룹 멤버 목록을 조회한다`() {
-        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
             .thenReturn(
                 listOf(
                     GroupMemberResult(
                         groupMemberId = 21L,
                         nickname = "방장",
+                        name = "이정원",
                         profileImageUrl = "https://example.com/owner-profile",
                         role = GroupRole.OWNER,
                     ),
                     GroupMemberResult(
                         groupMemberId = 22L,
                         nickname = "멤버",
+                        name = "김다빈",
                         profileImageUrl = null,
                         role = GroupRole.MEMBER,
                     ),
@@ -79,16 +81,18 @@ class GroupControllerTest {
             .andExpect(jsonPath("$.data.items.length()").value(2))
             .andExpect(jsonPath("$.data.items[0].groupMemberId").value(21))
             .andExpect(jsonPath("$.data.items[0].nickname").value("방장"))
+            .andExpect(jsonPath("$.data.items[0].name").value("이정원"))
             .andExpect(jsonPath("$.data.items[0].profileImageUrl").value("https://example.com/owner-profile"))
             .andExpect(jsonPath("$.data.items[0].role").value("OWNER"))
             .andExpect(jsonPath("$.data.items[1].groupMemberId").value(22))
+            .andExpect(jsonPath("$.data.items[1].name").value("김다빈"))
             .andExpect(jsonPath("$.data.items[1].profileImageUrl").isEmpty)
             .andExpect(jsonPath("$.data.items[1].role").value("MEMBER"))
     }
 
     @Test
     fun `그룹에 참여하지 않은 사용자는 멤버 목록을 조회할 수 없다`() {
-        `when`(groupMembershipService.getGroupMembers(1L, 15L))
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
             .thenThrow(BusinessException(GroupErrorCode.NOT_GROUP_MEMBER))
 
         mockMvc
@@ -101,7 +105,7 @@ class GroupControllerTest {
 
     @Test
     fun `존재하지 않는 그룹의 멤버 목록을 조회하면 404 응답을 반환한다`() {
-        `when`(groupMembershipService.getGroupMembers(999L, 15L))
+        `when`(groupMembershipService.getGroupMembers(999L, 15L, null))
             .thenThrow(BusinessException(GroupErrorCode.GROUP_NOT_FOUND))
 
         mockMvc

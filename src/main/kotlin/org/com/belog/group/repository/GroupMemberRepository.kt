@@ -36,4 +36,22 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
     fun findAllWithUserByGroupId(
         @Param("groupId") groupId: Long,
     ): List<GroupMember>
+
+    @EntityGraph(attributePaths = ["user"])
+    @Query(
+        """
+        SELECT member
+        FROM GroupMember member
+        WHERE member.group.id = :groupId
+          AND (
+              LOCATE(LOWER(:query), LOWER(member.user.nickname)) > 0
+              OR LOCATE(LOWER(:query), LOWER(member.user.name)) > 0
+          )
+        ORDER BY member.role DESC, member.id ASC
+        """,
+    )
+    fun searchAllWithUserByGroupId(
+        @Param("groupId") groupId: Long,
+        @Param("query") query: String,
+    ): List<GroupMember>
 }

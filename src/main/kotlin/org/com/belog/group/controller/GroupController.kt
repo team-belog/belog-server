@@ -89,8 +89,14 @@ class GroupController(
     override fun getGroupMembers(
         @LoginUserId userId: Long,
         @PathVariable groupId: Long,
+        @RequestParam(required = false) query: String?,
     ): ResponseEntity<CommonResponse<GroupMembersResponse>> {
-        val members = groupMembershipService.getGroupMembers(groupId, userId)
+        val members =
+            groupMembershipService.getGroupMembers(
+                groupId = groupId,
+                userId = userId,
+                query = query,
+            )
 
         return ResponseEntity
             .status(GroupSuccessCode.GROUP_MEMBERS_RETRIEVED.status)
