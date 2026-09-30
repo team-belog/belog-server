@@ -39,4 +39,10 @@ class AuthService(
 
         return tokens
     }
+
+    @Transactional
+    fun logout(refreshToken: String) {
+        val userId = jwtTokenProvider.extractUserIdFromRefreshToken(refreshToken)
+        refreshTokenService.deleteIfMatches(userId, refreshToken)
+    }
 }

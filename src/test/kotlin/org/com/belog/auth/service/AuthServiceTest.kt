@@ -87,4 +87,13 @@ class AuthServiceTest {
             expiration = Duration.ofDays(14),
         )
     }
+
+    @Test
+    fun `로그아웃하면 현재 Refresh Token을 삭제한다`() {
+        `when`(jwtTokenProvider.extractUserIdFromRefreshToken("refresh-token")).thenReturn(1L)
+
+        authService.logout("refresh-token")
+
+        verify(refreshTokenService).deleteIfMatches(1L, "refresh-token")
+    }
 }
