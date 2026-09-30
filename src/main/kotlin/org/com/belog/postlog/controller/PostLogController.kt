@@ -9,6 +9,7 @@ import org.com.belog.postlog.code.PostLogSuccessCode
 import org.com.belog.postlog.controller.dto.request.CreatePostLogTicketRequest
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
+import org.com.belog.postlog.controller.dto.request.SavePostLogDraftRequest
 import org.com.belog.postlog.controller.dto.response.CreatePostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
@@ -37,6 +38,23 @@ class PostLogController(
     private val photoService: PostLogPhotoService,
     private val photoLikeService: PostLogPhotoLikeService,
 ) : PostLogSwagger {
+    @PutMapping("/draft")
+    override fun saveDraft(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: SavePostLogDraftRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        postLogService.saveDraft(
+            meetingId = meetingId,
+            userId = userId,
+            memory = request.memory,
+        )
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.DRAFT_SAVED.status)
+            .body(CommonResponse.success(PostLogSuccessCode.DRAFT_SAVED))
+    }
+
     @PostMapping("/ticket")
     override fun createTicket(
         @LoginUserId userId: Long,
