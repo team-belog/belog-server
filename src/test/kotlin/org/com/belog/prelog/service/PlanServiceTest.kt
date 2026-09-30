@@ -18,6 +18,7 @@ import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -93,6 +94,112 @@ class PlanServiceTest {
         val result = getPlans()
 
         assertFalse(result.items.single().canDelete)
+    }
+
+    @Test
+    fun `계획 작성자는 자신의 계획을 수정할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+
+        val result =
+            planService.updateLinkPlan(
+                meetingId = 1L,
+                planId = 20L,
+                userId = 15L,
+                category = PlanCategory.CAFE,
+                title = "수정한 카페",
+                url = "https://example.com/updated-cafe",
+            )
+
+        assertSame(target.plan, result)
+        assertEquals(PlanType.LINK, result.type)
+        assertEquals(PlanCategory.CAFE, result.category)
+        assertEquals("수정한 카페", result.title)
+        assertEquals("https://example.com/updated-cafe", result.url)
+    }
+
+    @Test
+    fun `계획 작성자가 아니면 계획을 수정할 수 없다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.updateMemoPlan(
+                    meetingId = 1L,
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "수정 시도",
+                    content = "수정할 수 없는 내용",
+                )
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
+        assertEquals(PlanType.LINK, target.plan.type)
+        assertEquals("맛집", target.plan.title)
+        assertEquals("https://example.com/place", target.plan.url)
+    }
+
+    @Test
+    fun `서비스에서 계획 작성자는 자신의 계획을 삭제할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+
+        planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+
+        verify(planLikeRepository).deleteAllByPlanId(20L)
+        verify(planRepository).delete(target.plan)
+    }
+
+    @Test
+    fun `서비스에서 만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, loginIsMeetingCreator = true)
+
+        planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+
+        verify(planLikeRepository).deleteAllByPlanId(20L)
+        verify(planRepository).delete(target.plan)
+    }
+
+    @Test
+    fun `작성자와 만남 생성자가 아니면 계획을 삭제할 수 없다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, loginIsMeetingCreator = false)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_DELETE_FORBIDDEN, exception.errorCode)
+        verifyNoInteractions(planLikeRepository)
+        verify(planRepository, never()).delete(target.plan)
+    }
+
+    @Test
+    fun `다른 만남에 속한 계획은 수정하거나 삭제할 수 없다`() {
+        val context = meetingContext()
+        val groupMember = mock(GroupMember::class.java)
+        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
+        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(null)
+
+        val updateException =
+            assertFailsWith<BusinessException> {
+                planService.updateLinkPlan(
+                    meetingId = 1L,
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.CAFE,
+                    title = "카페",
+                    url = "https://example.com/cafe",
+                )
+            }
+        val deleteException =
+            assertFailsWith<BusinessException> {
+                planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, updateException.errorCode)
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, deleteException.errorCode)
+        verifyNoInteractions(planLikeRepository)
     }
 
     @Test
@@ -296,6 +403,39 @@ class PlanServiceTest {
         return plan
     }
 
+    private fun stubPlanActionTarget(
+        loginIsPlanCreator: Boolean,
+        loginIsMeetingCreator: Boolean = false,
+    ): PlanActionTarget {
+        val context = meetingContext()
+        val planCreator = mock(GroupMember::class.java)
+        val loginGroupMember = if (loginIsPlanCreator) planCreator else mock(GroupMember::class.java)
+        `when`(planCreator.id).thenReturn(10L)
+        `when`(planCreator.group).thenReturn(context.group)
+        `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
+        if (!loginIsPlanCreator) {
+            `when`(loginGroupMember.id).thenReturn(11L)
+        }
+
+        val plan =
+            Plan.createLink(
+                meeting = context.meeting,
+                creator = planCreator,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = "https://example.com/place",
+                currentDate = LocalDate.of(2026, 9, 22),
+            )
+        ReflectionTestUtils.setField(plan, "id", 20L)
+
+        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
+        `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(loginIsMeetingCreator)
+
+        return PlanActionTarget(plan)
+    }
+
     private fun getPlans() =
         planService.getPlans(
             meetingId = 1L,
@@ -308,5 +448,9 @@ class PlanServiceTest {
     private data class MeetingContext(
         val group: Group,
         val meeting: Meeting,
+    )
+
+    private data class PlanActionTarget(
+        val plan: Plan,
     )
 }
