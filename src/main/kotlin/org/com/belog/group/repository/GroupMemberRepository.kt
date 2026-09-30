@@ -1,8 +1,10 @@
 package org.com.belog.group.repository
 
+import jakarta.persistence.LockModeType
 import org.com.belog.group.domain.GroupMember
 import org.springframework.data.jpa.repository.EntityGraph
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -12,6 +14,20 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
     fun findByGroupIdAndUserId(
         groupId: Long,
         userId: Long,
+    ): GroupMember?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT member
+        FROM GroupMember member
+        WHERE member.group.id = :groupId
+          AND member.user.id = :userId
+        """,
+    )
+    fun findByGroupIdAndUserIdForUpdate(
+        @Param("groupId") groupId: Long,
+        @Param("userId") userId: Long,
     ): GroupMember?
 
     fun findAllByGroupIdAndIdIn(

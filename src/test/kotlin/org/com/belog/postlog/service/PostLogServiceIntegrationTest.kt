@@ -116,7 +116,7 @@ class PostLogServiceIntegrationTest {
                 memory = "  함께한 광주 여행  ",
             )
 
-        val savedPostLog = postLogRepository.findByMeetingId(context.meetingId)
+        val savedPostLog = postLogRepository.findByMeetingIdAndCreatedById(context.meetingId, checkNotNull(context.creator.id))
         assertNotNull(savedPostLog)
         assertEquals("함께한 광주 여행", savedPostLog.memory)
         assertEquals(FIXED_INSTANT, savedPostLog.ticketCreatedAt)
@@ -140,7 +140,7 @@ class PostLogServiceIntegrationTest {
                 postLogService.createTicket(context.meetingId, context.creatorUserId, "변경하려는 추억")
             }
 
-        val savedPostLog = postLogRepository.findByMeetingId(context.meetingId)
+        val savedPostLog = postLogRepository.findByMeetingIdAndCreatedById(context.meetingId, checkNotNull(context.creator.id))
         assertEquals(PostLogErrorCode.TICKET_ALREADY_CREATED, exception.errorCode)
         assertEquals("첫 번째 추억", savedPostLog?.memory)
         assertEquals(FIXED_INSTANT, savedPostLog?.ticketCreatedAt)
@@ -158,7 +158,14 @@ class PostLogServiceIntegrationTest {
             memory = "그룹 멤버가 만든 추억",
         )
 
-        assertTrue(checkNotNull(postLogRepository.findByMeetingId(context.meetingId)).isTicketCreated)
+        assertTrue(
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(nonParticipant.id),
+                ),
+            ).isTicketCreated,
+        )
     }
 
     @Test
@@ -202,7 +209,13 @@ class PostLogServiceIntegrationTest {
 
             startSignal.countDown()
             val results = requests.map { request -> request.get(10, TimeUnit.SECONDS) }
-            val savedPostLog = checkNotNull(postLogRepository.findByMeetingId(context.meetingId))
+            val savedPostLog =
+                checkNotNull(
+                    postLogRepository.findByMeetingIdAndCreatedById(
+                        context.meetingId,
+                        checkNotNull(context.creator.id),
+                    ),
+                )
 
             assertEquals(1, results.count { it == null })
             assertEquals(1, results.count { it == PostLogErrorCode.TICKET_ALREADY_CREATED })
@@ -244,7 +257,6 @@ class PostLogServiceIntegrationTest {
         val context = saveMeetingContext()
         val participant = saveGroupMember(context.group, "member2")
         val nonParticipant = saveGroupMember(context.group, "member3")
-        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, context.creator))
         meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, participant))
 
         val result =
@@ -283,6 +295,7 @@ class PostLogServiceIntegrationTest {
                     currentDate = LocalDate.of(2026, 9, 20),
                 ),
             )
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, creator))
 
         return MeetingContext(
             group = group,
