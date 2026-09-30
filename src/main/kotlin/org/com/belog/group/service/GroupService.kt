@@ -127,6 +127,24 @@ class GroupService(
         )
     }
 
+    @Transactional
+    fun pinGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        findGroup(groupId)
+        findCurrentMember(groupId, userId).pin()
+    }
+
+    @Transactional
+    fun unpinGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        findGroup(groupId)
+        findCurrentMember(groupId, userId).unpin()
+    }
+
     @Transactional(readOnly = true)
     fun getGroup(
         groupId: Long,

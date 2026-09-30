@@ -24,6 +24,7 @@ import org.com.belog.group.service.GroupService
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -62,6 +63,30 @@ class GroupController(
                     MyGroupListResponse.from(result),
                 ),
             )
+    }
+
+    @PutMapping("/{groupId}/pin")
+    override fun pinGroup(
+        @LoginUserId userId: Long,
+        @PathVariable groupId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        groupService.pinGroup(groupId = groupId, userId = userId)
+
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_PINNED.status)
+            .body(CommonResponse.success(GroupSuccessCode.GROUP_PINNED))
+    }
+
+    @DeleteMapping("/{groupId}/pin")
+    override fun unpinGroup(
+        @LoginUserId userId: Long,
+        @PathVariable groupId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        groupService.unpinGroup(groupId = groupId, userId = userId)
+
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_UNPINNED.status)
+            .body(CommonResponse.success(GroupSuccessCode.GROUP_UNPINNED))
     }
 
     @GetMapping("/{groupId}")

@@ -10,6 +10,7 @@ import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -20,7 +21,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -99,6 +102,34 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(planService)
+    }
+
+    @Test
+    fun `계획을 핀 고정하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/meetings/1/pre-log/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S007"))
+            .andExpect(jsonPath("$.message").value("계획이 핀 고정되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(planService).pinPlan(meetingId = 1L, planId = 12L, userId = 15L)
+    }
+
+    @Test
+    fun `계획 핀 고정을 해제하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/meetings/1/pre-log/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S008"))
+            .andExpect(jsonPath("$.message").value("계획 핀 고정이 해제되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(planService).unpinPlan(meetingId = 1L, planId = 12L, userId = 15L)
     }
 
     private fun mockLinkPlan(): Plan {

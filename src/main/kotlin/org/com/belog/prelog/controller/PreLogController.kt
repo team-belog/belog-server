@@ -12,7 +12,6 @@ import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
-import org.com.belog.prelog.controller.dto.response.PlanPinResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
 import org.com.belog.prelog.controller.dto.response.UpdatePlanResponse
 import org.com.belog.prelog.controller.swagger.PreLogSwagger
@@ -180,17 +179,12 @@ class PreLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @PathVariable planId: Long,
-    ): ResponseEntity<CommonResponse<PlanPinResponse>> {
-        val result = planService.pinPlan(meetingId = meetingId, planId = planId, userId = userId)
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        planService.pinPlan(meetingId = meetingId, planId = planId, userId = userId)
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_PINNED.status)
-            .body(
-                CommonResponse.success(
-                    PreLogSuccessCode.PLAN_PINNED,
-                    PlanPinResponse.from(result),
-                ),
-            )
+            .body(CommonResponse.success(PreLogSuccessCode.PLAN_PINNED))
     }
 
     @DeleteMapping("/plans/{planId}/pin")
@@ -198,17 +192,12 @@ class PreLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @PathVariable planId: Long,
-    ): ResponseEntity<CommonResponse<PlanPinResponse>> {
-        val result = planService.unpinPlan(meetingId = meetingId, planId = planId, userId = userId)
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        planService.unpinPlan(meetingId = meetingId, planId = planId, userId = userId)
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_UNPINNED.status)
-            .body(
-                CommonResponse.success(
-                    PreLogSuccessCode.PLAN_UNPINNED,
-                    PlanPinResponse.from(result),
-                ),
-            )
+            .body(CommonResponse.success(PreLogSuccessCode.PLAN_UNPINNED))
     }
 
     @PutMapping("/plans/{planId}/likes/me")

@@ -13,6 +13,7 @@ import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.meeting.service.MeetingService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,8 +24,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -110,6 +113,34 @@ class GroupControllerTest {
                     .principal(authenticatedUser()),
             ).andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("GROUP-E012"))
+    }
+
+    @Test
+    fun `그룹을 고정하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/groups/1/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S008"))
+            .andExpect(jsonPath("$.message").value("그룹이 고정되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(groupService).pinGroup(groupId = 1L, userId = 15L)
+    }
+
+    @Test
+    fun `그룹 고정을 해제하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/groups/1/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S009"))
+            .andExpect(jsonPath("$.message").value("그룹 고정이 해제되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(groupService).unpinGroup(groupId = 1L, userId = 15L)
     }
 
     @Test
