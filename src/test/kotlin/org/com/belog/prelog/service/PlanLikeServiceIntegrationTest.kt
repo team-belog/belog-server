@@ -37,6 +37,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @SpringBootTest
@@ -44,6 +45,9 @@ import kotlin.test.assertTrue
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class PlanLikeServiceIntegrationTest {
+    @Autowired
+    private lateinit var planService: PlanService
+
     @Autowired
     private lateinit var planLikeService: PlanLikeService
 
@@ -125,6 +129,17 @@ class PlanLikeServiceIntegrationTest {
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `좋아요가 등록된 계획을 삭제하면 좋아요와 계획이 모두 삭제된다`() {
+        val context = savePlanContext()
+        planLikeRepository.saveAndFlush(PlanLike.create(context.plan, context.groupMember))
+
+        planService.deletePlan(context.meetingId, context.planId, context.userId)
+
+        assertEquals(0L, planLikeRepository.count())
+        assertFalse(planRepository.existsById(context.planId))
     }
 
     private fun savePlanContext(): PlanContext {
