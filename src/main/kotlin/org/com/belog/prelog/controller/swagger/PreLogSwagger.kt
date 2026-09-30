@@ -358,6 +358,58 @@ interface PreLogSwagger {
     ): ResponseEntity<CommonResponse<UpdatePlanResponse>>
 
     @Operation(
+        summary = "Pre-log 계획 삭제",
+        description =
+            "계획 작성자 또는 만남 생성자가 계획을 삭제합니다. " +
+                "종료된 만남의 계획도 삭제할 수 있으며 계획에 등록된 좋아요도 함께 삭제됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "계획 삭제 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아니거나 계획 삭제 권한이 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "삭제 권한 없음", value = PLAN_DELETE_FORBIDDEN_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
+                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun deletePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "Pre-log 계획 핀 고정",
         description =
             "해당 만남이 속한 그룹의 멤버가 계획을 핀 고정합니다. " +
@@ -635,6 +687,9 @@ private const val PLAN_NOT_FOUND_EXAMPLE =
 
 private const val PLAN_UPDATE_FORBIDDEN_EXAMPLE =
     """{"code":"PRE_LOG-E004","message":"계획 작성자만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_DELETE_FORBIDDEN_EXAMPLE =
+    """{"code":"PRE_LOG-E005","message":"계획을 삭제할 권한이 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val LIKE_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S005","message":"계획에 좋아요를 등록했습니다.","data":{"planId":12,"likedByMe":true,"likeCount":3}}"""

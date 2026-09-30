@@ -35,4 +35,15 @@ interface PlanLikeRepository :
         @Param("planId") planId: Long,
         @Param("groupMemberId") groupMemberId: Long,
     ): Int
+
+    @Modifying
+    @Query(
+        """
+        DELETE FROM PlanLike planLike
+        WHERE planLike.plan.id = :planId
+        """,
+    )
+    fun deleteAllByPlanId(
+        @Param("planId") planId: Long,
+    ): Int
 }

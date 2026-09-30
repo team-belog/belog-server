@@ -13,6 +13,7 @@ import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
@@ -37,8 +38,9 @@ class PlanServiceTest {
     private val meetingRepository = mock(MeetingRepository::class.java)
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
     private val planRepository = mock(PlanRepository::class.java)
+    private val planLikeRepository = mock(PlanLikeRepository::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-22T00:00:00Z"), ZoneOffset.UTC)
-    private val planService = PlanService(meetingRepository, groupMemberRepository, planRepository, clock)
+    private val planService = PlanService(meetingRepository, groupMemberRepository, planRepository, planLikeRepository, clock)
 
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {

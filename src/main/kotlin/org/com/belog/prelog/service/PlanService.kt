@@ -11,6 +11,7 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
@@ -26,6 +27,7 @@ class PlanService(
     private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
+    private val planLikeRepository: PlanLikeRepository,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -147,6 +149,26 @@ class PlanService(
         updatePlan(meetingId, planId, userId) { plan ->
             plan.updateMemo(category = category, title = title, content = content)
         }
+
+    @Transactional
+    fun deletePlan(
+        meetingId: Long,
+        planId: Long,
+        userId: Long,
+    ) {
+        val meeting = findMeeting(meetingId)
+        val groupMember = findGroupMember(meeting, userId)
+        val plan =
+            planRepository.findByIdAndMeetingId(planId, meetingId)
+                ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
+
+        if (!plan.isCreatedBy(groupMember) && !meeting.isCreatedBy(groupMember)) {
+            throw BusinessException(PreLogErrorCode.PLAN_DELETE_FORBIDDEN)
+        }
+
+        planLikeRepository.deleteAllByPlanId(planId)
+        planRepository.delete(plan)
+    }
 
     @Transactional
     fun pinPlan(

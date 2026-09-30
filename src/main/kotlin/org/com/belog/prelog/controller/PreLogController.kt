@@ -162,6 +162,19 @@ class PreLogController(
             )
     }
 
+    @DeleteMapping("/plans/{planId}")
+    override fun deletePlan(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @PathVariable planId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        planService.deletePlan(meetingId = meetingId, planId = planId, userId = userId)
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_DELETED.status)
+            .build()
+    }
+
     @PutMapping("/plans/{planId}/pin")
     override fun pinPlan(
         @LoginUserId userId: Long,
