@@ -62,6 +62,15 @@ class GlobalExceptionHandlerMvcTest {
     }
 
     @Test
+    @DisplayName("잘못된 인자로 도메인 검증에 실패하면 400 응답을 반환한다")
+    fun illegalArgumentReturnsBadRequest() {
+        mockMvc
+            .perform(get("/test/illegal-argument"))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+    }
+
+    @Test
     @DisplayName("중첩된 요청 필드 검증에 실패하면 전체 필드 경로를 반환한다")
     fun nestedRequestValidationFailureReturnsFullFieldPath() {
         mockMvc
@@ -135,6 +144,9 @@ class GlobalExceptionHandlerMvcTest {
         fun validated(
             @RequestParam(name = "page") @Min(1) page: Int,
         ) = Unit
+
+        @GetMapping("/illegal-argument")
+        fun illegalArgument(): Nothing = throw IllegalArgumentException("잘못된 인자")
 
         @PostMapping(value = ["/json"], consumes = [MediaType.APPLICATION_JSON_VALUE])
         fun consumeJson() = Unit

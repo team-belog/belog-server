@@ -68,6 +68,9 @@ class GlobalExceptionHandler {
         return createResponse(CommonErrorCode.INVALID_INPUT, listOf(fieldError))
     }
 
+    @ExceptionHandler(IllegalArgumentException::class)
+    fun handleIllegalArgument(): ResponseEntity<CommonResponse<ErrorMetadata>> = createResponse(CommonErrorCode.INVALID_INPUT)
+
     @ExceptionHandler(
         MissingServletRequestParameterException::class,
         MissingRequestHeaderException::class,
