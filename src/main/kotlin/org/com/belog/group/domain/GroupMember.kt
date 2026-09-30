@@ -51,6 +51,10 @@ class GroupMember protected constructor(
     @Column(nullable = false, length = 20)
     val role: GroupRole,
 ) : BaseEntity() {
+    @Column(nullable = false)
+    var pinned: Boolean = false
+        protected set
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
