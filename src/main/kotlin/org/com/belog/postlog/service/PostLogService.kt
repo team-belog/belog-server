@@ -11,6 +11,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
+import org.com.belog.postlog.domain.POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.postlog.domain.PostLog
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
@@ -18,6 +19,8 @@ import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import org.com.belog.postlog.service.result.PostLogTicketMemberResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
+import org.hibernate.exception.ConstraintViolationException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -61,7 +64,15 @@ class PostLogService(
         postLog.updateMemory(memory)
         check(postLog.createTicket(Instant.now(clock))) { "티켓 생성 상태를 변경할 수 없습니다." }
 
-        val savedPostLog = postLogRepository.save(postLog)
+        val savedPostLog =
+            try {
+                postLogRepository.saveAndFlush(postLog)
+            } catch (exception: DataIntegrityViolationException) {
+                if (exception.isMeetingMemberUniqueConstraintViolation()) {
+                    throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED, exception)
+                }
+                throw exception
+            }
         val members =
             meetingParticipantRepository
                 .findAllWithMemberAndUserByMeetingId(meetingId)
@@ -139,5 +150,16 @@ class PostLogService(
 
     companion object {
         private const val REPRESENTATIVE_PHOTO_COUNT = 1
+    }
+
+    private fun DataIntegrityViolationException.isMeetingMemberUniqueConstraintViolation(): Boolean {
+        val constraintName =
+            generateSequence(this as Throwable?) { throwable -> throwable.cause }
+                .filterIsInstance<ConstraintViolationException>()
+                .firstOrNull()
+                ?.constraintName
+
+        val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
+        return unqualifiedConstraintName.equals(POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
     }
 }

@@ -19,13 +19,14 @@ import java.time.Instant
 
 private const val POST_LOG_MEMORY_MIN_LENGTH = 1
 private const val POST_LOG_MEMORY_MAX_LENGTH = 80
+const val POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME = "uk_post_logs_meeting_member"
 
 @Entity
 @Table(
     name = "post_logs",
     uniqueConstraints = [
         UniqueConstraint(
-            name = "uk_post_logs_meeting_member",
+            name = POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME,
             columnNames = ["meeting_id", "created_by_group_member_id"],
         ),
     ],
