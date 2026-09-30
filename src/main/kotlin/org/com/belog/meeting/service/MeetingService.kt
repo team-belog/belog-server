@@ -221,6 +221,41 @@ class MeetingService(
     ): Boolean {
         val meeting = findMeetingForUpdate(meetingId)
         validateScheduleManager(meeting, userId)
+        return updateConfirmedDate(meeting, dateRange)
+    }
+
+    @Transactional
+    fun updateMeeting(
+        meetingId: Long,
+        userId: Long,
+        name: String,
+        location: String?,
+        dateRange: MeetingDateRange?,
+    ) {
+        val meeting = findMeetingForUpdate(meetingId)
+        validateScheduleManager(meeting, userId)
+
+        when (meeting.status) {
+            MeetingStatus.SCHEDULING -> {
+                if (dateRange != null) {
+                    throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_CONFIRMED)
+                }
+            }
+
+            MeetingStatus.CONFIRMED ->
+                updateConfirmedDate(
+                    meeting = meeting,
+                    dateRange = dateRange ?: throw BusinessException(MeetingErrorCode.MEETING_DATE_REQUIRED),
+                )
+        }
+
+        meeting.updateDetails(name = name, location = location)
+    }
+
+    private fun updateConfirmedDate(
+        meeting: Meeting,
+        dateRange: MeetingDateRange,
+    ): Boolean {
         if (meeting.status != MeetingStatus.CONFIRMED) {
             throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_CONFIRMED)
         }
