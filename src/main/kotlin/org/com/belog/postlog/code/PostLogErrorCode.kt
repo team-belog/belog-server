@@ -19,4 +19,5 @@ enum class PostLogErrorCode(
     PHOTO_VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "POST_LOG-E009", "업로드된 사진을 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
     POST_LOG_PHOTO_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_LOG-E010", "사진을 찾을 수 없습니다."),
     INVALID_PHOTO_CURSOR(HttpStatus.BAD_REQUEST, "POST_LOG-E011", "사진 목록 커서가 올바르지 않습니다."),
+    TICKET_ALREADY_CREATED(HttpStatus.CONFLICT, "POST_LOG-E012", "이미 티켓이 생성된 만남입니다."),
 }

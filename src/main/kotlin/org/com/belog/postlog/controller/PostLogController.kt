@@ -6,8 +6,10 @@ import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.postlog.code.PostLogSuccessCode
+import org.com.belog.postlog.controller.dto.request.CreatePostLogTicketRequest
 import org.com.belog.postlog.controller.dto.request.PostLogPhotoUploadUrlsRequest
 import org.com.belog.postlog.controller.dto.request.RegisterPostLogPhotosRequest
+import org.com.belog.postlog.controller.dto.response.CreatePostLogTicketResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoLikeResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoListResponse
 import org.com.belog.postlog.controller.dto.response.PostLogPhotoUploadUrlsResponse
@@ -35,6 +37,29 @@ class PostLogController(
     private val photoService: PostLogPhotoService,
     private val photoLikeService: PostLogPhotoLikeService,
 ) : PostLogSwagger {
+    @PostMapping("/ticket")
+    override fun createTicket(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: CreatePostLogTicketRequest,
+    ): ResponseEntity<CommonResponse<CreatePostLogTicketResponse>> {
+        val postLog =
+            postLogService.createTicket(
+                meetingId = meetingId,
+                userId = userId,
+                memory = request.memory,
+            )
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.TICKET_CREATED.status)
+            .body(
+                CommonResponse.success(
+                    PostLogSuccessCode.TICKET_CREATED,
+                    CreatePostLogTicketResponse.from(postLog),
+                ),
+            )
+    }
+
     @GetMapping
     override fun getSummary(
         @LoginUserId userId: Long,
