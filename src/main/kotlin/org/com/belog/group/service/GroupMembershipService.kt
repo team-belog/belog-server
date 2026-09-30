@@ -46,7 +46,6 @@ class GroupMembershipService(
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
                 nickname = requireNotNull(memberUser.nickname),
-                name = requireNotNull(memberUser.name),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )

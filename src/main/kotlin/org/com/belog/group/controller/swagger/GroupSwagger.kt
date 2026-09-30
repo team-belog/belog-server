@@ -510,7 +510,7 @@ private const val INVITE_CODE_ISSUANCE_FAILED_EXAMPLE =
     """{"code":"GROUP-E002","message":"초대 코드를 발급할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
 
 private const val GET_GROUP_MEMBERS_SUCCESS_EXAMPLE =
-    """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","name":"이정원","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER"},{"groupMemberId":22,"nickname":"멤버","name":"김다빈","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER"}]}}"""
+    """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER"},{"groupMemberId":22,"nickname":"멤버","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER"}]}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""

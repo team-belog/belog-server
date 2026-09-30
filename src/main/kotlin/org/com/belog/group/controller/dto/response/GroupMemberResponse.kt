@@ -9,8 +9,6 @@ data class GroupMemberResponse(
     val groupMemberId: Long,
     @field:Schema(description = "멤버 닉네임", example = "빌로그")
     val nickname: String,
-    @field:Schema(description = "멤버 이름", example = "이정원")
-    val name: String,
     @field:Schema(
         description = "프로필 이미지 조회 URL. 프로필 이미지가 없으면 null",
         example = "https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...",
@@ -25,7 +23,6 @@ data class GroupMemberResponse(
             GroupMemberResponse(
                 groupMemberId = result.groupMemberId,
                 nickname = result.nickname,
-                name = result.name,
                 profileImageUrl = result.profileImageUrl,
                 role = result.role,
             )
