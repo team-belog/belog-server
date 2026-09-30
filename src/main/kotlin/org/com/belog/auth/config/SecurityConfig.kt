@@ -6,6 +6,8 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.oauth2.jwt.JwtDecoder
+import org.springframework.security.oauth2.server.resource.web.BearerTokenResolver
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver
 import org.springframework.security.web.SecurityFilterChain
 
 @Configuration
@@ -15,6 +17,7 @@ class SecurityConfig {
         http: HttpSecurity,
         @Qualifier(JwtTokenConfig.ACCESS_TOKEN_JWT_DECODER) accessTokenJwtDecoder: JwtDecoder,
         bearerAuthenticationEntryPoint: BearerAuthenticationEntryPoint,
+        bearerTokenResolver: BearerTokenResolver,
     ): SecurityFilterChain =
         http
             .csrf { csrf -> csrf.disable() }
@@ -25,6 +28,7 @@ class SecurityConfig {
                     .requestMatchers(
                         "/api/v1/auth/google",
                         "/api/v1/auth/refresh",
+                        "/api/v1/auth/logout",
                         "/actuator/health",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
@@ -37,6 +41,26 @@ class SecurityConfig {
             }.oauth2ResourceServer { resourceServer ->
                 resourceServer
                     .authenticationEntryPoint(bearerAuthenticationEntryPoint)
+                    .bearerTokenResolver(bearerTokenResolver)
                     .jwt { jwt -> jwt.decoder(accessTokenJwtDecoder) }
             }.build()
+
+    @Bean
+    fun bearerTokenResolver(): BearerTokenResolver {
+        val delegate = DefaultBearerTokenResolver()
+
+        return BearerTokenResolver { request ->
+            val requestPath = request.requestURI.removePrefix(request.contextPath)
+
+            if (requestPath == LOGOUT_PATH) {
+                null
+            } else {
+                delegate.resolve(request)
+            }
+        }
+    }
+
+    companion object {
+        private const val LOGOUT_PATH = "/api/v1/auth/logout"
+    }
 }

@@ -8,6 +8,7 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
@@ -140,5 +141,44 @@ class RefreshTokenServiceTest {
             }
 
         assertEquals(AuthErrorCode.INVALID_REFRESH_TOKEN, exception.errorCode)
+    }
+
+    @Test
+    fun `전달된 Refresh Token이 저장된 토큰과 일치하면 삭제한다`() {
+        val savedToken =
+            RefreshToken.issue(
+                user = mock(User::class.java),
+                tokenHash = "0eb17643d4e9261163783a420859c92c7d212fa9624106a12b510afbec266120",
+                expiresAt = Instant.parse("2026-09-12T00:00:00Z"),
+            )
+        `when`(refreshTokenRepository.findByUserIdForUpdate(1L)).thenReturn(savedToken)
+
+        refreshTokenService.deleteIfMatches(1L, "refresh-token")
+
+        verify(refreshTokenRepository).delete(savedToken)
+    }
+
+    @Test
+    fun `전달된 Refresh Token이 저장된 토큰과 일치하지 않으면 삭제하지 않는다`() {
+        val savedToken =
+            RefreshToken.issue(
+                user = mock(User::class.java),
+                tokenHash = "different-token-hash",
+                expiresAt = Instant.parse("2026-09-12T00:00:00Z"),
+            )
+        `when`(refreshTokenRepository.findByUserIdForUpdate(1L)).thenReturn(savedToken)
+
+        refreshTokenService.deleteIfMatches(1L, "refresh-token")
+
+        verify(refreshTokenRepository, never()).delete(savedToken)
+    }
+
+    @Test
+    fun `저장된 Refresh Token이 없으면 삭제를 생략한다`() {
+        `when`(refreshTokenRepository.findByUserIdForUpdate(1L)).thenReturn(null)
+
+        refreshTokenService.deleteIfMatches(1L, "refresh-token")
+
+        verify(refreshTokenRepository, never()).delete(any(RefreshToken::class.java))
     }
 }

@@ -62,6 +62,20 @@ class AuthController(
             .body(CommonResponse.success(AuthSuccessCode.TOKEN_REISSUE_SUCCESS, response))
     }
 
+    @PostMapping("/logout")
+    override fun logout(
+        @CookieValue(name = REFRESH_TOKEN_COOKIE_NAME, required = false) refreshToken: String?,
+    ): ResponseEntity<Void> {
+        refreshToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let(authService::logout)
+
+        return ResponseEntity
+            .noContent()
+            .header(HttpHeaders.SET_COOKIE, createExpiredRefreshTokenCookie().toString())
+            .build()
+    }
+
     private fun createRefreshTokenCookie(tokens: AuthTokens): ResponseCookie =
         ResponseCookie
             .from(REFRESH_TOKEN_COOKIE_NAME, tokens.refreshToken)
@@ -72,8 +86,18 @@ class AuthController(
             .maxAge(tokens.refreshTokenExpiration)
             .build()
 
+    private fun createExpiredRefreshTokenCookie(): ResponseCookie =
+        ResponseCookie
+            .from(REFRESH_TOKEN_COOKIE_NAME, "")
+            .httpOnly(true)
+            .secure(jwtProperties.refreshCookieSecure)
+            .sameSite(jwtProperties.refreshCookieSameSite)
+            .path(REFRESH_TOKEN_COOKIE_PATH)
+            .maxAge(0)
+            .build()
+
     companion object {
         private const val REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
-        private const val REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth/refresh"
+        private const val REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth"
     }
 }
