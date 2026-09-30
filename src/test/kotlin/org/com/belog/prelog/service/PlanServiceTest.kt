@@ -97,10 +97,8 @@ class PlanServiceTest {
     fun `일반 그룹 멤버는 다른 사용자의 계획을 핀 고정할 수 있다`() {
         val plan = stubPlanPinTarget()
 
-        val result = planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
 
-        assertEquals(20L, result.planId)
-        assertTrue(result.pinned)
         assertTrue(plan.pinned)
     }
 
@@ -108,10 +106,8 @@ class PlanServiceTest {
     fun `일반 그룹 멤버는 다른 사용자가 고정한 계획을 해제할 수 있다`() {
         val plan = stubPlanPinTarget(initiallyPinned = true)
 
-        val result = planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
 
-        assertEquals(20L, result.planId)
-        assertFalse(result.pinned)
         assertFalse(plan.pinned)
     }
 

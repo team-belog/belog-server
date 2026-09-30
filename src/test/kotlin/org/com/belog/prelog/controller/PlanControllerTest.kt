@@ -10,6 +10,7 @@ import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -20,7 +21,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -99,6 +103,30 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(planService)
+    }
+
+    @Test
+    fun `계획을 핀 고정하면 본문 없이 성공한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/meetings/1/pre-log/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isNoContent)
+            .andExpect(content().string(""))
+
+        verify(planService).pinPlan(meetingId = 1L, planId = 12L, userId = 15L)
+    }
+
+    @Test
+    fun `계획 핀 고정을 해제하면 본문 없이 성공한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/meetings/1/pre-log/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isNoContent)
+            .andExpect(content().string(""))
+
+        verify(planService).unpinPlan(meetingId = 1L, planId = 12L, userId = 15L)
     }
 
     private fun mockLinkPlan(): Plan {

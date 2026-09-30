@@ -14,7 +14,6 @@ import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
-import org.com.belog.prelog.service.result.PlanPinResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -127,11 +126,8 @@ class PlanService(
         meetingId: Long,
         planId: Long,
         userId: Long,
-    ): PlanPinResult {
-        val plan = findPinTarget(meetingId, planId, userId)
-        plan.pin()
-
-        return plan.toPinResult()
+    ) {
+        findPinTarget(meetingId, planId, userId).pin()
     }
 
     @Transactional
@@ -139,11 +135,8 @@ class PlanService(
         meetingId: Long,
         planId: Long,
         userId: Long,
-    ): PlanPinResult {
-        val plan = findPinTarget(meetingId, planId, userId)
-        plan.unpin()
-
-        return plan.toPinResult()
+    ) {
+        findPinTarget(meetingId, planId, userId).unpin()
     }
 
     private fun findMeeting(meetingId: Long): Meeting =
@@ -191,12 +184,6 @@ class PlanService(
 
         return planRepository.save(plan)
     }
-
-    private fun Plan.toPinResult(): PlanPinResult =
-        PlanPinResult(
-            planId = checkNotNull(id) { "핀 상태를 변경한 계획의 ID가 없습니다." },
-            pinned = pinned,
-        )
 
     private fun Plan.toListItemResult(
         loginGroupMemberId: Long,

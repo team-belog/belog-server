@@ -20,7 +20,6 @@ import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
-import org.com.belog.prelog.controller.dto.response.PlanPinResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
 import org.com.belog.prelog.domain.PlanCategory
 import org.springframework.http.MediaType
@@ -269,15 +268,8 @@ interface PreLogSwagger {
     @ApiResponses(
         value = [
             ApiResponse(
-                responseCode = "200",
+                responseCode = "204",
                 description = "계획 핀 고정 성공",
-                useReturnTypeSchema = true,
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(value = PIN_PLAN_SUCCESS_EXAMPLE)],
-                    ),
-                ],
             ),
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
@@ -317,7 +309,7 @@ interface PreLogSwagger {
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
-    ): ResponseEntity<CommonResponse<PlanPinResponse>>
+    ): ResponseEntity<Void>
 
     @Operation(
         summary = "Pre-log 계획 핀 고정 해제",
@@ -328,15 +320,8 @@ interface PreLogSwagger {
     @ApiResponses(
         value = [
             ApiResponse(
-                responseCode = "200",
+                responseCode = "204",
                 description = "계획 핀 고정 해제 성공",
-                useReturnTypeSchema = true,
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(value = UNPIN_PLAN_SUCCESS_EXAMPLE)],
-                    ),
-                ],
             ),
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
@@ -376,7 +361,7 @@ interface PreLogSwagger {
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
-    ): ResponseEntity<CommonResponse<PlanPinResponse>>
+    ): ResponseEntity<Void>
 
     @Operation(
         summary = "Pre-log 계획 좋아요 등록",
@@ -529,12 +514,6 @@ private const val LIKE_PLAN_SUCCESS_EXAMPLE =
 
 private const val UNLIKE_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S006","message":"계획 좋아요를 취소했습니다.","data":{"planId":12,"likedByMe":false,"likeCount":2}}"""
-
-private const val PIN_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S007","message":"계획이 핀 고정되었습니다.","data":{"planId":12,"pinned":true}}"""
-
-private const val UNPIN_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S008","message":"계획 핀 고정이 해제되었습니다.","data":{"planId":12,"pinned":false}}"""
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
