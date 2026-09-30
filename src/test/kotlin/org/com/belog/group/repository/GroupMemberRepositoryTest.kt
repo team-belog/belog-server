@@ -119,6 +119,89 @@ class GroupMemberRepositoryTest {
         assertTrue(members.all { member -> Hibernate.isInitialized(member.user) })
     }
 
+    @Test
+    fun `이름 또는 닉네임에 검색어가 포함된 그룹 멤버를 조회한다`() {
+        val nicknameMatchedUser = saveCompletedUser("nickname-matched-subject", "정원이", "김철수")
+        val nameMatchedUser = saveCompletedUser("name-matched-subject", "다빈", "이정원")
+        val unmatchedUser = saveCompletedUser("unmatched-subject", "성연", "박민수")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val nicknameMatchedMember = groupMemberRepository.save(GroupMember.createMember(group, nicknameMatchedUser))
+        val nameMatchedMember = groupMemberRepository.save(GroupMember.createMember(group, nameMatchedUser))
+        groupMemberRepository.save(GroupMember.createMember(group, unmatchedUser))
+        groupMemberRepository.flush()
+
+        val members =
+            groupMemberRepository.searchAllWithUserByGroupId(
+                groupId = requireNotNull(group.id),
+                query = "정원",
+            )
+
+        assertEquals(
+            listOf(requireNotNull(nicknameMatchedMember.id), requireNotNull(nameMatchedMember.id)),
+            members.map { member -> member.id },
+        )
+    }
+
+    @Test
+    fun `영문 대소문자를 구분하지 않고 그룹 멤버를 검색한다`() {
+        val user = saveCompletedUser("member-subject", "JuNe", "홍길동")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val member = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+
+        val members =
+            groupMemberRepository.searchAllWithUserByGroupId(
+                groupId = requireNotNull(group.id),
+                query = "jUnE",
+            )
+
+        assertEquals(listOf(requireNotNull(member.id)), members.map { groupMember -> groupMember.id })
+    }
+
+    @Test
+    fun `퍼센트와 밑줄을 일반 문자로 검색한다`() {
+        val percentUser = saveCompletedUser("percent-subject", "퍼센트%", "김철수")
+        val underscoreUser = saveCompletedUser("underscore-subject", "밑줄_", "이정원")
+        val ordinaryUser = saveCompletedUser("ordinary-subject", "일반", "박민수")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val percentMember = groupMemberRepository.save(GroupMember.createMember(group, percentUser))
+        val underscoreMember = groupMemberRepository.save(GroupMember.createMember(group, underscoreUser))
+        groupMemberRepository.save(GroupMember.createMember(group, ordinaryUser))
+        groupMemberRepository.flush()
+
+        val percentMatches =
+            groupMemberRepository.searchAllWithUserByGroupId(
+                groupId = requireNotNull(group.id),
+                query = "%",
+            )
+        val underscoreMatches =
+            groupMemberRepository.searchAllWithUserByGroupId(
+                groupId = requireNotNull(group.id),
+                query = "_",
+            )
+
+        assertEquals(listOf(requireNotNull(percentMember.id)), percentMatches.map { member -> member.id })
+        assertEquals(listOf(requireNotNull(underscoreMember.id)), underscoreMatches.map { member -> member.id })
+    }
+
+    @Test
+    fun `검색 결과에 다른 그룹의 멤버를 포함하지 않는다`() {
+        val memberUser = saveCompletedUser("member-subject", "정원이", "김철수")
+        val otherGroupMemberUser = saveCompletedUser("other-member-subject", "정원친구", "이정원")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val otherGroup = groupRepository.save(createGroup("EF34GH"))
+        val member = groupMemberRepository.save(GroupMember.createMember(group, memberUser))
+        groupMemberRepository.save(GroupMember.createMember(otherGroup, otherGroupMemberUser))
+        groupMemberRepository.flush()
+
+        val members =
+            groupMemberRepository.searchAllWithUserByGroupId(
+                groupId = requireNotNull(group.id),
+                query = "정원",
+            )
+
+        assertEquals(listOf(requireNotNull(member.id)), members.map { groupMember -> groupMember.id })
+    }
+
     private fun createGroup(inviteCode: String): Group =
         Group.create(
             name = "주말 러닝 모임",
@@ -129,6 +212,7 @@ class GroupMemberRepositoryTest {
     private fun saveCompletedUser(
         providerUserId: String,
         nickname: String,
+        name: String = "홍길동",
     ): User {
         val user =
             userRepository.save(
@@ -141,7 +225,7 @@ class GroupMemberRepositoryTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = nickname,
-            name = "홍길동",
+            name = name,
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
