@@ -192,7 +192,7 @@ class MeetingDatePollService(
             ?: throwParticipantLookupException(meetingId)
 
     private fun throwParticipantLookupException(meetingId: Long): Nothing {
-        if (!meetingRepository.existsById(meetingId)) {
+        if (!meetingRepository.existsByIdAndDeletedAtIsNull(meetingId)) {
             throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         }
         throw BusinessException(MeetingErrorCode.NOT_MEETING_PARTICIPANT)

@@ -188,9 +188,8 @@ class PlanService(
     }
 
     private fun findMeeting(meetingId: Long): Meeting =
-        meetingRepository.findById(meetingId).orElseThrow {
-            BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        }
+        meetingRepository.findActiveById(meetingId)
+            ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
 
     private fun findGroupMember(
         meeting: Meeting,
