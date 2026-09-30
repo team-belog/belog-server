@@ -81,6 +81,98 @@ interface GroupSwagger {
     ): ResponseEntity<CommonResponse<MyGroupListResponse>>
 
     @Operation(
+        summary = "그룹 고정",
+        description =
+            "로그인 사용자가 참여 중인 그룹을 고정합니다. " +
+                "여러 그룹을 고정할 수 있으며 이미 고정된 그룹에 대한 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "그룹 고정 성공",
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun pinGroup(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+    ): ResponseEntity<Void>
+
+    @Operation(
+        summary = "그룹 고정 해제",
+        description =
+            "로그인 사용자가 참여 중인 그룹의 고정을 해제합니다. " +
+                "고정되지 않은 그룹에 대한 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "그룹 고정 해제 성공",
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun unpinGroup(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+    ): ResponseEntity<Void>
+
+    @Operation(
         summary = "그룹 조회",
         description =
             "그룹 정보와 일정 조율 중인 만남, 종료되지 않은 확정 만남을 조회합니다. " +

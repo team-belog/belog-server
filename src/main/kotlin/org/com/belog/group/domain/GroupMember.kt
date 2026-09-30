@@ -61,6 +61,14 @@ class GroupMember protected constructor(
     var id: Long? = null
         protected set
 
+    fun pin() {
+        pinned = true
+    }
+
+    fun unpin() {
+        pinned = false
+    }
+
     internal fun belongsTo(group: Group): Boolean {
         if (this.group === group) {
             return true
