@@ -38,7 +38,7 @@ class WebConfig(
     override fun addInterceptors(registry: InterceptorRegistry) {
         registry
             .addInterceptor(refreshTokenOriginInterceptor)
-            .addPathPatterns(REFRESH_TOKEN_PATH)
+            .addPathPatterns(REFRESH_TOKEN_PATH, LOGOUT_PATH)
     }
 
     override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
@@ -47,6 +47,7 @@ class WebConfig(
 
     companion object {
         private const val REFRESH_TOKEN_PATH = "/api/v1/auth/refresh"
+        private const val LOGOUT_PATH = "/api/v1/auth/logout"
         private const val CORS_MAX_AGE_SECONDS = 3600L
     }
 }

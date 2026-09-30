@@ -163,11 +163,60 @@ interface AuthSwagger {
     fun reissueTokens(
         @Parameter(hidden = true) refreshToken: String,
     ): ResponseEntity<CommonResponse<TokenReissueResponse>>
+
+    @Operation(
+        summary = "로그아웃",
+        description = "Refresh Token을 폐기하고 Refresh Token 쿠키를 만료시킵니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "로그아웃 성공",
+                headers = [
+                    Header(
+                        name = "Set-Cookie",
+                        description = "만료된 HttpOnly Refresh Token 쿠키",
+                        schema = Schema(type = "string", example = EXPIRED_REFRESH_COOKIE_EXAMPLE),
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "401",
+                description = "유효하지 않거나 만료된 Refresh Token",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_REFRESH_TOKEN_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "403",
+                description = "허용되지 않은 요청 출처",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_REQUEST_ORIGIN_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    @SecurityRequirements
+    fun logout(
+        @Parameter(hidden = true) refreshToken: String?,
+    ): ResponseEntity<Void>
 }
 
 private const val REFRESH_COOKIE_EXAMPLE =
-    "refresh_token=eyJ...; Path=/api/v1/auth/refresh; Max-Age=1209600; " +
+    "refresh_token=eyJ...; Path=/api/v1/auth; Max-Age=1209600; " +
         "Secure; HttpOnly; SameSite=None"
+
+private const val EXPIRED_REFRESH_COOKIE_EXAMPLE =
+    "refresh_token=; Path=/api/v1/auth; Max-Age=0; Secure; HttpOnly; SameSite=None"
 
 private const val TOKEN_REISSUE_SUCCESS_EXAMPLE =
     """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800}}"""
