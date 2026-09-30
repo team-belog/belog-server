@@ -2,7 +2,7 @@ package org.com.belog.postlog.controller.dto.request
 
 import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
+import org.com.belog.postlog.controller.validation.ValidPostLogMemory
 import org.com.belog.postlog.domain.PostLog
 
 @Schema(description = "Post-log 티켓 생성 요청")
@@ -15,10 +15,6 @@ data class CreatePostLogTicketRequest(
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     @field:NotBlank(message = "추억 문구는 공백일 수 없습니다.")
-    @field:Size(
-        min = PostLog.MEMORY_MIN_LENGTH,
-        max = PostLog.MEMORY_MAX_LENGTH,
-        message = "추억 문구는 ${PostLog.MEMORY_MIN_LENGTH}자 이상 ${PostLog.MEMORY_MAX_LENGTH}자 이하여야 합니다.",
-    )
+    @field:ValidPostLogMemory
     val memory: String,
 )
