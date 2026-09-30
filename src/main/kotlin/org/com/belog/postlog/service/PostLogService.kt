@@ -79,6 +79,7 @@ class PostLogService(
                 ?.let(objectReadUrlProvider::generateReadUrl)
 
         return PostLogTicketResult(
+            postLogId = checkNotNull(savedPostLog.id) { "생성된 Post-log의 ID가 없습니다." },
             meetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." },
             meetingName = meeting.name,
             memory = checkNotNull(savedPostLog.memory) { "생성된 티켓의 추억 문구가 없습니다." },
@@ -118,6 +119,7 @@ class PostLogService(
         val postLog = postLogRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)
 
         return PostLogSummaryResult(
+            postLogId = postLog?.id,
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
             meetingName = meeting.name,
             startDate = meeting.startDate,
