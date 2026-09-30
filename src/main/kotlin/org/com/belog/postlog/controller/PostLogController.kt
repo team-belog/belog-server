@@ -43,7 +43,7 @@ class PostLogController(
         @PathVariable meetingId: Long,
         @Valid @RequestBody request: CreatePostLogTicketRequest,
     ): ResponseEntity<CommonResponse<CreatePostLogTicketResponse>> {
-        val postLog =
+        val result =
             postLogService.createTicket(
                 meetingId = meetingId,
                 userId = userId,
@@ -55,7 +55,7 @@ class PostLogController(
             .body(
                 CommonResponse.success(
                     PostLogSuccessCode.TICKET_CREATED,
-                    CreatePostLogTicketResponse.from(postLog),
+                    CreatePostLogTicketResponse.from(result),
                 ),
             )
     }

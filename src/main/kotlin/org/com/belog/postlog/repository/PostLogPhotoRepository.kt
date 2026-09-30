@@ -27,6 +27,21 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
 
     @Query(
         """
+        SELECT photo.objectKey
+        FROM PostLogPhoto photo
+        LEFT JOIN PostLogPhotoLike photoLike ON photoLike.photo = photo
+        WHERE photo.meeting.id = :meetingId
+        GROUP BY photo.id, photo.objectKey
+        ORDER BY COUNT(photoLike.id) DESC, photo.id ASC
+        """,
+    )
+    fun findRepresentativeObjectKeys(
+        @Param("meetingId") meetingId: Long,
+        pageable: Pageable,
+    ): List<String>
+
+    @Query(
+        """
         SELECT photo
         FROM PostLogPhoto photo
         WHERE photo.meeting.id = :meetingId
