@@ -19,6 +19,28 @@ class NotificationService(
     private val userRepository: UserRepository,
     private val clock: Clock,
 ) {
+    @Transactional(readOnly = true)
+    fun getPushNotificationEnabled(userId: Long): Boolean {
+        val user =
+            userRepository.findById(userId).orElseThrow {
+                BusinessException(UserErrorCode.USER_NOT_FOUND)
+            }
+
+        return user.pushNotificationEnabled
+    }
+
+    @Transactional
+    fun updatePushNotificationEnabled(
+        userId: Long,
+        enabled: Boolean,
+    ) {
+        val user =
+            userRepository.findByIdForUpdate(userId)
+                ?: throw BusinessException(UserErrorCode.USER_NOT_FOUND)
+
+        user.updatePushNotificationEnabled(enabled)
+    }
+
     @Transactional
     fun create(command: CreateNotificationCommand) {
         createAll(listOf(command))
