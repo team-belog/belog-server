@@ -1,19 +1,26 @@
 package org.com.belog.home.service
 
+import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.home.domain.HomeMeetingProgressStatus
 import org.com.belog.home.repository.HomeActiveMeetingRepository
 import org.com.belog.home.repository.HomeCalendarRepository
+import org.com.belog.home.repository.HomeCompletedMeetingRepository
 import org.com.belog.home.service.query.ActiveMeetingCursor
 import org.com.belog.home.service.query.ActiveMeetingCursorType
+import org.com.belog.home.service.query.CompletedMeetingCursor
 import org.com.belog.home.service.result.ActiveMeetingListResult
 import org.com.belog.home.service.result.ActiveMeetingParticipantResult
 import org.com.belog.home.service.result.ActiveMeetingResult
+import org.com.belog.home.service.result.CompletedMeetingListResult
+import org.com.belog.home.service.result.CompletedMeetingParticipantResult
+import org.com.belog.home.service.result.CompletedMeetingResult
 import org.com.belog.home.service.result.HomeCalendarMeetingResult
 import org.com.belog.home.service.result.HomeCalendarResult
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.user.service.UserService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -25,7 +32,10 @@ import java.time.YearMonth
 class HomeService(
     private val homeCalendarRepository: HomeCalendarRepository,
     private val homeActiveMeetingRepository: HomeActiveMeetingRepository,
+    private val homeCompletedMeetingRepository: HomeCompletedMeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val postLogPhotoRepository: PostLogPhotoRepository,
+    private val objectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
     private val clock: Clock,
 ) {
@@ -164,6 +174,83 @@ class HomeService(
         )
     }
 
+    @Transactional(readOnly = true)
+    fun getCompletedMeetings(
+        userId: Long,
+        cursor: CompletedMeetingCursor?,
+        size: Int,
+    ): CompletedMeetingListResult {
+        require(size in MIN_COMPLETED_MEETING_PAGE_SIZE..MAX_COMPLETED_MEETING_PAGE_SIZE) {
+            "종료된 만남 조회 개수는 ${MIN_COMPLETED_MEETING_PAGE_SIZE}개 이상 " +
+                "${MAX_COMPLETED_MEETING_PAGE_SIZE}개 이하여야 합니다."
+        }
+
+        val currentDate = clock.currentBusinessDate()
+        val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
+        val postLogs =
+            if (cursor == null) {
+                homeCompletedMeetingRepository.findCompletedPage(
+                    userId = userId,
+                    currentDate = currentDate,
+                    pageable = pageable,
+                )
+            } else {
+                homeCompletedMeetingRepository.findCompletedPageAfter(
+                    userId = userId,
+                    currentDate = currentDate,
+                    cursorEndDate = cursor.endDate,
+                    cursorPostLogId = cursor.postLogId,
+                    pageable = pageable,
+                )
+            }
+        val hasNext = postLogs.size > size
+        val pageItems = postLogs.take(size)
+        val meetings = pageItems.map { postLog -> postLog.meeting }
+        val participantsByMeetingId = findParticipantsByMeetingId(meetings)
+        val representativePhotoObjectKeys = findRepresentativePhotoObjectKeys(meetings)
+
+        return CompletedMeetingListResult(
+            items =
+                pageItems.map { postLog ->
+                    val meeting = postLog.meeting
+                    val meetingId = requireNotNull(meeting.id)
+                    val participants = participantsByMeetingId[meetingId].orEmpty()
+
+                    CompletedMeetingResult(
+                        postLogId = requireNotNull(postLog.id),
+                        meetingId = meetingId,
+                        name = meeting.name,
+                        memory = requireNotNull(postLog.memory),
+                        coverPhotoUrl =
+                            representativePhotoObjectKeys[meetingId]?.let(objectReadUrlProvider::generateReadUrl),
+                        startDate = requireNotNull(meeting.startDate),
+                        endDate = requireNotNull(meeting.endDate),
+                        location = meeting.location,
+                        participantCount = participants.size,
+                        participants =
+                            participants.map { participant ->
+                                val groupMember = participant.groupMember
+                                CompletedMeetingParticipantResult(
+                                    groupMemberId = requireNotNull(groupMember.id),
+                                    nickname = requireNotNull(groupMember.user.nickname),
+                                )
+                            },
+                    )
+                },
+            nextCursor =
+                pageItems
+                    .lastOrNull()
+                    ?.takeIf { hasNext }
+                    ?.let { postLog ->
+                        CompletedMeetingCursor(
+                            endDate = requireNotNull(postLog.meeting.endDate),
+                            postLogId = requireNotNull(postLog.id),
+                        )
+                    },
+            hasNext = hasNext,
+        )
+    }
+
     private fun findParticipantsByMeetingId(meetings: List<Meeting>) =
         if (meetings.isEmpty()) {
             emptyMap()
@@ -173,9 +260,24 @@ class HomeService(
                 .groupBy { participant -> requireNotNull(participant.meeting.id) }
         }
 
+    private fun findRepresentativePhotoObjectKeys(meetings: List<Meeting>): Map<Long, String> {
+        if (meetings.isEmpty()) {
+            return emptyMap()
+        }
+
+        val meetingIds = meetings.map { meeting -> requireNotNull(meeting.id) }
+        val objectKeysByMeetingId = linkedMapOf<Long, String>()
+        postLogPhotoRepository.findRepresentativePhotoCandidates(meetingIds).forEach { photo ->
+            objectKeysByMeetingId.putIfAbsent(photo.meetingId, photo.objectKey)
+        }
+        return objectKeysByMeetingId
+    }
+
     companion object {
         private const val MIN_ACTIVE_MEETING_PAGE_SIZE = 1
         private const val MAX_ACTIVE_MEETING_PAGE_SIZE = 50
+        private const val MIN_COMPLETED_MEETING_PAGE_SIZE = 1
+        private const val MAX_COMPLETED_MEETING_PAGE_SIZE = 50
         private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
         private const val PREVIEW_PARTICIPANT_COUNT = 3
     }
