@@ -1,12 +1,14 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.postlog.service.result.PostLogTicketCalendarItemResult
 import org.com.belog.postlog.service.result.PostLogTicketCalendarResult
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
 import java.time.YearMonth
 
 @Service
@@ -14,14 +16,13 @@ class PostLogCalendarService(
     private val postLogRepository: PostLogRepository,
     private val postLogPhotoRepository: PostLogPhotoRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun getMyTicketCalendar(
         userId: Long,
-        year: Int,
-        month: Int,
+        yearMonth: YearMonth,
     ): PostLogTicketCalendarResult {
-        val yearMonth = YearMonth.of(year, month)
         val postLogs =
             postLogRepository.findTicketCalendar(
                 userId = userId,
@@ -40,8 +41,8 @@ class PostLogCalendarService(
             }
 
         return PostLogTicketCalendarResult(
-            year = yearMonth.year,
-            month = yearMonth.monthValue,
+            yearMonth = yearMonth,
+            today = clock.currentBusinessDate(),
             memoryCount = tickets.size,
             tickets = tickets,
         )

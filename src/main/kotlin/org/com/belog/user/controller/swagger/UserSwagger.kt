@@ -9,8 +9,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Max
-import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
@@ -25,10 +23,12 @@ import org.com.belog.user.controller.dto.response.PostLogTicketCalendarResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
 import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.validation.ValidNickname
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
+import java.time.YearMonth
 
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
@@ -53,7 +53,7 @@ interface UserSwagger {
             ),
             ApiResponse(
                 responseCode = "400",
-                description = "연도 또는 월 범위가 올바르지 않음",
+                description = "조회 연월 형식이 올바르지 않음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -69,16 +69,10 @@ interface UserSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "조회 연도", example = "2026", required = true)
+        @Parameter(description = "조회 연월", example = "2026-08", required = true)
         @RequestParam
-        @Min(1000)
-        @Max(9999)
-        year: Int,
-        @Parameter(description = "조회 월", example = "8", required = true)
-        @RequestParam
-        @Min(1)
-        @Max(12)
-        month: Int,
+        @DateTimeFormat(pattern = "yyyy-MM")
+        yearMonth: YearMonth,
     ): ResponseEntity<CommonResponse<PostLogTicketCalendarResponse>>
 
     @Operation(
@@ -525,7 +519,7 @@ private const val PROFILE_SUCCESS_EXAMPLE =
     """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
 
 private const val GET_POST_LOG_TICKET_CALENDAR_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S010","message":"월별 티켓 달력이 조회되었습니다.","data":{"year":2026,"month":8,"memoryCount":2,"tickets":[{"postLogId":31,"meetingEndDate":"2026-08-12","thumbnailUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?..."},{"postLogId":42,"meetingEndDate":"2026-08-13","thumbnailUrl":null}]}}"""
+    """{"code":"POST_LOG-S010","message":"월별 티켓 달력이 조회되었습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","memoryCount":2,"tickets":[{"postLogId":31,"meetingEndDate":"2026-08-12","thumbnailUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?..."},{"postLogId":42,"meetingEndDate":"2026-08-13","thumbnailUrl":null}]}}"""
 
 private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
     """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":null}}"""

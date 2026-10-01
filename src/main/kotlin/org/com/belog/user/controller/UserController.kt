@@ -1,8 +1,6 @@
 package org.com.belog.user.controller
 
 import jakarta.validation.Valid
-import jakarta.validation.constraints.Max
-import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
@@ -26,6 +24,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.UserService
 import org.com.belog.user.service.command.ProfileImageChange
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -36,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import java.time.YearMonth
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -46,10 +46,9 @@ class UserController(
     @GetMapping("/me/post-logs/calendar")
     override fun getMyTicketCalendar(
         @LoginUserId userId: Long,
-        @RequestParam @Min(1000) @Max(9999) year: Int,
-        @RequestParam @Min(1) @Max(12) month: Int,
+        @RequestParam @DateTimeFormat(pattern = "yyyy-MM") yearMonth: YearMonth,
     ): ResponseEntity<CommonResponse<PostLogTicketCalendarResponse>> {
-        val result = postLogCalendarService.getMyTicketCalendar(userId, year, month)
+        val result = postLogCalendarService.getMyTicketCalendar(userId, yearMonth)
 
         return ResponseEntity
             .status(PostLogSuccessCode.TICKET_CALENDAR_RETRIEVED.status)
