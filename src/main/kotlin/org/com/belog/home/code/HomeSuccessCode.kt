@@ -9,4 +9,5 @@ enum class HomeSuccessCode(
     override val message: String,
 ) : SuccessCode {
     HOME_CALENDAR_RETRIEVED(HttpStatus.OK, "HOME-S001", "홈 달력을 조회했습니다."),
+    HOME_ACTIVE_MEETINGS_RETRIEVED(HttpStatus.OK, "HOME-S002", "진행 중인 만남 목록을 조회했습니다."),
 }

@@ -7,11 +7,15 @@ import io.swagger.v3.oas.annotations.media.ExampleObject
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
+import org.com.belog.home.controller.dto.response.ActiveMeetingListResponse
 import org.com.belog.home.controller.dto.response.HomeCalendarResponse
+import org.com.belog.home.domain.HomeMeetingStatus
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -63,8 +67,66 @@ interface HomeSwagger {
         yearMonth: YearMonth,
     ): ResponseEntity<CommonResponse<HomeCalendarResponse>>
 
+    @Operation(
+        summary = "진행 중인 만남 목록 조회",
+        description =
+            "로그인 사용자가 참여한 일정 조율 중인 만남과 종료일이 오늘 이후인 확정 만남을 조회합니다. " +
+                "만남명 또는 그룹명으로 검색할 수 있으며 시작일과 만남 ID 오름차순으로 정렬합니다. " +
+                "일정 조율 중인 만남을 먼저 반환하며 날짜는 null, 진행 상태는 SCHEDULING입니다. " +
+                "오늘은 Asia/Seoul 기준입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "진행 중인 만남 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = ACTIVE_MEETINGS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "상태, 커서 또는 조회 개수가 올바르지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun getMeetings(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "홈 만남 목록 상태. 현재 ACTIVE만 지원", example = "ACTIVE", required = true)
+        @RequestParam
+        status: HomeMeetingStatus,
+        @Parameter(description = "만남명 또는 그룹명 검색어", example = "광주")
+        @RequestParam(required = false)
+        query: String?,
+        @Parameter(description = "다음 페이지 커서. 첫 요청에서는 생략")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 10개, 최대 50개", example = "10")
+        @RequestParam(defaultValue = "10")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<ActiveMeetingListResponse>>
+
     companion object {
         private const val HOME_CALENDAR_SUCCESS_EXAMPLE =
             """{"code":"HOME-S001","message":"홈 달력을 조회했습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","meetings":[{"meetingId":11,"startDate":"2026-08-17","endDate":"2026-08-18"}]}}"""
+
+        private const val ACTIVE_MEETINGS_SUCCESS_EXAMPLE =
+            """{"code":"HOME-S002","message":"진행 중인 만남 목록을 조회했습니다.","data":{"items":[{"meetingId":10,"name":"제주 여행","startDate":null,"endDate":null,"groupName":"피놀리와 기니휘기","progressStatus":"SCHEDULING","participantCount":3,"previewParticipants":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":null}]},{"meetingId":11,"name":"1박 2일 광주 여행","startDate":"2026-08-20","endDate":"2026-08-21","groupName":"피놀리와 기니휘기","progressStatus":"UPCOMING","participantCount":3,"previewParticipants":[]}],"nextCursor":null,"hasNext":false}}"""
     }
 }
