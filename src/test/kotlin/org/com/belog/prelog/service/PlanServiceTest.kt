@@ -28,7 +28,6 @@ import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
-import java.util.Optional
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -46,7 +45,7 @@ class PlanServiceTest {
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
         val context = meetingContext()
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
 
         val exception =
@@ -177,7 +176,7 @@ class PlanServiceTest {
     fun `다른 만남에 속한 계획은 수정하거나 삭제할 수 없다`() {
         val context = meetingContext()
         val groupMember = mock(GroupMember::class.java)
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
         `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(null)
 
@@ -223,7 +222,7 @@ class PlanServiceTest {
     @Test
     fun `그룹 멤버가 아니면 계획을 핀 고정하거나 해제할 수 없다`() {
         val context = meetingContext()
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
 
         val pinException =
@@ -242,7 +241,7 @@ class PlanServiceTest {
 
     @Test
     fun `존재하지 않는 만남에는 계획을 생성할 수 없다`() {
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.empty())
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(null)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -262,7 +261,7 @@ class PlanServiceTest {
     @Test
     fun `해당 만남이 속한 그룹의 멤버가 아니면 계획을 생성할 수 없다`() {
         val context = meetingContext()
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
 
         val exception =
@@ -286,7 +285,7 @@ class PlanServiceTest {
         val groupMember = mock(GroupMember::class.java)
         `when`(groupMember.group).thenReturn(context.group)
         `when`(groupMember.belongsTo(context.group)).thenCallRealMethod()
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
         `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }
 
@@ -307,7 +306,7 @@ class PlanServiceTest {
     fun `종료된 만남에는 계획을 생성할 수 없다`() {
         val context = meetingContext(endDate = LocalDate.of(2026, 9, 21))
         val groupMember = mock(GroupMember::class.java)
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
 
         val exception =
@@ -357,7 +356,7 @@ class PlanServiceTest {
         `when`(plan.title).thenReturn("맛집")
         `when`(plan.url).thenReturn("https://example.com/place")
         `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
         `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(isMeetingCreator)
         `when`(
@@ -392,7 +391,7 @@ class PlanServiceTest {
             plan.pin()
         }
 
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
         `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
 
@@ -424,7 +423,7 @@ class PlanServiceTest {
             )
         ReflectionTestUtils.setField(plan, "id", 20L)
 
-        `when`(meetingRepository.findById(1L)).thenReturn(Optional.of(context.meeting))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
         `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
         `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(loginIsMeetingCreator)
