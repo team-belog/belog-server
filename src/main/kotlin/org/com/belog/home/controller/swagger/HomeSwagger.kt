@@ -94,7 +94,10 @@ interface HomeSwagger {
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                        examples = [
+                            ExampleObject(name = "조회 개수 오류", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 커서", value = INVALID_CURSOR_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -145,7 +148,10 @@ interface HomeSwagger {
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                        examples = [
+                            ExampleObject(name = "조회 개수 오류", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 커서", value = INVALID_CURSOR_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -176,5 +182,8 @@ interface HomeSwagger {
 
         private const val COMPLETED_MEETINGS_SUCCESS_EXAMPLE =
             """{"code":"HOME-S003","message":"종료된 만남 목록을 조회했습니다.","data":{"items":[{"postLogId":31,"meetingId":7,"name":"1박 2일 광주 여행","memory":"친구들과 다녀온 첫 여행","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-07-17","endDate":"2026-07-18","location":"광주","participantCount":2,"participants":[{"groupMemberId":21,"nickname":"이정원"},{"groupMemberId":22,"nickname":"김민지"}]}],"nextCursor":null,"hasNext":false}}"""
+
+        private const val INVALID_CURSOR_EXAMPLE =
+            """{"code":"HOME-E001","message":"홈 만남 목록 커서가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-10-01T00:00:00Z"}}"""
     }
 }

@@ -18,13 +18,15 @@ internal object CompletedMeetingCursorCodec {
             return null
         }
 
-        val decodedValue = String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8)
-        val parts = decodedValue.split(SEPARATOR)
-        require(parts.size == 2) { "종료된 만남 목록 커서 형식이 올바르지 않습니다." }
+        return decodeHomeCursor {
+            val decodedValue = String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8)
+            val parts = decodedValue.split(SEPARATOR)
+            require(parts.size == 2) { "종료된 만남 목록 커서 형식이 올바르지 않습니다." }
 
-        return CompletedMeetingCursor(
-            endDate = LocalDate.parse(parts[0]),
-            postLogId = parts[1].toLong(),
-        )
+            CompletedMeetingCursor(
+                endDate = LocalDate.parse(parts[0]),
+                postLogId = parts[1].toLong(),
+            )
+        }
     }
 }

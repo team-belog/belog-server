@@ -21,16 +21,18 @@ internal object ActiveMeetingCursorCodec {
             return null
         }
 
-        val decodedValue = String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8)
-        val parts = decodedValue.split(SEPARATOR)
-        require(parts.size == 3) { "진행 중인 만남 목록 커서 형식이 올바르지 않습니다." }
+        return decodeHomeCursor {
+            val decodedValue = String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8)
+            val parts = decodedValue.split(SEPARATOR)
+            require(parts.size == 3) { "진행 중인 만남 목록 커서 형식이 올바르지 않습니다." }
 
-        val type = ActiveMeetingCursorType.valueOf(parts[0])
+            val type = ActiveMeetingCursorType.valueOf(parts[0])
 
-        return ActiveMeetingCursor(
-            type = type,
-            startDate = parts[1].takeUnless { it == EMPTY_DATE }?.let(LocalDate::parse),
-            meetingId = parts[2].toLong(),
-        )
+            ActiveMeetingCursor(
+                type = type,
+                startDate = parts[1].takeUnless { it == EMPTY_DATE }?.let(LocalDate::parse),
+                meetingId = parts[2].toLong(),
+            )
+        }
     }
 }
