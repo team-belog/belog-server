@@ -11,6 +11,8 @@ import org.springframework.data.repository.query.Param
 interface NotificationRepository :
     JpaRepository<Notification, Long>,
     NotificationRepositoryCustom {
+    fun existsByRecipientIdAndReadAtIsNull(recipientUserId: Long): Boolean
+
     @Query(
         """
         SELECT notification

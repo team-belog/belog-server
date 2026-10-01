@@ -13,6 +13,9 @@ class NotificationQueryService(
     private val notificationRepository: NotificationRepository,
 ) {
     @Transactional(readOnly = true)
+    fun hasUnreadNotification(userId: Long): Boolean = notificationRepository.existsByRecipientIdAndReadAtIsNull(userId)
+
+    @Transactional(readOnly = true)
     fun getNotifications(
         userId: Long,
         cursor: Long?,

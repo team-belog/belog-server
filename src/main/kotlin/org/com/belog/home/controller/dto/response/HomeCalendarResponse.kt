@@ -12,6 +12,8 @@ data class HomeCalendarResponse(
     val yearMonth: YearMonth,
     @field:Schema(description = "서비스 기준 오늘 날짜", example = "2026-08-18")
     val today: LocalDate,
+    @field:Schema(description = "읽지 않은 알림 존재 여부", example = "true")
+    val hasUnreadNotification: Boolean,
     @field:Schema(description = "조회 월과 일정이 겹치는 확정 만남 목록")
     val meetings: List<HomeCalendarMeetingResponse>,
 ) {
@@ -20,6 +22,7 @@ data class HomeCalendarResponse(
             HomeCalendarResponse(
                 yearMonth = result.yearMonth,
                 today = result.today,
+                hasUnreadNotification = result.hasUnreadNotification,
                 meetings = result.meetings.map(HomeCalendarMeetingResponse::from),
             )
     }

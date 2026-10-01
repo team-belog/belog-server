@@ -12,6 +12,8 @@ data class PostLogTicketCalendarResponse(
     val yearMonth: YearMonth,
     @field:Schema(description = "서비스 기준 오늘 날짜", example = "2026-08-18")
     val today: LocalDate,
+    @field:Schema(description = "읽지 않은 알림 존재 여부", example = "true")
+    val hasUnreadNotification: Boolean,
     @field:Schema(description = "조회 월에 표시되는 서로 다른 티켓 수", example = "2")
     val memoryCount: Int,
     @field:Schema(description = "만남 종료일 기준 티켓 목록")
@@ -22,6 +24,7 @@ data class PostLogTicketCalendarResponse(
             PostLogTicketCalendarResponse(
                 yearMonth = result.yearMonth,
                 today = result.today,
+                hasUnreadNotification = result.hasUnreadNotification,
                 memoryCount = result.memoryCount,
                 tickets = result.tickets.map(PostLogTicketCalendarItemResponse::from),
             )
