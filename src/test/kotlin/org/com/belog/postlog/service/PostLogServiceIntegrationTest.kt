@@ -105,7 +105,7 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `그룹 멤버가 최초 임시저장하면 미발행 Post-log가 생성된다`() {
+    fun `만남 참여자가 최초 임시저장하면 미발행 Post-log가 생성된다`() {
         val context = saveMeetingContext()
 
         postLogService.saveDraft(
@@ -153,9 +153,10 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `서로 다른 그룹 멤버는 같은 만남에 각자의 초안을 저장한다`() {
+    fun `서로 다른 만남 참여자는 같은 만남에 각자의 초안을 저장한다`() {
         val context = saveMeetingContext()
         val otherMember = saveGroupMember(context.group, "member2")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, otherMember))
 
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "생성자의 초안")
         postLogService.saveDraft(
@@ -272,11 +273,19 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
-    fun `같은 그룹 멤버여도 만남 참여자가 아니면 티켓을 생성할 수 없다`() {
+    fun `같은 그룹 멤버여도 만남 참여자가 아니면 Post-log를 작성할 수 없다`() {
         val context = saveMeetingContext()
         val nonParticipant = saveGroupMember(context.group, "writer")
 
-        val exception =
+        val draftException =
+            assertFailsWith<BusinessException> {
+                postLogService.saveDraft(
+                    meetingId = context.meetingId,
+                    userId = checkNotNull(nonParticipant.user.id),
+                    memory = "비참여 그룹 멤버의 초안",
+                )
+            }
+        val ticketException =
             assertFailsWith<BusinessException> {
                 postLogService.createTicket(
                     meetingId = context.meetingId,
@@ -285,7 +294,8 @@ class PostLogServiceIntegrationTest {
                 )
             }
 
-        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, draftException.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, ticketException.errorCode)
         assertEquals(0L, postLogRepository.count())
     }
 

@@ -49,10 +49,11 @@ class PostLogService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
         val creator =
-            groupMemberRepository.findByGroupIdAndUserIdForUpdate(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+            meetingParticipantRepository
+                .findByMeetingIdAndUserIdForUpdate(meetingId, userId)
+                ?.groupMember
+                ?: throw BusinessException(MeetingErrorCode.NOT_MEETING_PARTICIPANT)
         val creatorId = checkNotNull(creator.id) { "Post-log 임시저장 작성자의 그룹 멤버 ID가 없습니다." }
 
         val postLog =
