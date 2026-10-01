@@ -15,12 +15,11 @@ class SettlementRequestService(
 ) {
     @Transactional
     fun complete(
-        meetingId: Long,
         settlementRequestId: Long,
         requesterUserId: Long,
     ) {
         val settlementRequest =
-            settlementRequestRepository.findByIdAndMeetingIdForUpdate(settlementRequestId, meetingId)
+            settlementRequestRepository.findByIdForUpdate(settlementRequestId)
                 ?: throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND)
 
         if (settlementRequest.participant.groupMember.user.id != requesterUserId) {

@@ -139,7 +139,6 @@ class BillServiceTest {
 
         val result =
             billService.getBillDetail(
-                meetingId = requireNotNull(context.meeting.id),
                 billId = registeredBill.billId,
                 userId = requireNotNull(context.creator.user.id),
             )
@@ -169,7 +168,6 @@ class BillServiceTest {
 
         val result =
             billService.getBillDetail(
-                meetingId = requireNotNull(context.meeting.id),
                 billId = registeredBill.billId,
                 userId = requireNotNull(context.creator.user.id),
             )
@@ -186,7 +184,6 @@ class BillServiceTest {
 
         val result =
             billService.getBillDetail(
-                meetingId = requireNotNull(context.meeting.id),
                 billId = registeredBill.billId,
                 userId = requireNotNull(context.creator.user.id),
             )

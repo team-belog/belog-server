@@ -314,15 +314,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -332,9 +329,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
@@ -382,15 +376,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -400,9 +391,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
@@ -441,15 +429,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -459,9 +444,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
@@ -500,15 +482,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -518,9 +497,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
@@ -559,15 +535,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -577,9 +550,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,
@@ -618,15 +588,12 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 계획을 찾을 수 없음",
+                description = "계획을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "계획 없음", value = PLAN_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -636,9 +603,6 @@ interface PreLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "1", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "계획 ID", example = "12", required = true)
         @PathVariable
         planId: Long,

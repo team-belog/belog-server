@@ -68,16 +68,14 @@ class BillService(
 
     @Transactional(readOnly = true)
     fun getBillDetail(
-        meetingId: Long,
         billId: Long,
         userId: Long,
     ): BillDetailResult {
-        val meeting = findMeeting(meetingId)
-        findGroupMember(meeting, userId)
-
         val bill =
-            billRepository.findByIdAndMeetingIdWithPayer(billId = billId, meetingId = meetingId)
+            billRepository.findByIdWithMeetingAndPayer(billId)
                 ?: throw BusinessException(BillLogErrorCode.BILL_NOT_FOUND)
+        val meeting = bill.meeting
+        findGroupMember(meeting, userId)
         val items = billItemRepository.findAllByBillIdOrderByItemOrderAsc(billId)
         val shares = billShareRepository.findAllWithParticipantAndUserByBillId(billId)
         val paymentDate =

@@ -69,11 +69,10 @@ interface BillRepository : JpaRepository<Bill, Long> {
         JOIN FETCH payer.groupMember payerMember
         JOIN FETCH payerMember.user
         WHERE bill.id = :billId
-          AND meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
-    fun findByIdAndMeetingIdWithPayer(
+    fun findByIdWithMeetingAndPayer(
         @Param("billId") billId: Long,
-        @Param("meetingId") meetingId: Long,
     ): Bill?
 }

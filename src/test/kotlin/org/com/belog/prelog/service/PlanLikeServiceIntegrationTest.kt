@@ -95,8 +95,8 @@ class PlanLikeServiceIntegrationTest {
     fun `동일한 좋아요 등록을 반복하면 멱등하게 성공하고 한 건만 유지한다`() {
         val context = savePlanContext()
 
-        val firstResult = planLikeService.likePlan(context.meetingId, context.planId, context.userId)
-        val secondResult = planLikeService.likePlan(context.meetingId, context.planId, context.userId)
+        val firstResult = planLikeService.likePlan(context.planId, context.userId)
+        val secondResult = planLikeService.likePlan(context.planId, context.userId)
 
         assertTrue(firstResult.likedByMe)
         assertEquals(1L, firstResult.likeCount)
@@ -116,7 +116,7 @@ class PlanLikeServiceIntegrationTest {
                 (1..CONCURRENT_REQUEST_COUNT).map {
                     executor.submit<PlanLikeResult> {
                         startSignal.await()
-                        planLikeService.likePlan(context.meetingId, context.planId, context.userId)
+                        planLikeService.likePlan(context.planId, context.userId)
                     }
                 }
 
@@ -136,7 +136,7 @@ class PlanLikeServiceIntegrationTest {
         val context = savePlanContext()
         planLikeRepository.saveAndFlush(PlanLike.create(context.plan, context.groupMember))
 
-        planService.deletePlan(context.meetingId, context.planId, context.userId)
+        planService.deletePlan(context.planId, context.userId)
 
         assertEquals(0L, planLikeRepository.count())
         assertFalse(planRepository.existsById(context.planId))

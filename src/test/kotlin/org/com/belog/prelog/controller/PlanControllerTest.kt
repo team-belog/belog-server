@@ -108,28 +108,28 @@ class PlanControllerTest {
     fun `계획을 핀 고정하면 성공 메시지를 반환한다`() {
         mockMvc
             .perform(
-                put("/api/v1/meetings/1/pre-log/plans/12/pin")
+                put("/api/v1/plans/12/pin")
                     .principal(authenticatedUser()),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.code").value("PRE_LOG-S007"))
             .andExpect(jsonPath("$.message").value("계획이 핀 고정되었습니다."))
             .andExpect(jsonPath("$.data").isEmpty)
 
-        verify(planService).pinPlan(meetingId = 1L, planId = 12L, userId = 15L)
+        verify(planService).pinPlan(planId = 12L, userId = 15L)
     }
 
     @Test
     fun `계획 핀 고정을 해제하면 성공 메시지를 반환한다`() {
         mockMvc
             .perform(
-                delete("/api/v1/meetings/1/pre-log/plans/12/pin")
+                delete("/api/v1/plans/12/pin")
                     .principal(authenticatedUser()),
             ).andExpect(status().isOk)
             .andExpect(jsonPath("$.code").value("PRE_LOG-S008"))
             .andExpect(jsonPath("$.message").value("계획 핀 고정이 해제되었습니다."))
             .andExpect(jsonPath("$.data").isEmpty)
 
-        verify(planService).unpinPlan(meetingId = 1L, planId = 12L, userId = 15L)
+        verify(planService).unpinPlan(planId = 12L, userId = 15L)
     }
 
     private fun mockLinkPlan(): Plan {

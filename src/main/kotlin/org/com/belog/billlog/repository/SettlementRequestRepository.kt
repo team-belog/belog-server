@@ -93,11 +93,9 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         JOIN FETCH participant.groupMember groupMember
         JOIN FETCH groupMember.user
         WHERE settlementRequest.id = :settlementRequestId
-          AND bill.meeting.id = :meetingId
         """,
     )
-    fun findByIdAndMeetingIdForUpdate(
+    fun findByIdForUpdate(
         @Param("settlementRequestId") settlementRequestId: Long,
-        @Param("meetingId") meetingId: Long,
     ): SettlementRequest?
 }

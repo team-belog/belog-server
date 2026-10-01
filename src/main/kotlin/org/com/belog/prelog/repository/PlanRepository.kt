@@ -10,9 +10,19 @@ import org.springframework.data.repository.query.Param
 interface PlanRepository : JpaRepository<Plan, Long> {
     fun existsByMeetingId(meetingId: Long): Boolean
 
-    fun findByIdAndMeetingId(
-        planId: Long,
-        meetingId: Long,
+    @Query(
+        """
+        SELECT plan
+        FROM Plan plan
+        JOIN FETCH plan.meeting meeting
+        JOIN FETCH meeting.group
+        JOIN FETCH plan.createdBy
+        WHERE plan.id = :planId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findByIdWithMeetingAndCreator(
+        @Param("planId") planId: Long,
     ): Plan?
 
     @Query(

@@ -608,15 +608,12 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 사진을 찾을 수 없음",
+                description = "사진을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "사진 없음", value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -626,9 +623,6 @@ interface PostLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "7", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "사진 ID", example = "31", required = true)
         @PathVariable
         photoId: Long,
@@ -667,15 +661,12 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 해당 만남의 사진을 찾을 수 없음",
+                description = "사진을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "사진 없음", value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -685,9 +676,6 @@ interface PostLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "7", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "사진 ID", example = "31", required = true)
         @PathVariable
         photoId: Long,

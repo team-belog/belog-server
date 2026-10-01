@@ -27,18 +27,16 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/v1/meetings/{meetingId}/post-log")
 class PostLogController(
     private val postLogService: PostLogService,
     private val photoService: PostLogPhotoService,
     private val photoLikeService: PostLogPhotoLikeService,
 ) : PostLogSwagger {
-    @PutMapping("/draft")
+    @PutMapping("/api/v1/meetings/{meetingId}/post-log/draft")
     override fun saveDraft(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -55,7 +53,7 @@ class PostLogController(
             .body(CommonResponse.success(PostLogSuccessCode.DRAFT_SAVED))
     }
 
-    @PostMapping("/ticket")
+    @PostMapping("/api/v1/meetings/{meetingId}/post-log/ticket")
     override fun createTicket(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -78,7 +76,7 @@ class PostLogController(
             )
     }
 
-    @GetMapping("/ticket")
+    @GetMapping("/api/v1/meetings/{meetingId}/post-log/ticket")
     override fun getTicket(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -95,7 +93,7 @@ class PostLogController(
             )
     }
 
-    @GetMapping
+    @GetMapping("/api/v1/meetings/{meetingId}/post-log")
     override fun getSummary(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -112,7 +110,7 @@ class PostLogController(
             )
     }
 
-    @GetMapping("/photos")
+    @GetMapping("/api/v1/meetings/{meetingId}/post-log-photos")
     override fun getPhotos(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -137,7 +135,7 @@ class PostLogController(
             )
     }
 
-    @PostMapping("/photos/upload-urls")
+    @PostMapping("/api/v1/meetings/{meetingId}/post-log-photos/upload-urls")
     override fun issuePhotoUploadUrls(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -160,7 +158,7 @@ class PostLogController(
             )
     }
 
-    @PostMapping("/photos")
+    @PostMapping("/api/v1/meetings/{meetingId}/post-log-photos")
     override fun registerPhotos(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -183,15 +181,13 @@ class PostLogController(
             )
     }
 
-    @PutMapping("/photos/{photoId}/likes/me")
+    @PutMapping("/api/v1/post-log-photos/{photoId}/likes/me")
     override fun likePhoto(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable photoId: Long,
     ): ResponseEntity<CommonResponse<PostLogPhotoLikeResponse>> {
         val result =
             photoLikeService.likePhoto(
-                meetingId = meetingId,
                 photoId = photoId,
                 userId = userId,
             )
@@ -206,15 +202,13 @@ class PostLogController(
             )
     }
 
-    @DeleteMapping("/photos/{photoId}/likes/me")
+    @DeleteMapping("/api/v1/post-log-photos/{photoId}/likes/me")
     override fun unlikePhoto(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable photoId: Long,
     ): ResponseEntity<CommonResponse<PostLogPhotoLikeResponse>> {
         val result =
             photoLikeService.unlikePhoto(
-                meetingId = meetingId,
                 photoId = photoId,
                 userId = userId,
             )

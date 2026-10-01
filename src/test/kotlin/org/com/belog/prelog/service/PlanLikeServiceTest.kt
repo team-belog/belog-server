@@ -6,7 +6,6 @@ import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.domain.Meeting
-import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanLike
 import org.com.belog.prelog.repository.PlanLikeRepository
@@ -23,13 +22,11 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PlanLikeServiceTest {
-    private val meetingRepository = mock(MeetingRepository::class.java)
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
     private val planRepository = mock(PlanRepository::class.java)
     private val planLikeRepository = mock(PlanLikeRepository::class.java)
     private val planLikeService =
         PlanLikeService(
-            meetingRepository = meetingRepository,
             groupMemberRepository = groupMemberRepository,
             planRepository = planRepository,
             planLikeRepository = planLikeRepository,
@@ -40,8 +37,8 @@ class PlanLikeServiceTest {
         stubLikeTarget()
         `when`(planLikeRepository.findAllByPlanIdForShare(PLAN_ID)).thenReturn(listOf(mock(PlanLike::class.java)))
 
-        val firstResult = planLikeService.likePlan(MEETING_ID, PLAN_ID, USER_ID)
-        val secondResult = planLikeService.likePlan(MEETING_ID, PLAN_ID, USER_ID)
+        val firstResult = planLikeService.likePlan(PLAN_ID, USER_ID)
+        val secondResult = planLikeService.likePlan(PLAN_ID, USER_ID)
 
         assertTrue(firstResult.likedByMe)
         assertEquals(1L, firstResult.likeCount)
@@ -55,8 +52,8 @@ class PlanLikeServiceTest {
         stubLikeTarget()
         `when`(planLikeRepository.findAllByPlanIdForShare(PLAN_ID)).thenReturn(emptyList())
 
-        val firstResult = planLikeService.unlikePlan(MEETING_ID, PLAN_ID, USER_ID)
-        val secondResult = planLikeService.unlikePlan(MEETING_ID, PLAN_ID, USER_ID)
+        val firstResult = planLikeService.unlikePlan(PLAN_ID, USER_ID)
+        val secondResult = planLikeService.unlikePlan(PLAN_ID, USER_ID)
 
         assertFalse(firstResult.likedByMe)
         assertEquals(0L, firstResult.likeCount)
@@ -71,8 +68,8 @@ class PlanLikeServiceTest {
         `when`(planLikeRepository.findAllByPlanIdForShare(PLAN_ID))
             .thenReturn(listOf(mock(PlanLike::class.java)), emptyList())
 
-        val likeResult = planLikeService.likePlan(MEETING_ID, PLAN_ID, USER_ID)
-        val unlikeResult = planLikeService.unlikePlan(MEETING_ID, PLAN_ID, USER_ID)
+        val likeResult = planLikeService.likePlan(PLAN_ID, USER_ID)
+        val unlikeResult = planLikeService.unlikePlan(PLAN_ID, USER_ID)
 
         assertTrue(likeResult.likedByMe)
         assertFalse(unlikeResult.likedByMe)
@@ -86,21 +83,23 @@ class PlanLikeServiceTest {
         val group = mock(Group::class.java)
         `when`(meeting.group).thenReturn(group)
         `when`(group.id).thenReturn(GROUP_ID)
-        `when`(meetingRepository.findActiveById(MEETING_ID)).thenReturn(meeting)
+        val plan = mock(Plan::class.java)
+        `when`(plan.meeting).thenReturn(meeting)
+        `when`(planRepository.findByIdWithMeetingAndCreator(PLAN_ID)).thenReturn(plan)
         `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(null)
 
         val likeException =
             assertFailsWith<BusinessException> {
-                planLikeService.likePlan(MEETING_ID, PLAN_ID, USER_ID)
+                planLikeService.likePlan(PLAN_ID, USER_ID)
             }
         val unlikeException =
             assertFailsWith<BusinessException> {
-                planLikeService.unlikePlan(MEETING_ID, PLAN_ID, USER_ID)
+                planLikeService.unlikePlan(PLAN_ID, USER_ID)
             }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, likeException.errorCode)
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unlikeException.errorCode)
-        verifyNoInteractions(planRepository, planLikeRepository)
+        verifyNoInteractions(planLikeRepository)
     }
 
     private fun stubLikeTarget() {
@@ -112,13 +111,12 @@ class PlanLikeServiceTest {
         `when`(group.id).thenReturn(GROUP_ID)
         `when`(groupMember.id).thenReturn(GROUP_MEMBER_ID)
         `when`(plan.id).thenReturn(PLAN_ID)
-        `when`(meetingRepository.findActiveById(MEETING_ID)).thenReturn(meeting)
+        `when`(plan.meeting).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(groupMember)
-        `when`(planRepository.findByIdAndMeetingId(PLAN_ID, MEETING_ID)).thenReturn(plan)
+        `when`(planRepository.findByIdWithMeetingAndCreator(PLAN_ID)).thenReturn(plan)
     }
 
     companion object {
-        private const val MEETING_ID = 1L
         private const val PLAN_ID = 12L
         private const val GROUP_ID = 3L
         private const val GROUP_MEMBER_ID = 10L

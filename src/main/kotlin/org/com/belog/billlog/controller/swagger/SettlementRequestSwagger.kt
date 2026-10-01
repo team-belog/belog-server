@@ -117,7 +117,7 @@ interface SettlementRequestSwagger {
             ),
             ApiResponse(
                 responseCode = "404",
-                description = "해당 만남에 속한 정산 요청을 찾을 수 없음",
+                description = "정산 요청을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -132,9 +132,6 @@ interface SettlementRequestSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "7", required = true)
-        @PathVariable
-        meetingId: Long,
         @Parameter(description = "정산 요청 ID", example = "12", required = true)
         @PathVariable
         settlementRequestId: Long,
