@@ -32,13 +32,14 @@ class UserProfileQueryTest {
         )
 
     @Test
-    fun `현재 사용자의 닉네임과 프로필 이미지 URL을 조회한다`() {
+    fun `현재 사용자의 닉네임과 이메일과 프로필 이미지 URL을 조회한다`() {
         val user = completedUser()
         `when`(userRepository.findById(15L)).thenReturn(Optional.of(user))
 
         val result = service.getProfile(15L)
 
         assertEquals("빌로그", result.nickname)
+        assertEquals("user@example.com", result.email)
         assertEquals("https://example.com/social-profile", result.profileImageUrl)
     }
 

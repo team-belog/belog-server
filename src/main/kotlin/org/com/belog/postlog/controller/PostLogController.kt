@@ -76,12 +76,12 @@ class PostLogController(
             )
     }
 
-    @GetMapping("/api/v1/meetings/{meetingId}/post-log/ticket")
+    @GetMapping("/api/v1/post-logs/{postLogId}/ticket")
     override fun getTicket(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
+        @PathVariable postLogId: Long,
     ): ResponseEntity<CommonResponse<PostLogTicketResponse>> {
-        val result = postLogService.getTicket(meetingId = meetingId, userId = userId)
+        val result = postLogService.getTicket(postLogId = postLogId, userId = userId)
 
         return ResponseEntity
             .status(PostLogSuccessCode.TICKET_RETRIEVED.status)

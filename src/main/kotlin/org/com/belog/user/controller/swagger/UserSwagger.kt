@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
@@ -19,19 +21,70 @@ import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
 import org.com.belog.user.controller.dto.request.UpdateUserProfileRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
+import org.com.belog.user.controller.dto.response.PostLogTicketCalendarResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
 import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.validation.ValidNickname
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
     @Operation(
+        summary = "마이페이지 월별 티켓 달력 조회",
+        description =
+            "로그인한 사용자가 생성한 Post-log 티켓 중 만남 종료일이 요청 연월에 포함되는 티켓을 조회합니다. " +
+                "티켓이 생성된 Post-log만 반환하며 만남 종료일 오름차순, Post-log ID 오름차순으로 정렬합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "월별 티켓 달력 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_POST_LOG_TICKET_CALENDAR_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "연도 또는 월 범위가 올바르지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+        ],
+    )
+    fun getMyTicketCalendar(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "조회 연도", example = "2026", required = true)
+        @RequestParam
+        @Min(1000)
+        @Max(9999)
+        year: Int,
+        @Parameter(description = "조회 월", example = "8", required = true)
+        @RequestParam
+        @Min(1)
+        @Max(12)
+        month: Int,
+    ): ResponseEntity<CommonResponse<PostLogTicketCalendarResponse>>
+
+    @Operation(
         summary = "내 프로필 조회",
         description =
-            "로그인한 사용자의 닉네임과 표시용 프로필 이미지 URL을 조회합니다. " +
+            "로그인한 사용자의 닉네임, 이메일과 표시용 프로필 이미지 URL을 조회합니다. " +
                 "앱 기본 이미지를 사용하는 경우 profileImageUrl은 null입니다.",
     )
     @ApiResponses(
@@ -469,10 +522,13 @@ private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
     """{"contentType":"image/webp","fileSize":524288}"""
 
 private const val PROFILE_SUCCESS_EXAMPLE =
-    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
+
+private const val GET_POST_LOG_TICKET_CALENDAR_SUCCESS_EXAMPLE =
+    """{"code":"POST_LOG-S010","message":"월별 티켓 달력이 조회되었습니다.","data":{"year":2026,"month":8,"memoryCount":2,"tickets":[{"postLogId":31,"meetingEndDate":"2026-08-12","thumbnailUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?..."},{"postLogId":42,"meetingEndDate":"2026-08-13","thumbnailUrl":null}]}}"""
 
 private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
-    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":null}}"""
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":null}}"""
 
 private const val UPDATE_PROFILE_NICKNAME_REQUEST_EXAMPLE =
     """{"nickname":"피블"}"""

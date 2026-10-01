@@ -36,7 +36,7 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 추억 문구 임시저장",
         description =
-            "해당 만남이 속한 그룹의 멤버가 본인의 Post-log 추억 문구를 임시저장합니다. " +
+            "해당 만남의 참여자가 본인의 Post-log 추억 문구를 임시저장합니다. " +
                 "기존 임시저장 문구가 있으면 새 문구로 교체하며, 티켓이 이미 생성된 경우에는 변경할 수 없습니다.",
     )
     @ApiResponses(
@@ -66,12 +66,12 @@ interface PostLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남의 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [ExampleObject(value = NOT_MEETING_PARTICIPANT_EXAMPLE)],
                     ),
                 ],
             ),
@@ -88,7 +88,7 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "로그인한 그룹 멤버가 해당 만남의 티켓을 이미 생성함",
+                description = "로그인한 참여자가 해당 만남의 티켓을 이미 생성함",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -212,7 +212,7 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 티켓 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 본인이 생성한 개인 티켓을 조회합니다. " +
+            "로그인한 사용자가 본인이 생성한 개인 티켓을 Post-log ID로 조회합니다. " +
                 "티켓 생성 API와 동일한 응답 구조를 반환합니다.",
     )
     @ApiResponses(
@@ -230,27 +230,13 @@ interface PostLogSwagger {
             ),
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
-                responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
-                    ),
-                ],
-            ),
-            ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 로그인한 그룹 멤버가 생성한 티켓을 찾을 수 없음",
+                description = "로그인한 사용자가 생성한 티켓을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "티켓 없음", value = TICKET_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = TICKET_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -260,9 +246,9 @@ interface PostLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "7", required = true)
+        @Parameter(description = "Post-log ID", example = "11", required = true)
         @PathVariable
-        meetingId: Long,
+        postLogId: Long,
     ): ResponseEntity<CommonResponse<PostLogTicketResponse>>
 
     @Operation(
@@ -480,7 +466,7 @@ interface PostLogSwagger {
         summary = "Post-log 사진 메타데이터 일괄 등록",
         description =
             "S3 업로드가 완료된 최대 100개 사진의 object key와 촬영 시각을 등록합니다. " +
-                "Post-log가 없으면 자동으로 생성하며, 동일한 메타데이터의 재요청은 기존 등록 결과를 반환합니다.",
+                "동일한 메타데이터의 재요청은 기존 등록 결과를 반환합니다.",
     )
     @ApiResponses(
         value = [
