@@ -124,8 +124,8 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 티켓 생성",
         description =
-            "해당 만남이 속한 그룹의 멤버가 본인의 추억 문구를 작성하고 개인 티켓을 생성합니다. " +
-                "같은 만남에도 그룹 멤버마다 하나씩 티켓을 생성할 수 있습니다.",
+            "해당 만남의 참여자가 본인의 추억 문구를 작성하고 개인 티켓을 생성합니다. " +
+                "같은 만남에도 참여자마다 하나씩 티켓을 생성할 수 있습니다.",
     )
     @ApiResponses(
         value = [
@@ -154,12 +154,12 @@ interface PostLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남의 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [ExampleObject(value = NOT_MEETING_PARTICIPANT_EXAMPLE)],
                     ),
                 ],
             ),
@@ -176,7 +176,7 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "로그인한 그룹 멤버가 해당 만남의 티켓을 이미 생성함",
+                description = "로그인한 참여자가 해당 만남의 티켓을 이미 생성함",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -729,6 +729,9 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":null}"""
+
+private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":null}"""
 
 private const val PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE =
     """{"code":"POST_LOG-E008","message":"이미 다른 정보로 등록된 사진입니다.","data":null}"""
