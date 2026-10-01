@@ -1,10 +1,11 @@
 package org.com.belog.postlog.service.result
 
 import java.time.LocalDate
+import java.time.YearMonth
 
 data class PostLogTicketCalendarResult(
-    val year: Int,
-    val month: Int,
+    val yearMonth: YearMonth,
+    val today: LocalDate,
     val memoryCount: Int,
     val tickets: List<PostLogTicketCalendarItemResult>,
 )

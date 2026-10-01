@@ -38,6 +38,7 @@ import org.testcontainers.mysql.MySQLContainer
 import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.YearMonth
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 
@@ -116,10 +117,9 @@ class PostLogCalendarServiceIntegrationTest {
         deletedMeeting.delete(Instant.parse("2026-09-02T00:00:00Z"))
         meetingRepository.saveAndFlush(deletedMeeting)
 
-        val result = calendarService.getMyTicketCalendar(ownerUserId, 2026, 8)
+        val result = calendarService.getMyTicketCalendar(ownerUserId, YearMonth.of(2026, 8))
 
-        assertEquals(2026, result.year)
-        assertEquals(8, result.month)
+        assertEquals(YearMonth.of(2026, 8), result.yearMonth)
         assertEquals(3, result.memoryCount)
         assertEquals(
             listOf(firstTicket.postLogId, secondTicket.postLogId, thirdTicket.postLogId),
@@ -153,7 +153,7 @@ class PostLogCalendarServiceIntegrationTest {
         )
         `when`(objectReadUrlProvider.generateReadUrl(firstPhoto.objectKey)).thenReturn(REPRESENTATIVE_PHOTO_URL)
 
-        val result = calendarService.getMyTicketCalendar(checkNotNull(owner.user.id), 2026, 8)
+        val result = calendarService.getMyTicketCalendar(checkNotNull(owner.user.id), YearMonth.of(2026, 8))
 
         assertEquals(REPRESENTATIVE_PHOTO_URL, result.tickets[0].thumbnailUrl)
         assertNull(result.tickets[1].thumbnailUrl)

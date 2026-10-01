@@ -4,13 +4,14 @@ import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.postlog.service.result.PostLogTicketCalendarItemResult
 import org.com.belog.postlog.service.result.PostLogTicketCalendarResult
 import java.time.LocalDate
+import java.time.YearMonth
 
 @Schema(description = "마이페이지 월별 티켓 달력")
 data class PostLogTicketCalendarResponse(
-    @field:Schema(description = "조회 연도", example = "2026")
-    val year: Int,
-    @field:Schema(description = "조회 월", example = "8")
-    val month: Int,
+    @field:Schema(description = "조회 연월", example = "2026-08")
+    val yearMonth: YearMonth,
+    @field:Schema(description = "서비스 기준 오늘 날짜", example = "2026-08-18")
+    val today: LocalDate,
     @field:Schema(description = "조회 월에 표시되는 서로 다른 티켓 수", example = "2")
     val memoryCount: Int,
     @field:Schema(description = "만남 종료일 기준 티켓 목록")
@@ -19,8 +20,8 @@ data class PostLogTicketCalendarResponse(
     companion object {
         fun from(result: PostLogTicketCalendarResult): PostLogTicketCalendarResponse =
             PostLogTicketCalendarResponse(
-                year = result.year,
-                month = result.month,
+                yearMonth = result.yearMonth,
+                today = result.today,
                 memoryCount = result.memoryCount,
                 tickets = result.tickets.map(PostLogTicketCalendarItemResponse::from),
             )
