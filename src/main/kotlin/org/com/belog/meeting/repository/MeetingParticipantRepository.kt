@@ -15,9 +15,21 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         groupMemberId: Long,
     ): Boolean
 
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id = :meetingId
+          AND groupMember.user.id = :userId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
     fun findByMeetingIdAndGroupMemberUserId(
-        meetingId: Long,
-        userId: Long,
+        @Param("meetingId") meetingId: Long,
+        @Param("userId") userId: Long,
     ): MeetingParticipant?
 
     @Query(
@@ -58,6 +70,7 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         JOIN FETCH participant.groupMember groupMember
         JOIN FETCH groupMember.user
         WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         ORDER BY participant.id ASC
         """,
     )
@@ -70,8 +83,12 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         """
         SELECT participant
         FROM MeetingParticipant participant
-        WHERE participant.meeting.id = :meetingId
-          AND participant.groupMember.user.id = :userId
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id = :meetingId
+          AND groupMember.user.id = :userId
+          AND meeting.deletedAt IS NULL
         """,
     )
     fun findByMeetingIdAndUserIdForUpdate(
