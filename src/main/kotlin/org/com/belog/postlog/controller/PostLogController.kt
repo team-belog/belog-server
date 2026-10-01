@@ -110,7 +110,7 @@ class PostLogController(
             )
     }
 
-    @GetMapping("/api/v1/meetings/{meetingId}/post-log/photos")
+    @GetMapping("/api/v1/meetings/{meetingId}/post-log-photos")
     override fun getPhotos(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -135,7 +135,7 @@ class PostLogController(
             )
     }
 
-    @PostMapping("/api/v1/meetings/{meetingId}/post-log/photos/upload-urls")
+    @PostMapping("/api/v1/meetings/{meetingId}/post-log-photos/upload-urls")
     override fun issuePhotoUploadUrls(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -158,7 +158,7 @@ class PostLogController(
             )
     }
 
-    @PostMapping("/api/v1/meetings/{meetingId}/post-log/photos")
+    @PostMapping("/api/v1/meetings/{meetingId}/post-log-photos")
     override fun registerPhotos(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
