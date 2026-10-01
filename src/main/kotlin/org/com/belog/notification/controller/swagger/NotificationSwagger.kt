@@ -18,6 +18,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.notification.controller.dto.response.NotificationListResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestParam
 
 @Tag(name = "Notification", description = "알림 관련 API")
@@ -70,8 +71,41 @@ interface NotificationSwagger {
         size: Int,
     ): ResponseEntity<CommonResponse<NotificationListResponse>>
 
+    @Operation(
+        summary = "알림 읽음 처리",
+        description =
+            "로그인 사용자의 알림을 읽음 처리합니다. 이미 읽은 알림은 기존 읽은 시각을 유지하며 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "알림 읽음 처리 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "404",
+                description = "알림이 없거나 로그인 사용자의 알림이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOTIFICATION_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun markAsRead(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "읽음 처리할 알림 ID", example = "101", required = true)
+        @PathVariable
+        notificationId: Long,
+    ): ResponseEntity<Void>
+
     companion object {
         private const val NOTIFICATION_LIST_SUCCESS_EXAMPLE =
             """{"code":"NOTIFICATION-S001","message":"알림 목록을 조회했습니다.","data":{"items":[{"notificationId":101,"type":"SETTLEMENT_REQUESTED","message":"피놀 님이 정산을 요청했어요","targetId":7,"read":false,"createdAt":"2026-10-01T04:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
+        private const val NOTIFICATION_NOT_FOUND_EXAMPLE =
+            """{"code":"NOTIFICATION-E001","message":"알림을 찾을 수 없습니다.","data":null}"""
     }
 }

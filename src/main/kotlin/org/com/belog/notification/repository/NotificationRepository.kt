@@ -1,8 +1,10 @@
 package org.com.belog.notification.repository
 
+import jakarta.persistence.LockModeType
 import org.com.belog.notification.domain.Notification
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -23,4 +25,18 @@ interface NotificationRepository :
         @Param("cursor") cursor: Long?,
         pageable: Pageable,
     ): List<Notification>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT notification
+        FROM Notification notification
+        WHERE notification.id = :notificationId
+          AND notification.recipient.id = :recipientUserId
+        """,
+    )
+    fun findByIdAndRecipientUserIdForUpdate(
+        @Param("notificationId") notificationId: Long,
+        @Param("recipientUserId") recipientUserId: Long,
+    ): Notification?
 }

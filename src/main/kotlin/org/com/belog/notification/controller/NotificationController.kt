@@ -9,8 +9,11 @@ import org.com.belog.notification.code.NotificationSuccessCode
 import org.com.belog.notification.controller.dto.response.NotificationListResponse
 import org.com.belog.notification.controller.swagger.NotificationSwagger
 import org.com.belog.notification.service.NotificationQueryService
+import org.com.belog.notification.service.NotificationService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/notifications")
 class NotificationController(
     private val notificationQueryService: NotificationQueryService,
+    private val notificationService: NotificationService,
 ) : NotificationSwagger {
     @GetMapping
     override fun getNotifications(
@@ -36,5 +40,15 @@ class NotificationController(
                     NotificationListResponse.from(result),
                 ),
             )
+    }
+
+    @PutMapping("/{notificationId}/read")
+    override fun markAsRead(
+        @LoginUserId userId: Long,
+        @PathVariable notificationId: Long,
+    ): ResponseEntity<Void> {
+        notificationService.markAsRead(notificationId = notificationId, userId = userId)
+
+        return ResponseEntity.noContent().build()
     }
 }

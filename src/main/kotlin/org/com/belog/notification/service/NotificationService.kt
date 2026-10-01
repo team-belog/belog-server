@@ -1,6 +1,7 @@
 package org.com.belog.notification.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.notification.code.NotificationErrorCode
 import org.com.belog.notification.domain.Notification
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.notification.service.command.CreateNotificationCommand
@@ -9,11 +10,14 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Instant
 
 @Service
 class NotificationService(
     private val notificationRepository: NotificationRepository,
     private val userRepository: UserRepository,
+    private val clock: Clock,
 ) {
     @Transactional
     fun create(command: CreateNotificationCommand) {
@@ -40,6 +44,20 @@ class NotificationService(
                 ),
             )
         }
+    }
+
+    @Transactional
+    fun markAsRead(
+        notificationId: Long,
+        userId: Long,
+    ) {
+        val notification =
+            notificationRepository.findByIdAndRecipientUserIdForUpdate(
+                notificationId = notificationId,
+                recipientUserId = userId,
+            ) ?: throw BusinessException(NotificationErrorCode.NOTIFICATION_NOT_FOUND)
+
+        notification.markAsRead(Instant.now(clock))
     }
 
     private fun findUsersById(commands: List<CreateNotificationCommand>): Map<Long, User> {
