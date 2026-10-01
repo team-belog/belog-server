@@ -1,7 +1,15 @@
 package org.com.belog.postlog.service
 
+import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillShare
+import org.com.belog.billlog.domain.BillSplitType
+import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.repository.BillRepository
+import org.com.belog.billlog.repository.BillShareRepository
+import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
+import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
@@ -48,6 +56,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -88,11 +99,23 @@ class PostLogServiceIntegrationTest {
     @Autowired
     private lateinit var userRepository: UserRepository
 
+    @Autowired
+    private lateinit var billRepository: BillRepository
+
+    @Autowired
+    private lateinit var billShareRepository: BillShareRepository
+
+    @Autowired
+    private lateinit var settlementRequestRepository: SettlementRequestRepository
+
     @MockitoBean
     private lateinit var objectReadUrlProvider: S3ObjectReadUrlProvider
 
     @AfterEach
     fun cleanUp() {
+        settlementRequestRepository.deleteAllInBatch()
+        billShareRepository.deleteAllInBatch()
+        billRepository.deleteAllInBatch()
         photoLikeRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
         postLogRepository.deleteAllInBatch()
@@ -300,6 +323,47 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
+    fun `동일한 참여자가 티켓을 동시에 생성해도 한 건만 생성된다`() {
+        val context = saveMeetingContext()
+        val ready = CountDownLatch(CONCURRENT_REQUEST_COUNT)
+        val start = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(CONCURRENT_REQUEST_COUNT)
+
+        try {
+            val futures =
+                (1..CONCURRENT_REQUEST_COUNT).map { number ->
+                    executor.submit<Result<Long>> {
+                        ready.countDown()
+                        start.await()
+                        runCatching {
+                            postLogService
+                                .createTicket(
+                                    meetingId = context.meetingId,
+                                    userId = context.creatorUserId,
+                                    memory = "동시 생성 추억 $number",
+                                ).postLogId
+                        }
+                    }
+                }
+            assertTrue(ready.await(CONCURRENCY_TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            start.countDown()
+            val results = futures.map { future -> future.get(CONCURRENCY_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+            val failures = results.mapNotNull { result -> result.exceptionOrNull() }
+
+            assertEquals(1, results.count { result -> result.isSuccess })
+            assertEquals(1, failures.size)
+            assertEquals(
+                PostLogErrorCode.TICKET_ALREADY_CREATED,
+                (failures.single() as BusinessException).errorCode,
+            )
+            assertEquals(1L, postLogRepository.count())
+        } finally {
+            start.countDown()
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `서로 다른 만남 참여자는 같은 만남에 각자의 티켓을 생성할 수 있다`() {
         val context = saveMeetingContext()
         val otherMember = saveGroupMember(context.group, "member2")
@@ -494,6 +558,111 @@ class PostLogServiceIntegrationTest {
         assertEquals(listOf("creator", "member2"), result.members.map { member -> member.nickname })
     }
 
+    @Test
+    fun `그룹 멤버는 본인 Post-log 상태와 만남 정산 요약을 조회한다`() {
+        val context = saveMeetingContext()
+        val draftMember = saveGroupMember(context.group, "member2")
+        val pendingMember = saveGroupMember(context.group, "member3")
+        val observer = saveGroupMember(context.group, "observer")
+        val creatorParticipant =
+            checkNotNull(
+                meetingParticipantRepository.findByMeetingIdAndGroupMemberUserId(
+                    context.meetingId,
+                    context.creatorUserId,
+                ),
+            )
+        val draftParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, draftMember))
+        val pendingParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, pendingMember))
+        postLogService.createTicket(context.meetingId, context.creatorUserId, "생성자의 티켓")
+        postLogService.saveDraft(context.meetingId, checkNotNull(draftMember.user.id), "조회자의 초안")
+        val draftPostLog =
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(draftMember.id),
+                ),
+            )
+        val bill =
+            billRepository.saveAndFlush(
+                Bill.create(
+                    meeting = context.meeting,
+                    creator = context.creator,
+                    payer = creatorParticipant,
+                    title = "여행 경비",
+                    totalAmount = 30_000L,
+                    splitType = BillSplitType.EQUAL_SPLIT,
+                ),
+            )
+        saveSettlementRequest(bill, draftParticipant, 10_000L, 0, completed = true)
+        saveSettlementRequest(bill, pendingParticipant, 10_000L, 1, completed = false)
+
+        val draftMemberResult = postLogService.getSummary(context.meetingId, checkNotNull(draftMember.user.id))
+        val observerResult = postLogService.getSummary(context.meetingId, checkNotNull(observer.user.id))
+
+        assertEquals(draftPostLog.id, draftMemberResult.postLogId)
+        assertEquals("조회자의 초안", draftMemberResult.memory)
+        assertFalse(draftMemberResult.ticketCreated)
+        assertEquals(30_000L, draftMemberResult.totalAmount)
+        assertEquals(1L, draftMemberResult.completedParticipantCount)
+        assertEquals(3, draftMemberResult.participants.size)
+        assertNull(observerResult.postLogId)
+        assertNull(observerResult.memory)
+        assertFalse(observerResult.ticketCreated)
+        assertEquals(30_000L, observerResult.totalAmount)
+    }
+
+    @Test
+    fun `다른 그룹 사용자는 만남 정리를 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        val outsider = saveCompletedUser("outsider")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getSummary(context.meetingId, checkNotNull(outsider.id))
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 정리는 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        context.meeting.delete(FIXED_INSTANT)
+        meetingRepository.saveAndFlush(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getSummary(context.meetingId, context.creatorUserId)
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    private fun saveSettlementRequest(
+        bill: Bill,
+        participant: MeetingParticipant,
+        amount: Long,
+        allocationOrder: Int,
+        completed: Boolean,
+    ): SettlementRequest {
+        val share =
+            billShareRepository.saveAndFlush(
+                BillShare.create(
+                    bill = bill,
+                    participant = participant,
+                    amount = amount,
+                    allocationOrder = allocationOrder,
+                ),
+            )
+        val settlementRequest = SettlementRequest.create(share)
+        if (completed) {
+            settlementRequest.complete(FIXED_INSTANT)
+        }
+        return settlementRequestRepository.saveAndFlush(settlementRequest)
+    }
+
     private fun saveMeetingContext(): MeetingContext {
         val group =
             groupRepository.save(
@@ -590,6 +759,8 @@ class PostLogServiceIntegrationTest {
     }
 
     companion object {
+        private const val CONCURRENT_REQUEST_COUNT = 2
+        private const val CONCURRENCY_TIMEOUT_SECONDS = 10L
         private const val REPRESENTATIVE_PHOTO_URL = "https://example.com/representative.jpg"
         private val FIXED_INSTANT: Instant = Instant.parse("2026-09-30T00:00:00Z")
 
