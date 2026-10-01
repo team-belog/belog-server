@@ -440,6 +440,184 @@ class MeetingServiceTest {
     }
 
     @Test
+    fun `종료된 만남은 일정을 유지하면서 이름과 장소를 수정할 수 있다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20))
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = dateRange,
+                    currentDate = LocalDate.of(2026, 9, 19),
+                ),
+            )
+
+        meetingService.updateMeeting(
+            meetingId = requireNotNull(meeting.id),
+            userId = requireNotNull(creator.user.id),
+            name = "부산 여행",
+            location = "부산역",
+            dateRange = dateRange,
+        )
+
+        assertEquals("부산 여행", meeting.name)
+        assertEquals("부산역", meeting.location)
+        assertEquals(dateRange.startDate, meeting.startDate)
+        assertEquals(dateRange.endDate, meeting.endDate)
+    }
+
+    @Test
+    fun `종료된 만남의 날짜를 변경하면 이름과 장소도 수정되지 않는다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20)),
+                    currentDate = LocalDate.of(2026, 9, 19),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.updateMeeting(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(creator.user.id),
+                    name = "부산 여행",
+                    location = "부산역",
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
+        assertEquals("광주 여행", meeting.name)
+        assertEquals(null, meeting.location)
+    }
+
+    @Test
+    fun `일정 조율 중인 만남은 날짜 없이 이름과 장소를 수정할 수 있다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+
+        meetingService.updateMeeting(
+            meetingId = requireNotNull(meeting.id),
+            userId = requireNotNull(creator.user.id),
+            name = "부산 여행",
+            location = "부산역",
+            dateRange = null,
+        )
+
+        assertEquals("부산 여행", meeting.name)
+        assertEquals("부산역", meeting.location)
+        assertEquals(MeetingStatus.SCHEDULING, meeting.status)
+        assertEquals(null, meeting.startDate)
+        assertEquals(null, meeting.endDate)
+    }
+
+    @Test
+    fun `일정 조율 중인 만남에 확정 날짜를 지정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.updateMeeting(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(creator.user.id),
+                    name = "부산 여행",
+                    location = "부산역",
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_DATE_NOT_CONFIRMED, exception.errorCode)
+        assertEquals("광주 여행", meeting.name)
+        assertEquals(null, meeting.location)
+    }
+
+    @Test
+    fun `생성자가 아닌 사용자는 만남을 수정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "멤버")
+        val dateRange = MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23))
+        val meeting = meetingRepository.save(createFixedMeeting(group, creator, dateRange))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.updateMeeting(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(member.user.id),
+                    name = "부산 여행",
+                    location = "부산역",
+                    dateRange = dateRange,
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals("광주 여행", meeting.name)
+        assertEquals(null, meeting.location)
+    }
+
+    @Test
+    fun `생성자가 아닌 사용자는 만남을 삭제할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "멤버")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingService.deleteMeeting(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals(null, meeting.deletedAt)
+    }
+
+    @Test
+    fun `만남을 삭제하면 삭제 시각만 기록하고 데이터는 유지한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                ),
+            )
+        val meetingId = requireNotNull(meeting.id)
+
+        meetingService.deleteMeeting(
+            meetingId = meetingId,
+            userId = requireNotNull(creator.user.id),
+        )
+        meetingRepository.flush()
+
+        val deletedMeeting = meetingRepository.findById(meetingId).orElseThrow()
+        assertEquals(FIXED_INSTANT, deletedMeeting.deletedAt)
+        assertEquals("광주 여행", deletedMeeting.name)
+        assertEquals(1L, meetingRepository.count())
+    }
+
+    @Test
     fun `생성자가 아닌 사용자는 후보 일정을 확정할 수 없다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")

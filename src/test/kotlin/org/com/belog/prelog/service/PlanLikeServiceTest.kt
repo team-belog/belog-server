@@ -17,7 +17,6 @@ import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import java.util.Optional
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -87,7 +86,7 @@ class PlanLikeServiceTest {
         val group = mock(Group::class.java)
         `when`(meeting.group).thenReturn(group)
         `when`(group.id).thenReturn(GROUP_ID)
-        `when`(meetingRepository.findById(MEETING_ID)).thenReturn(Optional.of(meeting))
+        `when`(meetingRepository.findActiveById(MEETING_ID)).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(null)
 
         val likeException =
@@ -113,7 +112,7 @@ class PlanLikeServiceTest {
         `when`(group.id).thenReturn(GROUP_ID)
         `when`(groupMember.id).thenReturn(GROUP_MEMBER_ID)
         `when`(plan.id).thenReturn(PLAN_ID)
-        `when`(meetingRepository.findById(MEETING_ID)).thenReturn(Optional.of(meeting))
+        `when`(meetingRepository.findActiveById(MEETING_ID)).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(groupMember)
         `when`(planRepository.findByIdAndMeetingId(PLAN_ID, MEETING_ID)).thenReturn(plan)
     }

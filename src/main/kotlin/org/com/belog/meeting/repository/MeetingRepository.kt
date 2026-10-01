@@ -15,8 +15,23 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         """
         SELECT meeting
         FROM Meeting meeting
+        WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findActiveById(
+        @Param("meetingId") meetingId: Long,
+    ): Meeting?
+
+    fun existsByIdAndDeletedAtIsNull(id: Long): Boolean
+
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
         JOIN FETCH meeting.group
         WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
     fun findByIdWithGroup(
@@ -30,6 +45,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         FROM Meeting meeting
         JOIN FETCH meeting.group
         WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
     fun findByIdWithGroupForUpdate(
@@ -42,6 +58,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         FROM Meeting meeting
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
+          AND meeting.deletedAt IS NULL
         ORDER BY meeting.id DESC
         """,
     )
@@ -57,6 +74,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
           AND meeting.endDate >= :currentDate
+          AND meeting.deletedAt IS NULL
         ORDER BY meeting.startDate ASC, meeting.id ASC
         """,
     )
@@ -74,6 +92,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
           AND meeting.status = :status
           AND meeting.endDate < :currentDate
           AND (:cursor IS NULL OR meeting.id < :cursor)
+          AND meeting.deletedAt IS NULL
         ORDER BY meeting.id DESC
         """,
     )
@@ -92,6 +111,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         JOIN FETCH meeting.group
         JOIN FETCH meeting.createdBy
         WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
     fun findByIdWithGroupAndCreator(
@@ -106,6 +126,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         JOIN FETCH meeting.createdBy creator
         JOIN FETCH creator.user
         WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
     fun findByIdForUpdate(

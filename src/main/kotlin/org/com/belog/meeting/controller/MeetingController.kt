@@ -8,6 +8,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
+import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
 import org.com.belog.meeting.controller.swagger.MeetingSwagger
@@ -16,9 +17,11 @@ import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.service.MeetingDetailService
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
 
@@ -69,6 +72,37 @@ class MeetingController(
             )
     }
 
+    @PutMapping("/api/v1/meetings/{meetingId}")
+    override fun updateMeeting(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: UpdateMeetingRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        meetingService.updateMeeting(
+            meetingId = meetingId,
+            userId = userId,
+            name = request.name,
+            location = request.location,
+            dateRange = request.toDateRange(),
+        )
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_UPDATED.status)
+            .body(CommonResponse.success(MeetingSuccessCode.MEETING_UPDATED))
+    }
+
+    @DeleteMapping("/api/v1/meetings/{meetingId}")
+    override fun deleteMeeting(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        meetingService.deleteMeeting(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_DELETED.status)
+            .build()
+    }
+
     @GetMapping("/api/v1/meetings/{meetingId}")
     override fun getMeetingDetail(
         @LoginUserId userId: Long,
@@ -95,4 +129,18 @@ class MeetingController(
         } catch (_: IllegalArgumentException) {
             throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
         }
+
+    private fun UpdateMeetingRequest.toDateRange(): MeetingDateRange? {
+        val rangeStartDate = startDate ?: return null
+        val rangeEndDate = endDate ?: return null
+
+        return try {
+            MeetingDateRange(
+                startDate = rangeStartDate,
+                endDate = rangeEndDate,
+            )
+        } catch (_: IllegalArgumentException) {
+            throw BusinessException(MeetingErrorCode.INVALID_MEETING_DATE_RANGE)
+        }
+    }
 }

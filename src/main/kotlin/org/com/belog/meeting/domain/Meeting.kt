@@ -72,10 +72,8 @@ class Meeting protected constructor(
         foreignKey = ForeignKey(name = "fk_meetings_created_by_group_member_id"),
     )
     val createdBy: GroupMember,
-    @Column(nullable = false, length = MEETING_NAME_MAX_LENGTH)
-    val name: String,
-    @Column(length = MEETING_LOCATION_MAX_LENGTH)
-    val location: String?,
+    name: String,
+    location: String?,
     @Enumerated(EnumType.STRING)
     @Column(name = "schedule_type", nullable = false, length = 20)
     val scheduleType: MeetingScheduleType,
@@ -87,6 +85,14 @@ class Meeting protected constructor(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
+        protected set
+
+    @Column(nullable = false, length = MEETING_NAME_MAX_LENGTH)
+    var name: String = name
+        protected set
+
+    @Column(length = MEETING_LOCATION_MAX_LENGTH)
+    var location: String? = location
         protected set
 
     @Enumerated(EnumType.STRING)
@@ -106,6 +112,10 @@ class Meeting protected constructor(
     var confirmedAt: Instant? = confirmedAt
         protected set
 
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+        protected set
+
     fun isCreatedBy(groupMember: GroupMember): Boolean {
         if (createdBy === groupMember) {
             return true
@@ -117,6 +127,27 @@ class Meeting protected constructor(
     }
 
     fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
+
+    fun updateDetails(
+        name: String,
+        location: String?,
+    ): Boolean {
+        val normalizedName = normalizeName(name)
+        val normalizedLocation = normalizeLocation(location)
+
+        if (this.name == normalizedName && this.location == normalizedLocation) {
+            return false
+        }
+
+        this.name = normalizedName
+        this.location = normalizedLocation
+        return true
+    }
+
+    fun delete(deletedAt: Instant) {
+        require(this.deletedAt == null) { "이미 삭제된 만남입니다." }
+        this.deletedAt = deletedAt
+    }
 
     fun confirmDate(
         candidateDateRange: MeetingCandidateDateRange,

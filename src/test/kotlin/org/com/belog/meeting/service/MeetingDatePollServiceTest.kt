@@ -187,6 +187,56 @@ class MeetingDatePollServiceTest {
     }
 
     @Test
+    fun `삭제된 만남의 참여자는 후보 일정을 조회할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.getDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 참여자는 일정 조율 현황을 조회할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.getDatePollResults(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 참여자는 후보 일정에 응답할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                    candidateDateRangeIds = listOf(requireNotNull(context.candidates.first().id)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+        assertEquals(0L, meetingScheduleResponseRepository.count())
+    }
+
+    @Test
     fun `만남 생성자는 후보 일정에 응답할 수 없다`() {
         val context = savePollContext()
 
@@ -294,6 +344,11 @@ class MeetingDatePollServiceTest {
                 ),
             )
         return PollContext(group, creator, member, meeting, candidates)
+    }
+
+    private fun deleteMeeting(meeting: Meeting) {
+        meeting.delete(FIXED_INSTANT)
+        meetingRepository.flush()
     }
 
     private fun savePollResultsContext(): PollResultsContext {
