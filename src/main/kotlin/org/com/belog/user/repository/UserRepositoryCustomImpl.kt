@@ -64,6 +64,7 @@ open class UserRepositoryCustomImpl(
                 provider_user_id,
                 social_profile_image_url,
                 profile_image_source,
+                push_notification_enabled,
                 created_at,
                 updated_at
             ) VALUES (
@@ -72,6 +73,7 @@ open class UserRepositoryCustomImpl(
                 :providerUserId,
                 :socialProfileImageUrl,
                 :profileImageSource,
+                TRUE,
                 CURRENT_TIMESTAMP(6),
                 CURRENT_TIMESTAMP(6)
             )
