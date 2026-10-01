@@ -10,7 +10,6 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
@@ -79,7 +78,7 @@ class PostLogPhotoLikeServiceIntegrationTest {
     fun `그룹 멤버가 사진에 좋아요를 등록하면 상태와 개수를 반환한다`() {
         val context = savePhotoContext("AB12CD", "member")
 
-        val result = photoLikeService.likePhoto(context.meetingId, context.photoId, context.userId)
+        val result = photoLikeService.likePhoto(context.photoId, context.userId)
 
         assertEquals(context.photoId, result.photoId)
         assertTrue(result.likedByMe)
@@ -91,8 +90,8 @@ class PostLogPhotoLikeServiceIntegrationTest {
     fun `동일한 좋아요 등록을 반복해도 한 건만 유지한다`() {
         val context = savePhotoContext("AB12CD", "member")
 
-        val firstResult = photoLikeService.likePhoto(context.meetingId, context.photoId, context.userId)
-        val secondResult = photoLikeService.likePhoto(context.meetingId, context.photoId, context.userId)
+        val firstResult = photoLikeService.likePhoto(context.photoId, context.userId)
+        val secondResult = photoLikeService.likePhoto(context.photoId, context.userId)
 
         assertTrue(firstResult.likedByMe)
         assertEquals(1L, firstResult.likeCount)
@@ -108,7 +107,7 @@ class PostLogPhotoLikeServiceIntegrationTest {
         photoLikeRepository.saveAndFlush(PostLogPhotoLike.create(context.photo, context.groupMember))
         photoLikeRepository.saveAndFlush(PostLogPhotoLike.create(context.photo, otherMember))
 
-        val result = photoLikeService.unlikePhoto(context.meetingId, context.photoId, context.userId)
+        val result = photoLikeService.unlikePhoto(context.photoId, context.userId)
 
         assertFalse(result.likedByMe)
         assertEquals(1L, result.likeCount)
@@ -119,8 +118,8 @@ class PostLogPhotoLikeServiceIntegrationTest {
     fun `등록하지 않은 좋아요를 해제해도 성공하고 기존 개수를 유지한다`() {
         val context = savePhotoContext("AB12CD", "member")
 
-        val firstResult = photoLikeService.unlikePhoto(context.meetingId, context.photoId, context.userId)
-        val secondResult = photoLikeService.unlikePhoto(context.meetingId, context.photoId, context.userId)
+        val firstResult = photoLikeService.unlikePhoto(context.photoId, context.userId)
+        val secondResult = photoLikeService.unlikePhoto(context.photoId, context.userId)
 
         assertFalse(firstResult.likedByMe)
         assertEquals(0L, firstResult.likeCount)
@@ -130,16 +129,16 @@ class PostLogPhotoLikeServiceIntegrationTest {
     }
 
     @Test
-    fun `다른 만남에 속한 사진에는 좋아요를 등록할 수 없다`() {
+    fun `다른 그룹에 속한 사진에는 좋아요를 등록할 수 없다`() {
         val context = savePhotoContext("AB12CD", "member")
         val otherContext = savePhotoContext("EF34GH", "other-group-member")
 
         val exception =
             assertFailsWith<BusinessException> {
-                photoLikeService.likePhoto(context.meetingId, otherContext.photoId, context.userId)
+                photoLikeService.likePhoto(otherContext.photoId, context.userId)
             }
 
-        assertEquals(PostLogErrorCode.POST_LOG_PHOTO_NOT_FOUND, exception.errorCode)
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
         assertEquals(0L, photoLikeRepository.count())
     }
 
@@ -151,11 +150,11 @@ class PostLogPhotoLikeServiceIntegrationTest {
 
         val likeException =
             assertFailsWith<BusinessException> {
-                photoLikeService.likePhoto(context.meetingId, context.photoId, outsiderId)
+                photoLikeService.likePhoto(context.photoId, outsiderId)
             }
         val unlikeException =
             assertFailsWith<BusinessException> {
-                photoLikeService.unlikePhoto(context.meetingId, context.photoId, outsiderId)
+                photoLikeService.unlikePhoto(context.photoId, outsiderId)
             }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, likeException.errorCode)

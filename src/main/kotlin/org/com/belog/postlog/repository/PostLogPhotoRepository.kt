@@ -16,13 +16,14 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
         """
         SELECT photo
         FROM PostLogPhoto photo
+        JOIN FETCH photo.meeting meeting
+        JOIN FETCH meeting.group
         WHERE photo.id = :photoId
-          AND photo.meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
         """,
     )
-    fun findByIdAndMeetingId(
+    fun findByIdWithMeeting(
         @Param("photoId") photoId: Long,
-        @Param("meetingId") meetingId: Long,
     ): PostLogPhoto?
 
     @Query(

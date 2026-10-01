@@ -22,18 +22,16 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 
 @RestController
-@RequestMapping("/api/v1/meetings/{meetingId}/bill-log/bills")
 class BillController(
     private val billService: BillService,
     private val billLogService: BillLogService,
 ) : BillSwagger {
-    @GetMapping
+    @GetMapping("/api/v1/meetings/{meetingId}/bill-log/bills")
     override fun getBills(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -60,15 +58,13 @@ class BillController(
             )
     }
 
-    @GetMapping("/{billId}")
+    @GetMapping("/api/v1/bills/{billId}")
     override fun getBillDetail(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable billId: Long,
     ): ResponseEntity<CommonResponse<BillDetailResponse>> {
         val billDetail =
             billService.getBillDetail(
-                meetingId = meetingId,
                 billId = billId,
                 userId = userId,
             )
@@ -83,7 +79,7 @@ class BillController(
             )
     }
 
-    @PostMapping
+    @PostMapping("/api/v1/meetings/{meetingId}/bill-log/bills")
     override fun registerBill(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,

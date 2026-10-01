@@ -125,41 +125,36 @@ class PlanService(
 
     @Transactional
     fun updateLinkPlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
         category: PlanCategory,
         title: String,
         url: String,
     ): Plan =
-        updatePlan(meetingId, planId, userId) { plan ->
+        updatePlan(planId, userId) { plan ->
             plan.updateLink(category = category, title = title, url = url)
         }
 
     @Transactional
     fun updateMemoPlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
         category: PlanCategory,
         title: String,
         content: String,
     ): Plan =
-        updatePlan(meetingId, planId, userId) { plan ->
+        updatePlan(planId, userId) { plan ->
             plan.updateMemo(category = category, title = title, content = content)
         }
 
     @Transactional
     fun deletePlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ) {
-        val meeting = findMeeting(meetingId)
+        val plan = findPlan(planId)
+        val meeting = plan.meeting
         val groupMember = findGroupMember(meeting, userId)
-        val plan =
-            planRepository.findByIdAndMeetingId(planId, meetingId)
-                ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
 
         if (!plan.isCreatedBy(groupMember) && !meeting.isCreatedBy(groupMember)) {
             throw BusinessException(PreLogErrorCode.PLAN_DELETE_FORBIDDEN)
@@ -171,20 +166,18 @@ class PlanService(
 
     @Transactional
     fun pinPlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ) {
-        findPinTarget(meetingId, planId, userId).pin()
+        findPinTarget(planId, userId).pin()
     }
 
     @Transactional
     fun unpinPlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ) {
-        findPinTarget(meetingId, planId, userId).unpin()
+        findPinTarget(planId, userId).unpin()
     }
 
     private fun findMeeting(meetingId: Long): Meeting =
@@ -201,28 +194,24 @@ class PlanService(
     }
 
     private fun findPinTarget(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ): Plan {
-        val meeting = findMeeting(meetingId)
+        val plan = findPlan(planId)
+        val meeting = plan.meeting
         findGroupMember(meeting, userId)
 
-        return planRepository.findByIdAndMeetingId(planId, meetingId)
-            ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
+        return plan
     }
 
     private fun updatePlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
         update: (Plan) -> Unit,
     ): Plan {
-        val meeting = findMeeting(meetingId)
+        val plan = findPlan(planId)
+        val meeting = plan.meeting
         val groupMember = findGroupMember(meeting, userId)
-        val plan =
-            planRepository.findByIdAndMeetingId(planId, meetingId)
-                ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
 
         if (!plan.isCreatedBy(groupMember)) {
             throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
@@ -236,6 +225,10 @@ class PlanService(
 
         return plan
     }
+
+    private fun findPlan(planId: Long): Plan =
+        planRepository.findByIdWithMeetingAndCreator(planId)
+            ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
 
     private fun validateMeetingNotEnded(
         meeting: Meeting,

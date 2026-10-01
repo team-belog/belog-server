@@ -101,7 +101,6 @@ class PlanServiceTest {
 
         val result =
             planService.updateLinkPlan(
-                meetingId = 1L,
                 planId = 20L,
                 userId = 15L,
                 category = PlanCategory.CAFE,
@@ -123,7 +122,6 @@ class PlanServiceTest {
         val exception =
             assertFailsWith<BusinessException> {
                 planService.updateMemoPlan(
-                    meetingId = 1L,
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.OTHER,
@@ -142,7 +140,7 @@ class PlanServiceTest {
     fun `서비스에서 계획 작성자는 자신의 계획을 삭제할 수 있다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
 
-        planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.deletePlan(planId = 20L, userId = 15L)
 
         verify(planLikeRepository).deleteAllByPlanId(20L)
         verify(planRepository).delete(target.plan)
@@ -152,7 +150,7 @@ class PlanServiceTest {
     fun `서비스에서 만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = false, loginIsMeetingCreator = true)
 
-        planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.deletePlan(planId = 20L, userId = 15L)
 
         verify(planLikeRepository).deleteAllByPlanId(20L)
         verify(planRepository).delete(target.plan)
@@ -164,7 +162,7 @@ class PlanServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+                planService.deletePlan(planId = 20L, userId = 15L)
             }
 
         assertEquals(PreLogErrorCode.PLAN_DELETE_FORBIDDEN, exception.errorCode)
@@ -173,17 +171,12 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `다른 만남에 속한 계획은 수정하거나 삭제할 수 없다`() {
-        val context = meetingContext()
-        val groupMember = mock(GroupMember::class.java)
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
-        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(null)
+    fun `존재하지 않는 계획은 수정하거나 삭제할 수 없다`() {
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(null)
 
         val updateException =
             assertFailsWith<BusinessException> {
                 planService.updateLinkPlan(
-                    meetingId = 1L,
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
@@ -193,7 +186,7 @@ class PlanServiceTest {
             }
         val deleteException =
             assertFailsWith<BusinessException> {
-                planService.deletePlan(meetingId = 1L, planId = 20L, userId = 15L)
+                planService.deletePlan(planId = 20L, userId = 15L)
             }
 
         assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, updateException.errorCode)
@@ -205,7 +198,7 @@ class PlanServiceTest {
     fun `일반 그룹 멤버는 다른 사용자의 계획을 핀 고정할 수 있다`() {
         val plan = stubPlanPinTarget()
 
-        planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.pinPlan(planId = 20L, userId = 15L)
 
         assertTrue(plan.pinned)
     }
@@ -214,7 +207,7 @@ class PlanServiceTest {
     fun `일반 그룹 멤버는 다른 사용자가 고정한 계획을 해제할 수 있다`() {
         val plan = stubPlanPinTarget(initiallyPinned = true)
 
-        planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+        planService.unpinPlan(planId = 20L, userId = 15L)
 
         assertFalse(plan.pinned)
     }
@@ -222,21 +215,23 @@ class PlanServiceTest {
     @Test
     fun `그룹 멤버가 아니면 계획을 핀 고정하거나 해제할 수 없다`() {
         val context = meetingContext()
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        val plan = mock(Plan::class.java)
+        `when`(plan.meeting).thenReturn(context.meeting)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
 
         val pinException =
             assertFailsWith<BusinessException> {
-                planService.pinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+                planService.pinPlan(planId = 20L, userId = 15L)
             }
         val unpinException =
             assertFailsWith<BusinessException> {
-                planService.unpinPlan(meetingId = 1L, planId = 20L, userId = 15L)
+                planService.unpinPlan(planId = 20L, userId = 15L)
             }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, pinException.errorCode)
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unpinException.errorCode)
-        verifyNoInteractions(planRepository)
+        verifyNoInteractions(planLikeRepository)
     }
 
     @Test
@@ -391,9 +386,8 @@ class PlanServiceTest {
             plan.pin()
         }
 
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
-        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
 
         return plan
     }
@@ -423,9 +417,8 @@ class PlanServiceTest {
             )
         ReflectionTestUtils.setField(plan, "id", 20L)
 
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
-        `when`(planRepository.findByIdAndMeetingId(20L, 1L)).thenReturn(plan)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
         `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(loginIsMeetingCreator)
 
         return PlanActionTarget(plan)

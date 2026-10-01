@@ -27,18 +27,16 @@ import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/v1/meetings/{meetingId}/pre-log")
 class PreLogController(
     private val preLogService: PreLogService,
     private val planService: PlanService,
     private val planLikeService: PlanLikeService,
 ) : PreLogSwagger {
-    @GetMapping
+    @GetMapping("/api/v1/meetings/{meetingId}/pre-log")
     override fun getPreLogMain(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -55,7 +53,7 @@ class PreLogController(
             )
     }
 
-    @GetMapping("/plans")
+    @GetMapping("/api/v1/meetings/{meetingId}/pre-log/plans")
     override fun getPlans(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -84,7 +82,7 @@ class PreLogController(
             )
     }
 
-    @PostMapping("/plans")
+    @PostMapping("/api/v1/meetings/{meetingId}/pre-log/plans")
     override fun createPlan(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -121,10 +119,9 @@ class PreLogController(
             )
     }
 
-    @PutMapping("/plans/{planId}")
+    @PutMapping("/api/v1/plans/{planId}")
     override fun updatePlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
         @Valid @RequestBody request: UpdatePlanRequest,
     ): ResponseEntity<CommonResponse<UpdatePlanResponse>> {
@@ -132,7 +129,6 @@ class PreLogController(
             when (request.type) {
                 PlanType.LINK ->
                     planService.updateLinkPlan(
-                        meetingId = meetingId,
                         planId = planId,
                         userId = userId,
                         category = request.category,
@@ -142,7 +138,6 @@ class PreLogController(
 
                 PlanType.MEMO ->
                     planService.updateMemoPlan(
-                        meetingId = meetingId,
                         planId = planId,
                         userId = userId,
                         category = request.category,
@@ -161,54 +156,49 @@ class PreLogController(
             )
     }
 
-    @DeleteMapping("/plans/{planId}")
+    @DeleteMapping("/api/v1/plans/{planId}")
     override fun deletePlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
     ): ResponseEntity<CommonResponse<Nothing>> {
-        planService.deletePlan(meetingId = meetingId, planId = planId, userId = userId)
+        planService.deletePlan(planId = planId, userId = userId)
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_DELETED.status)
             .build()
     }
 
-    @PutMapping("/plans/{planId}/pin")
+    @PutMapping("/api/v1/plans/{planId}/pin")
     override fun pinPlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
     ): ResponseEntity<CommonResponse<Nothing>> {
-        planService.pinPlan(meetingId = meetingId, planId = planId, userId = userId)
+        planService.pinPlan(planId = planId, userId = userId)
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_PINNED.status)
             .body(CommonResponse.success(PreLogSuccessCode.PLAN_PINNED))
     }
 
-    @DeleteMapping("/plans/{planId}/pin")
+    @DeleteMapping("/api/v1/plans/{planId}/pin")
     override fun unpinPlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
     ): ResponseEntity<CommonResponse<Nothing>> {
-        planService.unpinPlan(meetingId = meetingId, planId = planId, userId = userId)
+        planService.unpinPlan(planId = planId, userId = userId)
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_UNPINNED.status)
             .body(CommonResponse.success(PreLogSuccessCode.PLAN_UNPINNED))
     }
 
-    @PutMapping("/plans/{planId}/likes/me")
+    @PutMapping("/api/v1/plans/{planId}/likes/me")
     override fun likePlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
     ): ResponseEntity<CommonResponse<PlanLikeResponse>> {
         val result =
             planLikeService.likePlan(
-                meetingId = meetingId,
                 planId = planId,
                 userId = userId,
             )
@@ -223,15 +213,13 @@ class PreLogController(
             )
     }
 
-    @DeleteMapping("/plans/{planId}/likes/me")
+    @DeleteMapping("/api/v1/plans/{planId}/likes/me")
     override fun unlikePlan(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable planId: Long,
     ): ResponseEntity<CommonResponse<PlanLikeResponse>> {
         val result =
             planLikeService.unlikePlan(
-                meetingId = meetingId,
                 planId = planId,
                 userId = userId,
             )

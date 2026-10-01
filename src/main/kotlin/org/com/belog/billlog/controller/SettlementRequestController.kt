@@ -13,17 +13,15 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
-import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/api/v1/meetings/{meetingId}/bill-log/settlement-requests")
 class SettlementRequestController(
     private val billLogService: BillLogService,
     private val settlementRequestService: SettlementRequestService,
 ) : SettlementRequestSwagger {
-    @GetMapping
+    @GetMapping("/api/v1/meetings/{meetingId}/bill-log/settlement-requests")
     override fun getSettlementRequests(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
@@ -48,14 +46,12 @@ class SettlementRequestController(
             )
     }
 
-    @PutMapping("/{settlementRequestId}/completion")
+    @PutMapping("/api/v1/settlement-requests/{settlementRequestId}/completion")
     override fun complete(
         @LoginUserId userId: Long,
-        @PathVariable meetingId: Long,
         @PathVariable settlementRequestId: Long,
     ): ResponseEntity<Void> {
         settlementRequestService.complete(
-            meetingId = meetingId,
             settlementRequestId = settlementRequestId,
             requesterUserId = userId,
         )

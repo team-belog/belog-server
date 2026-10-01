@@ -4,9 +4,7 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
-import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
-import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.repository.PlanLikeRepository
@@ -17,18 +15,16 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PlanLikeService(
-    private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
     private val planLikeRepository: PlanLikeRepository,
 ) {
     @Transactional
     fun likePlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ): PlanLikeResult {
-        val target = findLikeTarget(meetingId, planId, userId)
+        val target = findLikeTarget(planId, userId)
 
         planLikeRepository.saveIfAbsent(
             planId = target.planId,
@@ -43,11 +39,10 @@ class PlanLikeService(
 
     @Transactional
     fun unlikePlan(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ): PlanLikeResult {
-        val target = findLikeTarget(meetingId, planId, userId)
+        val target = findLikeTarget(planId, userId)
 
         planLikeRepository.deleteByPlanIdAndGroupMemberId(
             planId = target.planId,
@@ -61,23 +56,18 @@ class PlanLikeService(
     }
 
     private fun findLikeTarget(
-        meetingId: Long,
         planId: Long,
         userId: Long,
     ): PlanLikeTarget {
-        val meeting = findMeeting(meetingId)
+        val plan = findPlan(planId)
+        val meeting = plan.meeting
         val groupMember = findGroupMember(meeting, userId)
-        val plan = findPlan(meetingId, planId)
 
         return PlanLikeTarget(
             planId = checkNotNull(plan.id) { "좋아요 대상 계획의 ID가 없습니다." },
             groupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." },
         )
     }
-
-    private fun findMeeting(meetingId: Long): Meeting =
-        meetingRepository.findActiveById(meetingId)
-            ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
 
     private fun findGroupMember(
         meeting: Meeting,
@@ -88,11 +78,8 @@ class PlanLikeService(
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
-    private fun findPlan(
-        meetingId: Long,
-        planId: Long,
-    ): Plan =
-        planRepository.findByIdAndMeetingId(planId, meetingId)
+    private fun findPlan(planId: Long): Plan =
+        planRepository.findByIdWithMeetingAndCreator(planId)
             ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
 
     private fun createResult(

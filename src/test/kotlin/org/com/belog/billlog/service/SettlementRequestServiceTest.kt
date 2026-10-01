@@ -90,7 +90,6 @@ class SettlementRequestServiceTest {
         val context = saveSettlementContext()
 
         settlementRequestService.complete(
-            meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
         )
@@ -108,7 +107,6 @@ class SettlementRequestServiceTest {
         val exception =
             assertFailsWith<BusinessException> {
                 settlementRequestService.complete(
-                    meetingId = context.meetingId,
                     settlementRequestId = context.settlementRequestId,
                     requesterUserId = context.payerUserId,
                 )
@@ -120,22 +118,13 @@ class SettlementRequestServiceTest {
     }
 
     @Test
-    fun `다른 만남에 속한 정산 요청은 완료할 수 없다`() {
+    fun `존재하지 않는 정산 요청은 완료할 수 없다`() {
         val context = saveSettlementContext()
-        val otherMeeting =
-            meetingRepository.saveAndFlush(
-                createMeeting(
-                    group = context.group,
-                    creator = context.payerMember,
-                    name = "다른 만남",
-                ),
-            )
 
         val exception =
             assertFailsWith<BusinessException> {
                 settlementRequestService.complete(
-                    meetingId = requireNotNull(otherMeeting.id),
-                    settlementRequestId = context.settlementRequestId,
+                    settlementRequestId = Long.MAX_VALUE,
                     requesterUserId = context.settlementTargetUserId,
                 )
             }
@@ -150,13 +139,11 @@ class SettlementRequestServiceTest {
         val context = saveSettlementContext()
 
         settlementRequestService.complete(
-            meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
         )
         flushAndClear()
         settlementRequestService.complete(
-            meetingId = context.meetingId,
             settlementRequestId = context.settlementRequestId,
             requesterUserId = context.settlementTargetUserId,
         )
