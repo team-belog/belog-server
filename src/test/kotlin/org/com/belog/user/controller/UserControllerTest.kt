@@ -1,5 +1,6 @@
 package org.com.belog.user.controller
 
+import org.com.belog.postlog.service.PostLogCalendarService
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageUpload
@@ -37,6 +38,9 @@ class UserControllerTest {
 
     @MockitoBean
     private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var postLogCalendarService: PostLogCalendarService
 
     @Test
     fun `닉네임만 수정하면 기존 프로필 이미지를 유지하도록 요청한다`() {

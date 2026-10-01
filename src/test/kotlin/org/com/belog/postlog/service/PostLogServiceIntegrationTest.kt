@@ -2,7 +2,6 @@ package org.com.belog.postlog.service
 
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
-import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
@@ -356,7 +355,7 @@ class PostLogServiceIntegrationTest {
                 memory = "함께한 광주 여행",
             )
 
-        val result = postLogService.getTicket(context.meetingId, context.creatorUserId)
+        val result = postLogService.getTicket(createdTicket.postLogId, context.creatorUserId)
 
         assertEquals(createdTicket.postLogId, result.postLogId)
         assertEquals(context.meetingId, result.meetingId)
@@ -371,22 +370,17 @@ class PostLogServiceIntegrationTest {
     fun `임시저장만 한 Post-log는 티켓으로 조회할 수 없다`() {
         val context = saveMeetingContext()
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
+        val draftPostLog =
+            checkNotNull(
+                postLogRepository.findByMeetingIdAndCreatedById(
+                    context.meetingId,
+                    checkNotNull(context.creator.id),
+                ),
+            )
 
         val exception =
             assertFailsWith<BusinessException> {
-                postLogService.getTicket(context.meetingId, context.creatorUserId)
-            }
-
-        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
-    }
-
-    @Test
-    fun `Post-log가 없으면 티켓을 조회할 수 없다`() {
-        val context = saveMeetingContext()
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                postLogService.getTicket(context.meetingId, context.creatorUserId)
+                postLogService.getTicket(checkNotNull(draftPostLog.id), context.creatorUserId)
             }
 
         assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
@@ -403,30 +397,37 @@ class PostLogServiceIntegrationTest {
         val otherMemberTicket =
             postLogService.createTicket(context.meetingId, otherUserId, "다른 멤버의 추억")
 
-        val creatorResult = postLogService.getTicket(context.meetingId, context.creatorUserId)
-        val otherMemberResult = postLogService.getTicket(context.meetingId, otherUserId)
+        val creatorResult = postLogService.getTicket(creatorTicket.postLogId, context.creatorUserId)
+        val otherMemberResult = postLogService.getTicket(otherMemberTicket.postLogId, otherUserId)
+        val exception =
+            assertFailsWith<BusinessException> {
+                postLogService.getTicket(otherMemberTicket.postLogId, context.creatorUserId)
+            }
 
         assertEquals(creatorTicket.postLogId, creatorResult.postLogId)
         assertEquals("생성자의 추억", creatorResult.memory)
         assertEquals(otherMemberTicket.postLogId, otherMemberResult.postLogId)
         assertEquals("다른 멤버의 추억", otherMemberResult.memory)
+        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
     }
 
     @Test
     fun `그룹 멤버가 아닌 사용자는 티켓을 조회할 수 없다`() {
         val context = saveMeetingContext()
         val outsider = saveCompletedUser("outsider")
+        val createdTicket =
+            postLogService.createTicket(context.meetingId, context.creatorUserId, "생성자의 추억")
 
         val exception =
             assertFailsWith<BusinessException> {
-                postLogService.getTicket(context.meetingId, checkNotNull(outsider.id))
+                postLogService.getTicket(createdTicket.postLogId, checkNotNull(outsider.id))
             }
 
-        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
     }
 
     @Test
-    fun `존재하지 않는 만남의 티켓은 조회할 수 없다`() {
+    fun `존재하지 않는 Post-log의 티켓은 조회할 수 없다`() {
         val context = saveMeetingContext()
 
         val exception =
@@ -434,7 +435,7 @@ class PostLogServiceIntegrationTest {
                 postLogService.getTicket(Long.MAX_VALUE, context.creatorUserId)
             }
 
-        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+        assertEquals(PostLogErrorCode.TICKET_NOT_FOUND, exception.errorCode)
     }
 
     @Test

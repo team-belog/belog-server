@@ -212,7 +212,7 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 티켓 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 본인이 생성한 개인 티켓을 조회합니다. " +
+            "로그인한 사용자가 본인이 생성한 개인 티켓을 Post-log ID로 조회합니다. " +
                 "티켓 생성 API와 동일한 응답 구조를 반환합니다.",
     )
     @ApiResponses(
@@ -230,27 +230,13 @@ interface PostLogSwagger {
             ),
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
-                responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
-                    ),
-                ],
-            ),
-            ApiResponse(
                 responseCode = "404",
-                description = "만남 또는 로그인한 그룹 멤버가 생성한 티켓을 찾을 수 없음",
+                description = "로그인한 사용자가 생성한 티켓을 찾을 수 없음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [
-                            ExampleObject(name = "만남 없음", value = MEETING_NOT_FOUND_EXAMPLE),
-                            ExampleObject(name = "티켓 없음", value = TICKET_NOT_FOUND_EXAMPLE),
-                        ],
+                        examples = [ExampleObject(value = TICKET_NOT_FOUND_EXAMPLE)],
                     ),
                 ],
             ),
@@ -260,9 +246,9 @@ interface PostLogSwagger {
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
-        @Parameter(description = "만남 ID", example = "7", required = true)
+        @Parameter(description = "Post-log ID", example = "11", required = true)
         @PathVariable
-        meetingId: Long,
+        postLogId: Long,
     ): ResponseEntity<CommonResponse<PostLogTicketResponse>>
 
     @Operation(

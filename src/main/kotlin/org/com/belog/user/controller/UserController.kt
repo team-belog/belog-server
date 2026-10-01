@@ -1,10 +1,14 @@
 package org.com.belog.user.controller
 
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.global.response.code.CommonSuccessCode
+import org.com.belog.postlog.code.PostLogSuccessCode
+import org.com.belog.postlog.service.PostLogCalendarService
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.code.UserSuccessCode
 import org.com.belog.user.controller.dto.request.CompleteOnboardingRequest
@@ -14,6 +18,7 @@ import org.com.belog.user.controller.dto.request.UpdateBankAccountRequest
 import org.com.belog.user.controller.dto.request.UpdateUserProfileRequest
 import org.com.belog.user.controller.dto.response.BankAccountResponse
 import org.com.belog.user.controller.dto.response.NicknameAvailabilityResponse
+import org.com.belog.user.controller.dto.response.PostLogTicketCalendarResponse
 import org.com.belog.user.controller.dto.response.ProfileImageUploadUrlResponse
 import org.com.belog.user.controller.dto.response.UserProfileResponse
 import org.com.belog.user.controller.swagger.UserSwagger
@@ -36,7 +41,26 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userService: UserService,
+    private val postLogCalendarService: PostLogCalendarService,
 ) : UserSwagger {
+    @GetMapping("/me/post-logs/calendar")
+    override fun getMyTicketCalendar(
+        @LoginUserId userId: Long,
+        @RequestParam @Min(1000) @Max(9999) year: Int,
+        @RequestParam @Min(1) @Max(12) month: Int,
+    ): ResponseEntity<CommonResponse<PostLogTicketCalendarResponse>> {
+        val result = postLogCalendarService.getMyTicketCalendar(userId, year, month)
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.TICKET_CALENDAR_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PostLogSuccessCode.TICKET_CALENDAR_RETRIEVED,
+                    PostLogTicketCalendarResponse.from(result),
+                ),
+            )
+    }
+
     @GetMapping("/me/profile")
     override fun getProfile(
         @LoginUserId userId: Long,

@@ -17,4 +17,5 @@ enum class PostLogSuccessCode(
     TICKET_CREATED(HttpStatus.CREATED, "POST_LOG-S007", "Post-log 티켓이 생성되었습니다."),
     DRAFT_SAVED(HttpStatus.OK, "POST_LOG-S008", "Post-log 추억 문구가 임시저장되었습니다."),
     TICKET_RETRIEVED(HttpStatus.OK, "POST_LOG-S009", "Post-log 티켓이 조회되었습니다."),
+    TICKET_CALENDAR_RETRIEVED(HttpStatus.OK, "POST_LOG-S010", "월별 티켓 달력이 조회되었습니다."),
 }
