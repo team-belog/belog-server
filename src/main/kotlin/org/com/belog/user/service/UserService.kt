@@ -69,6 +69,7 @@ class UserService(
 
         return UserProfileResult(
             nickname = requireNotNull(user.nickname),
+            email = user.email,
             profileImageUrl = resolveProfileImageUrl(user),
         )
     }

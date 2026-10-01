@@ -31,7 +31,7 @@ interface UserSwagger {
     @Operation(
         summary = "내 프로필 조회",
         description =
-            "로그인한 사용자의 닉네임과 표시용 프로필 이미지 URL을 조회합니다. " +
+            "로그인한 사용자의 닉네임, 이메일과 표시용 프로필 이미지 URL을 조회합니다. " +
                 "앱 기본 이미지를 사용하는 경우 profileImageUrl은 null입니다.",
     )
     @ApiResponses(
@@ -469,10 +469,10 @@ private const val PROFILE_IMAGE_UPLOAD_URL_REQUEST_EXAMPLE =
     """{"contentType":"image/webp","fileSize":524288}"""
 
 private const val PROFILE_SUCCESS_EXAMPLE =
-    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
 
 private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
-    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","profileImageUrl":null}}"""
+    """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":null}}"""
 
 private const val UPDATE_PROFILE_NICKNAME_REQUEST_EXAMPLE =
     """{"nickname":"피블"}"""
