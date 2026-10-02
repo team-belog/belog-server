@@ -6,6 +6,7 @@ import java.time.YearMonth
 data class PostLogTicketCalendarResult(
     val yearMonth: YearMonth,
     val today: LocalDate,
+    val hasUnreadNotification: Boolean,
     val memoryCount: Int,
     val tickets: List<PostLogTicketCalendarItemResult>,
 )

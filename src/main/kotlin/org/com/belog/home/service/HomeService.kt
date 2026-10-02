@@ -20,6 +20,7 @@ import org.com.belog.home.service.result.HomeCalendarResult
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.notification.service.NotificationQueryService
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.user.service.UserService
 import org.springframework.data.domain.PageRequest
@@ -37,6 +38,7 @@ class HomeService(
     private val postLogPhotoRepository: PostLogPhotoRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
+    private val notificationQueryService: NotificationQueryService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -55,6 +57,7 @@ class HomeService(
         return HomeCalendarResult(
             yearMonth = yearMonth,
             today = clock.currentBusinessDate(),
+            hasUnreadNotification = notificationQueryService.hasUnreadNotification(userId),
             meetings =
                 meetings.map { meeting ->
                     HomeCalendarMeetingResult(

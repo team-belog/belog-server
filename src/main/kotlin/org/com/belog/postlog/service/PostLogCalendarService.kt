@@ -2,6 +2,7 @@ package org.com.belog.postlog.service
 
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.global.time.currentBusinessDate
+import org.com.belog.notification.service.NotificationQueryService
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.postlog.service.result.PostLogTicketCalendarItemResult
@@ -16,6 +17,7 @@ class PostLogCalendarService(
     private val postLogRepository: PostLogRepository,
     private val postLogPhotoRepository: PostLogPhotoRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val notificationQueryService: NotificationQueryService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -43,6 +45,7 @@ class PostLogCalendarService(
         return PostLogTicketCalendarResult(
             yearMonth = yearMonth,
             today = clock.currentBusinessDate(),
+            hasUnreadNotification = notificationQueryService.hasUnreadNotification(userId),
             memoryCount = tickets.size,
             tickets = tickets,
         )

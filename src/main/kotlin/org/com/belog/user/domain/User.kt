@@ -87,6 +87,10 @@ class User protected constructor(
     var onboardingCompletedAt: Instant? = null
         protected set
 
+    @Column(name = "push_notification_enabled", nullable = false)
+    var pushNotificationEnabled: Boolean = true
+        protected set
+
     val isOnboardingCompleted: Boolean
         get() = onboardingCompletedAt != null
 
@@ -149,6 +153,10 @@ class User protected constructor(
         if (socialProfileImageUrl != null) {
             this.socialProfileImageUrl = normalizeSocialProfileImageUrl(socialProfileImageUrl)
         }
+    }
+
+    fun updatePushNotificationEnabled(enabled: Boolean) {
+        pushNotificationEnabled = enabled
     }
 
     companion object {

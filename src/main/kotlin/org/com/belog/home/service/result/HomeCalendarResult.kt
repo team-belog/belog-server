@@ -6,6 +6,7 @@ import java.time.YearMonth
 data class HomeCalendarResult(
     val yearMonth: YearMonth,
     val today: LocalDate,
+    val hasUnreadNotification: Boolean,
     val meetings: List<HomeCalendarMeetingResult>,
 )
 

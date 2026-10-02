@@ -175,7 +175,7 @@ interface HomeSwagger {
 
     companion object {
         private const val HOME_CALENDAR_SUCCESS_EXAMPLE =
-            """{"code":"HOME-S001","message":"홈 달력을 조회했습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","meetings":[{"meetingId":11,"startDate":"2026-08-17","endDate":"2026-08-18"}]}}"""
+            """{"code":"HOME-S001","message":"홈 달력을 조회했습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","hasUnreadNotification":true,"meetings":[{"meetingId":11,"startDate":"2026-08-17","endDate":"2026-08-18"}]}}"""
 
         private const val ACTIVE_MEETINGS_SUCCESS_EXAMPLE =
             """{"code":"HOME-S002","message":"진행 중인 만남 목록을 조회했습니다.","data":{"items":[{"meetingId":10,"name":"제주 여행","startDate":null,"endDate":null,"groupName":"피놀리와 기니휘기","progressStatus":"SCHEDULING","participantCount":3,"previewParticipants":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":null}]},{"meetingId":11,"name":"1박 2일 광주 여행","startDate":"2026-08-20","endDate":"2026-08-21","groupName":"피놀리와 기니휘기","progressStatus":"UPCOMING","participantCount":3,"previewParticipants":[]}],"nextCursor":null,"hasNext":false}}"""
