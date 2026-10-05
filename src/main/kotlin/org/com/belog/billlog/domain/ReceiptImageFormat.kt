@@ -17,5 +17,10 @@ enum class ReceiptImageFormat(
             val normalizedContentType = contentType.trim().lowercase(Locale.ROOT)
             return entries.firstOrNull { format -> format.contentType == normalizedContentType }
         }
+
+        fun fromExtension(extension: String): ReceiptImageFormat? {
+            val normalizedExtension = extension.trim().lowercase(Locale.ROOT)
+            return entries.firstOrNull { format -> format.extension == normalizedExtension }
+        }
     }
 }
