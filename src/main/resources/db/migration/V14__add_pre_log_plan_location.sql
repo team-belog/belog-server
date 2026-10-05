@@ -31,7 +31,7 @@ ALTER TABLE pre_log_plans
         longitude IS NULL OR longitude BETWEEN -180 AND 180
     ),
     ADD CONSTRAINT chk_pre_log_plans_map_provider CHECK (
-        map_provider IS NULL OR map_provider IN ('GOOGLE')
+        map_provider IS NULL OR map_provider IN ('GOOGLE', 'KAKAO')
     ),
     ADD CONSTRAINT chk_pre_log_plans_external_place_id CHECK (
         external_place_id IS NULL OR CHAR_LENGTH(TRIM(external_place_id)) BETWEEN 1 AND 512

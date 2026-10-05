@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service
 @Service
 class PlanLinkService(
     private val planService: PlanService,
-    private val planLocationResolver: PlanLocationResolver,
+    private val planLocationResolvers: List<PlanLocationResolver>,
 ) {
     fun createLinkPlan(
         meetingId: Long,
@@ -17,7 +17,7 @@ class PlanLinkService(
         url: String,
     ): Plan {
         planService.validatePlanCreation(meetingId = meetingId, userId = creatorUserId)
-        val resolution = planLocationResolver.resolve(url)
+        val resolution = resolveLocation(url)
 
         return planService.createLinkPlan(
             meetingId = meetingId,
@@ -42,7 +42,7 @@ class PlanLinkService(
             if (currentUrl == normalizedUrl) {
                 null
             } else {
-                planLocationResolver.resolve(normalizedUrl)
+                resolveLocation(normalizedUrl)
             }
 
         return planService.updateLinkPlan(
@@ -54,4 +54,11 @@ class PlanLinkService(
             locationResolution = resolution,
         )
     }
+
+    private fun resolveLocation(url: String): PlanLocationResolution =
+        planLocationResolvers
+            .asSequence()
+            .map { resolver -> resolver.resolve(url) }
+            .firstOrNull { resolution -> resolution != PlanLocationResolution.NotApplicable }
+            ?: PlanLocationResolution.NotApplicable
 }

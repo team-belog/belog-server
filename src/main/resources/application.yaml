@@ -55,6 +55,11 @@ google:
     read-timeout: "${GOOGLE_MAPS_READ_TIMEOUT:3s}"
     max-redirects: "${GOOGLE_MAPS_MAX_REDIRECTS:3}"
 
+kakao:
+  maps:
+    connection-timeout: "${KAKAO_MAPS_CONNECTION_TIMEOUT:2s}"
+    read-timeout: "${KAKAO_MAPS_READ_TIMEOUT:3s}"
+
 storage:
   s3:
     bucket: "${AWS_S3_BUCKET}"
