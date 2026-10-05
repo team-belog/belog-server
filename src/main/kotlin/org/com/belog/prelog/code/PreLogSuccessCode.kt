@@ -17,4 +17,5 @@ enum class PreLogSuccessCode(
     PLAN_PINNED(HttpStatus.OK, "PRE_LOG-S007", "계획이 핀 고정되었습니다."),
     PLAN_UNPINNED(HttpStatus.OK, "PRE_LOG-S008", "계획 핀 고정이 해제되었습니다."),
     PLAN_DELETED(HttpStatus.NO_CONTENT, "PRE_LOG-S009", "계획이 삭제되었습니다."),
+    MAP_PLAN_LIST_RETRIEVED(HttpStatus.OK, "PRE_LOG-S010", "지도 계획 목록을 조회했습니다."),
 }

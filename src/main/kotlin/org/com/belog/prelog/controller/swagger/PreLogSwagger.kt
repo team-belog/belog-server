@@ -19,6 +19,7 @@ import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
+import org.com.belog.prelog.controller.dto.response.MapPlanListResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
@@ -163,6 +164,61 @@ interface PreLogSwagger {
         @Max(50)
         size: Int,
     ): ResponseEntity<CommonResponse<PlanListResponse>>
+
+    @Operation(
+        summary = "Pre-log 지도 계획 목록 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 링크 계획을 조회합니다. " +
+                "카테고리 필터와 계획 ID 기반 커서 페이지네이션을 지원합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "지도 계획 목록 조회 성공", useReturnTypeSchema = true),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getMapPlans(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 카테고리. 생략하면 전체 카테고리를 조회", example = "RESTAURANT")
+        @RequestParam(required = false)
+        category: PlanCategory?,
+        @Parameter(description = "마지막으로 조회한 계획 ID", example = "120")
+        @RequestParam(required = false)
+        @Positive
+        cursor: Long?,
+        @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<MapPlanListResponse>>
 
     @Operation(
         summary = "Pre-log 계획 생성",
