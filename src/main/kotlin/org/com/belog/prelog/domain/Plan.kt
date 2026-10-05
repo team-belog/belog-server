@@ -2,6 +2,7 @@ package org.com.belog.prelog.domain
 
 import jakarta.persistence.CheckConstraint
 import jakarta.persistence.Column
+import jakarta.persistence.Embedded
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -104,6 +105,15 @@ class Plan protected constructor(
     var pinned: Boolean = false
         protected set
 
+    @Embedded
+    var location: PlanLocation? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "location_status", nullable = false, length = 20)
+    var locationStatus: LocationResolutionStatus = LocationResolutionStatus.NOT_APPLICABLE
+        protected set
+
     fun pin() {
         pinned = true
     }
@@ -119,6 +129,10 @@ class Plan protected constructor(
     ) {
         val normalizedTitle = normalizeTitle(title)
         val normalizedUrl = normalizeUrl(url)
+
+        if (this.url != normalizedUrl) {
+            clearLocation()
+        }
 
         this.type = PlanType.LINK
         this.category = category
@@ -140,6 +154,30 @@ class Plan protected constructor(
         this.title = normalizedTitle
         this.url = null
         this.content = normalizedContent
+        clearLocation()
+    }
+
+    fun resolveLocation(location: PlanLocation) {
+        require(type == PlanType.LINK && url != null) {
+            "링크 계획에만 위치 정보를 저장할 수 있습니다."
+        }
+
+        this.location = location
+        this.locationStatus = LocationResolutionStatus.RESOLVED
+    }
+
+    fun failLocationResolution() {
+        require(type == PlanType.LINK && url != null) {
+            "링크 계획에만 위치 정보 추출 실패 상태를 기록할 수 있습니다."
+        }
+
+        this.location = null
+        this.locationStatus = LocationResolutionStatus.FAILED
+    }
+
+    private fun clearLocation() {
+        location = null
+        locationStatus = LocationResolutionStatus.NOT_APPLICABLE
     }
 
     fun isCreatedBy(groupMember: GroupMember): Boolean {

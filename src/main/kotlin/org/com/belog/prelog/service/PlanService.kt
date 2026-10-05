@@ -264,7 +264,7 @@ class PlanService(
             category = category,
             title = title,
             url = url,
-            address = null,
+            address = location?.address,
             thumbnailUrl = null,
             likeCount = 0,
             likedByMe = false,
