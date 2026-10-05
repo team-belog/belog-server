@@ -23,4 +23,6 @@ enum class BillLogErrorCode(
     SETTLEMENT_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "BILL_LOG-E013", "정산 요청을 찾을 수 없습니다."),
     SETTLEMENT_REQUEST_ACCESS_DENIED(HttpStatus.FORBIDDEN, "BILL_LOG-E014", "정산 요청 대상자만 완료할 수 있습니다."),
     INVALID_SETTLEMENT_REQUEST_CURSOR(HttpStatus.BAD_REQUEST, "BILL_LOG-E015", "정산 현황 커서가 올바르지 않습니다."),
+    UNSUPPORTED_RECEIPT_IMAGE_TYPE(HttpStatus.BAD_REQUEST, "BILL_LOG-E016", "지원하지 않는 영수증 이미지 형식입니다."),
+    INVALID_RECEIPT_IMAGE_SIZE(HttpStatus.BAD_REQUEST, "BILL_LOG-E017", "영수증 이미지는 10MB 이하여야 합니다."),
 }

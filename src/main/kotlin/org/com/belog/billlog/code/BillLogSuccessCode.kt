@@ -13,4 +13,5 @@ enum class BillLogSuccessCode(
     BILL_LOG_SUMMARY_RETRIEVED(HttpStatus.OK, "BILL_LOG-S003", "Bill-log 요약 정보를 조회했습니다."),
     SETTLEMENT_REQUEST_LIST_RETRIEVED(HttpStatus.OK, "BILL_LOG-S004", "정산 현황을 조회했습니다."),
     BILL_LIST_RETRIEVED(HttpStatus.OK, "BILL_LOG-S005", "결제 내역을 조회했습니다."),
+    RECEIPT_IMAGE_UPLOAD_URL_ISSUED(HttpStatus.OK, "BILL_LOG-S006", "영수증 이미지 업로드 URL이 발급되었습니다."),
 }
