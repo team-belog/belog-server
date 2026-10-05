@@ -356,7 +356,13 @@ class PlanService(
             PlanLocationResolution.NotApplicable -> Unit
             is PlanLocationResolution.Resolved -> resolveLocation(resolution.location)
             PlanLocationResolution.Failed -> failLocationResolution()
-            is PlanLocationResolution.ProviderFailed -> failLocationResolution(resolution.provider, resolution.externalPlaceId)
+            is PlanLocationResolution.ProviderFailed ->
+                failLocationResolution(
+                    provider = resolution.provider,
+                    externalPlaceId = resolution.externalPlaceId,
+                    placeName = resolution.placeName,
+                    address = resolution.address,
+                )
         }
     }
 

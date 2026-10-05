@@ -172,15 +172,17 @@ class Plan protected constructor(
     fun failLocationResolution(
         provider: MapProvider? = null,
         externalPlaceId: String? = null,
+        placeName: String? = null,
+        address: String? = null,
     ) {
         require(type == PlanType.LINK && url != null) {
             "링크 계획에만 위치 정보 추출 실패 상태를 기록할 수 있습니다."
         }
-        require(provider != null || externalPlaceId == null) {
-            "지도 제공자 없이 외부 장소 ID를 저장할 수 없습니다."
+        require(provider != null || (externalPlaceId == null && placeName == null && address == null)) {
+            "지도 제공자 없이 장소 정보를 저장할 수 없습니다."
         }
 
-        this.location = provider?.let { PlanLocation.unresolved(it, externalPlaceId) }
+        this.location = provider?.let { PlanLocation.unresolved(it, externalPlaceId, placeName, address) }
         this.locationStatus = LocationResolutionStatus.FAILED
     }
 

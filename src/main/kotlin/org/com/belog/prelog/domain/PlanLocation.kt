@@ -58,15 +58,22 @@ class PlanLocation protected constructor(
         fun unresolved(
             provider: MapProvider,
             externalPlaceId: String?,
+            placeName: String? = null,
+            address: String? = null,
         ): PlanLocation =
             PlanLocation(
                 provider = provider,
-                externalPlaceId = normalizeOptional(externalPlaceId, EXTERNAL_PLACE_ID_MAX_LENGTH, "외부 장소 ID"),
-                placeName = null,
-                address = null,
+                externalPlaceId = normalizeExtractedOptional(externalPlaceId, EXTERNAL_PLACE_ID_MAX_LENGTH),
+                placeName = normalizeExtractedOptional(placeName, PLACE_NAME_MAX_LENGTH),
+                address = normalizeExtractedOptional(address, ADDRESS_MAX_LENGTH),
                 latitude = null,
                 longitude = null,
             )
+
+        private fun normalizeExtractedOptional(
+            value: String?,
+            maxLength: Int,
+        ): String? = value?.trim()?.takeIf { it.isNotEmpty() && it.length <= maxLength }
 
         private fun normalizeOptional(
             value: String?,

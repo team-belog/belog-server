@@ -22,36 +22,50 @@ class GoogleMapLocationResolver(
 
         val resolvedUri =
             if (urlDetector.isShortUrl(uri)) {
-                shortUrlResolver.resolve(uri) ?: return PlanLocationResolution.Failed
+                shortUrlResolver.resolve(uri) ?: return PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE)
             } else {
                 uri
             }
 
-        val reference = urlParser.parse(resolvedUri) ?: return PlanLocationResolution.Failed
+        val reference = urlParser.parse(resolvedUri) ?: return PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE)
         val place =
-            reference.placeId?.let(placesClient::getPlace)
-                ?: reference.placeName?.let { placeName -> placesClient.searchPlace(placeName, reference.coordinates) }
+            if (reference.placeId != null) {
+                placesClient.getPlace(reference.placeId)
+            } else {
+                reference.placeName?.let { placeName -> placesClient.searchPlace(placeName, reference.coordinates) }
+            }
 
-        return place?.let(::resolvePlace)
-            ?: reference.coordinates?.let { coordinates -> resolveCoordinates(coordinates, reference.placeName) }
-            ?: PlanLocationResolution.Failed
+        if (place != null) {
+            return resolvePlace(place, reference.placeId, reference.placeName, reference.coordinates)
+        }
+
+        return reference.coordinates?.let { coordinates -> resolveCoordinates(coordinates, reference.placeId, reference.placeName) }
+            ?: PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE, reference.placeId, reference.placeName)
     }
 
-    private fun resolvePlace(place: GooglePlace): PlanLocationResolution =
-        createResolvedLocation(
-            externalPlaceId = place.id,
-            placeName = place.name,
-            address = place.address,
-            latitude = place.latitude,
-            longitude = place.longitude,
-        )
+    private fun resolvePlace(
+        place: GooglePlace,
+        urlPlaceId: String?,
+        urlPlaceName: String?,
+        urlCoordinates: GoogleMapCoordinates?,
+    ): PlanLocationResolution {
+        val placeId = place.id ?: urlPlaceId
+        val placeName = place.name ?: urlPlaceName
+        val latitude = place.latitude ?: urlCoordinates?.latitude
+        val longitude = place.longitude ?: urlCoordinates?.longitude
+        if (latitude == null || longitude == null) {
+            return PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE, placeId, placeName, place.address)
+        }
+        return createResolvedLocation(placeId, placeName, place.address, latitude, longitude)
+    }
 
     private fun resolveCoordinates(
         coordinates: GoogleMapCoordinates,
+        placeId: String?,
         placeName: String?,
     ): PlanLocationResolution =
         createResolvedLocation(
-            externalPlaceId = null,
+            externalPlaceId = placeId,
             placeName = placeName,
             address = null,
             latitude = coordinates.latitude,
@@ -77,6 +91,6 @@ class GoogleMapLocationResolver(
                 ),
             )
         } catch (exception: IllegalArgumentException) {
-            PlanLocationResolution.Failed
+            PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE, externalPlaceId, placeName, address)
         }
 }

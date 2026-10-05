@@ -27,11 +27,14 @@ ALTER TABLE pre_log_plans
         (
             location_status = 'FAILED'
             AND (
-                (map_provider IS NULL AND external_place_id IS NULL)
-                OR (map_provider IS NOT NULL AND map_provider = 'NAVER')
+                (
+                    map_provider IS NULL
+                    AND external_place_id IS NULL
+                    AND place_name IS NULL
+                    AND address IS NULL
+                )
+                OR (map_provider IS NOT NULL AND map_provider IN ('GOOGLE', 'KAKAO', 'NAVER'))
             )
-            AND place_name IS NULL
-            AND address IS NULL
             AND latitude IS NULL
             AND longitude IS NULL
         )

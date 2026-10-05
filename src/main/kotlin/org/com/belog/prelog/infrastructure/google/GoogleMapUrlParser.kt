@@ -1,5 +1,6 @@
 package org.com.belog.prelog.infrastructure.google
 
+import org.com.belog.prelog.domain.PlanLocation
 import org.springframework.stereotype.Component
 import java.math.BigDecimal
 import java.net.URI
@@ -16,7 +17,9 @@ class GoogleMapUrlParser(
                 ?: parseEmbeddedCoordinates(uri.toString())
                 ?: parsePathCoordinates(uri.path.orEmpty())
                 ?: parsePlusCodeCoordinates(uri.toString())
-        val placeId = queryParameter(uri, "query_place_id")?.takeIf(String::isNotBlank)
+        val placeId =
+            queryParameter(uri, "query_place_id")
+                ?.takeIf { it.isNotBlank() && it.length <= PlanLocation.EXTERNAL_PLACE_ID_MAX_LENGTH }
         val placeName = parsePlaceName(uri)
 
         if (placeId == null && placeName == null && coordinates == null) {

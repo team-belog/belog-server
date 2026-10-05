@@ -15,5 +15,7 @@ sealed interface PlanLocationResolution {
     data class ProviderFailed(
         val provider: MapProvider,
         val externalPlaceId: String? = null,
+        val placeName: String? = null,
+        val address: String? = null,
     ) : PlanLocationResolution
 }

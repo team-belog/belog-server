@@ -31,23 +31,21 @@ class KakaoMapLocationResolver(
 
         val placeId =
             PLACE_PATH_REGEX.matchEntire(uri.path.orEmpty())?.groupValues?.get(1)
-                ?: return PlanLocationResolution.Failed
+                ?: return PlanLocationResolution.ProviderFailed(MapProvider.KAKAO)
+        val failed = PlanLocationResolution.ProviderFailed(MapProvider.KAKAO, placeId)
         val placeUri = URI.create("https://$PLACE_HOST/$placeId")
-        val html = fetchPlacePage(placeUri) ?: return PlanLocationResolution.Failed
+        val html = fetchPlacePage(placeUri) ?: return failed
         val metadata = parseMetadata(html)
         if (!isMatchingPlace(metadata["og:url"], placeId)) {
-            return PlanLocationResolution.Failed
+            return failed
         }
 
-        val placeName =
-            metadata["og:title"]?.let(HtmlUtils::htmlUnescape)?.takeIf(String::isNotBlank)
-                ?: return PlanLocationResolution.Failed
-        val address =
-            metadata["og:description"]?.let(HtmlUtils::htmlUnescape)?.takeIf(String::isNotBlank)
-                ?: return PlanLocationResolution.Failed
+        val placeName = metadata["og:title"]?.let(HtmlUtils::htmlUnescape)?.takeIf(String::isNotBlank)
+        val address = metadata["og:description"]?.let(HtmlUtils::htmlUnescape)?.takeIf(String::isNotBlank)
+        val partial = failed.copy(placeName = placeName, address = address)
         val coordinates =
             parseCoordinates(metadata["twitter:image"]?.let(HtmlUtils::htmlUnescape))
-                ?: return PlanLocationResolution.Failed
+                ?: return partial
 
         return try {
             PlanLocationResolution.Resolved(
@@ -61,7 +59,7 @@ class KakaoMapLocationResolver(
                 ),
             )
         } catch (exception: IllegalArgumentException) {
-            PlanLocationResolution.Failed
+            partial
         }
     }
 

@@ -70,13 +70,15 @@ class GooglePlacesClient(
     }
 
     private fun GooglePlaceResponse.toGooglePlace(): GooglePlace? {
-        val responseLocation = location ?: return null
+        if (id.isNullOrBlank() && displayName?.text.isNullOrBlank() && formattedAddress.isNullOrBlank() && location == null) {
+            return null
+        }
         return GooglePlace(
-            id = id,
+            id = id?.takeIf(String::isNotBlank),
             name = displayName?.text,
             address = formattedAddress,
-            latitude = responseLocation.latitude,
-            longitude = responseLocation.longitude,
+            latitude = location?.latitude,
+            longitude = location?.longitude,
         )
     }
 
@@ -99,15 +101,15 @@ class GooglePlacesClient(
 }
 
 data class GooglePlace(
-    val id: String,
+    val id: String?,
     val name: String?,
     val address: String?,
-    val latitude: BigDecimal,
-    val longitude: BigDecimal,
+    val latitude: BigDecimal?,
+    val longitude: BigDecimal?,
 )
 
 private data class GooglePlaceResponse(
-    val id: String,
+    val id: String? = null,
     val displayName: GooglePlaceDisplayNameResponse? = null,
     val formattedAddress: String? = null,
     val location: GooglePlaceLocationResponse? = null,
