@@ -344,8 +344,8 @@ class PlanService(
             title = title,
             url = checkNotNull(url) { "지도 계획의 URL이 없습니다." },
             address = planLocation.address,
-            latitude = planLocation.latitude,
-            longitude = planLocation.longitude,
+            latitude = checkNotNull(planLocation.latitude) { "지도 계획의 위도가 없습니다." },
+            longitude = checkNotNull(planLocation.longitude) { "지도 계획의 경도가 없습니다." },
             pinned = pinned,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )
@@ -356,6 +356,7 @@ class PlanService(
             PlanLocationResolution.NotApplicable -> Unit
             is PlanLocationResolution.Resolved -> resolveLocation(resolution.location)
             PlanLocationResolution.Failed -> failLocationResolution()
+            is PlanLocationResolution.ProviderFailed -> failLocationResolution(resolution.provider, resolution.externalPlaceId)
         }
     }
 

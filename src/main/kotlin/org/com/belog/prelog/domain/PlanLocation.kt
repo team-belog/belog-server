@@ -24,9 +24,9 @@ class PlanLocation protected constructor(
     @Column(name = "address", length = PLAN_LOCATION_ADDRESS_MAX_LENGTH)
     val address: String?,
     @Column(name = "latitude", precision = 10, scale = PLAN_LOCATION_COORDINATE_SCALE)
-    val latitude: BigDecimal,
+    val latitude: BigDecimal?,
     @Column(name = "longitude", precision = 11, scale = PLAN_LOCATION_COORDINATE_SCALE)
-    val longitude: BigDecimal,
+    val longitude: BigDecimal?,
 ) {
     companion object {
         const val EXTERNAL_PLACE_ID_MAX_LENGTH = PLAN_LOCATION_EXTERNAL_PLACE_ID_MAX_LENGTH
@@ -53,6 +53,19 @@ class PlanLocation protected constructor(
                 address = normalizeOptional(address, ADDRESS_MAX_LENGTH, "주소"),
                 latitude = validateCoordinate(latitude, MIN_LATITUDE, MAX_LATITUDE, "위도"),
                 longitude = validateCoordinate(longitude, MIN_LONGITUDE, MAX_LONGITUDE, "경도"),
+            )
+
+        fun unresolved(
+            provider: MapProvider,
+            externalPlaceId: String?,
+        ): PlanLocation =
+            PlanLocation(
+                provider = provider,
+                externalPlaceId = normalizeOptional(externalPlaceId, EXTERNAL_PLACE_ID_MAX_LENGTH, "외부 장소 ID"),
+                placeName = null,
+                address = null,
+                latitude = null,
+                longitude = null,
             )
 
         private fun normalizeOptional(

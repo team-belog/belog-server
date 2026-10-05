@@ -15,9 +15,21 @@ ALTER TABLE pre_log_plans
         )
         OR
         (
-            location_status IN ('NOT_APPLICABLE', 'FAILED')
+            location_status = 'NOT_APPLICABLE'
             AND map_provider IS NULL
             AND external_place_id IS NULL
+            AND place_name IS NULL
+            AND address IS NULL
+            AND latitude IS NULL
+            AND longitude IS NULL
+        )
+        OR
+        (
+            location_status = 'FAILED'
+            AND (
+                (map_provider IS NULL AND external_place_id IS NULL)
+                OR (map_provider IS NOT NULL AND map_provider = 'NAVER')
+            )
             AND place_name IS NULL
             AND address IS NULL
             AND latitude IS NULL
@@ -31,7 +43,7 @@ ALTER TABLE pre_log_plans
         longitude IS NULL OR longitude BETWEEN -180 AND 180
     ),
     ADD CONSTRAINT chk_pre_log_plans_map_provider CHECK (
-        map_provider IS NULL OR map_provider IN ('GOOGLE', 'KAKAO')
+        map_provider IS NULL OR map_provider IN ('GOOGLE', 'KAKAO', 'NAVER')
     ),
     ADD CONSTRAINT chk_pre_log_plans_external_place_id CHECK (
         external_place_id IS NULL OR CHAR_LENGTH(TRIM(external_place_id)) BETWEEN 1 AND 512

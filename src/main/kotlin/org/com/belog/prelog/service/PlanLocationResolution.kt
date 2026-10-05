@@ -1,5 +1,6 @@
 package org.com.belog.prelog.service
 
+import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.PlanLocation
 
 sealed interface PlanLocationResolution {
@@ -10,4 +11,9 @@ sealed interface PlanLocationResolution {
     ) : PlanLocationResolution
 
     data object Failed : PlanLocationResolution
+
+    data class ProviderFailed(
+        val provider: MapProvider,
+        val externalPlaceId: String? = null,
+    ) : PlanLocationResolution
 }
