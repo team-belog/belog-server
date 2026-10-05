@@ -178,8 +178,12 @@ class PlanService(
         title: String,
         url: String,
         locationResolution: PlanLocationResolution? = null,
+        expectedUrlWhenResolutionSkipped: String? = null,
     ): Plan =
         updatePlan(planId, userId) { plan ->
+            if (expectedUrlWhenResolutionSkipped != null && plan.url != expectedUrlWhenResolutionSkipped) {
+                throw BusinessException(PreLogErrorCode.PLAN_UPDATE_CONFLICT)
+            }
             plan.updateLink(category = category, title = title, url = url)
             locationResolution?.let { resolution -> plan.applyLocationResolution(resolution) }
         }

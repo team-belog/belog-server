@@ -38,8 +38,9 @@ class PlanLinkService(
     ): Plan {
         val currentUrl = planService.getLinkUrlForUpdate(planId = planId, userId = userId)
         val normalizedUrl = url.trim()
+        val unchangedUrl = currentUrl.takeIf { it == normalizedUrl }
         val resolution =
-            if (currentUrl == normalizedUrl) {
+            if (unchangedUrl != null) {
                 null
             } else {
                 resolveLocation(normalizedUrl)
@@ -52,6 +53,7 @@ class PlanLinkService(
             title = title,
             url = url,
             locationResolution = resolution,
+            expectedUrlWhenResolutionSkipped = unchangedUrl,
         )
     }
 

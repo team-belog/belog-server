@@ -379,6 +379,17 @@ interface PreLogSwagger {
                     ),
                 ],
             ),
+            ApiResponse(
+                responseCode = "409",
+                description = "링크 계획의 URL이 다른 요청에서 변경됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_UPDATE_CONFLICT_EXAMPLE)],
+                    ),
+                ],
+            ),
         ],
     )
     fun updatePlan(
@@ -706,6 +717,9 @@ private const val PLAN_NOT_FOUND_EXAMPLE =
 
 private const val PLAN_UPDATE_FORBIDDEN_EXAMPLE =
     """{"code":"PRE_LOG-E004","message":"계획 작성자만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_UPDATE_CONFLICT_EXAMPLE =
+    """{"code":"PRE_LOG-E006","message":"계획이 다른 요청에서 수정되었습니다. 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val PLAN_DELETE_FORBIDDEN_EXAMPLE =
     """{"code":"PRE_LOG-E005","message":"계획을 삭제할 권한이 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

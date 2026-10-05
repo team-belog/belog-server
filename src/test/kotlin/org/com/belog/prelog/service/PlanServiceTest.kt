@@ -11,6 +11,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
+import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
@@ -147,6 +148,31 @@ class PlanServiceTest {
         assertEquals(PlanCategory.CAFE, result.category)
         assertEquals("수정한 카페", result.title)
         assertEquals("https://example.com/updated-cafe", result.url)
+    }
+
+    @Test
+    fun `위치 해석을 생략한 사이 URL이 변경되면 위치 정보를 보존하고 충돌을 반환한다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+        target.plan.updateLink(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
+        target.plan.failLocationResolution(MapProvider.GOOGLE, externalPlaceId = "new-place-id")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.updateLinkPlan(
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.CAFE,
+                    title = "수정한 카페",
+                    url = "https://example.com/place",
+                    expectedUrlWhenResolutionSkipped = "https://example.com/place",
+                )
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_CONFLICT, exception.errorCode)
+        assertEquals("https://maps.google.com/new-place", target.plan.url)
+        assertEquals(LocationResolutionStatus.FAILED, target.plan.locationStatus)
+        assertEquals(MapProvider.GOOGLE, target.plan.location?.provider)
+        assertEquals("new-place-id", target.plan.location?.externalPlaceId)
     }
 
     @Test
