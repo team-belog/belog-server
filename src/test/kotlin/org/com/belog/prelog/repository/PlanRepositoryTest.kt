@@ -91,7 +91,8 @@ class PlanRepositoryTest {
                 meetingId = requireNotNull(context.meeting.id),
                 category = null,
                 locationStatus = LocationResolutionStatus.RESOLVED,
-                cursor = null,
+                cursorPinned = null,
+                cursorId = null,
                 pageable = PageRequest.of(0, 20),
             )
 
@@ -113,7 +114,9 @@ class PlanRepositoryTest {
             planRepository.findPageWithCreator(
                 meetingId = requireNotNull(context.meeting.id),
                 category = PlanCategory.ACCOMMODATION,
-                cursor = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
                 pageable = PageRequest.of(0, 20),
             )
 
@@ -142,7 +145,9 @@ class PlanRepositoryTest {
             planRepository.findPageWithCreator(
                 meetingId = requireNotNull(context.meeting.id),
                 category = null,
-                cursor = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
                 pageable = PageRequest.of(0, 20),
             )
         val queryCountAfterPlanLookup = statistics.prepareStatementCount

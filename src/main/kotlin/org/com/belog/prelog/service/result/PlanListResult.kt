@@ -2,11 +2,12 @@ package org.com.belog.prelog.service.result
 
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.service.query.PlanListCursor
 import java.time.Instant
 
 data class PlanListResult(
     val items: List<PlanListItemResult>,
-    val nextCursor: Long?,
+    val nextCursor: PlanListCursor?,
     val hasNext: Boolean,
 )
 

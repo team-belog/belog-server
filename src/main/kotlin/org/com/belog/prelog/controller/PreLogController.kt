@@ -3,10 +3,10 @@ package org.com.belog.prelog.controller
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.Positive
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.prelog.code.PreLogSuccessCode
+import org.com.belog.prelog.controller.cursor.PlanListCursorCodec
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
@@ -61,7 +61,7 @@ class PreLogController(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
         @RequestParam(required = false) category: PlanCategory?,
-        @RequestParam(required = false) @Positive cursor: Long?,
+        @RequestParam(required = false) cursor: String?,
         @RequestParam(defaultValue = "20") @Min(1) @Max(50) size: Int,
     ): ResponseEntity<CommonResponse<MapPlanListResponse>> {
         val result =
@@ -69,7 +69,7 @@ class PreLogController(
                 meetingId = meetingId,
                 userId = userId,
                 category = category,
-                cursor = cursor,
+                cursor = PlanListCursorCodec.decode(cursor),
                 size = size,
             )
 
@@ -89,7 +89,7 @@ class PreLogController(
         @PathVariable meetingId: Long,
         @RequestParam(required = false) category: PlanCategory?,
         @RequestParam(defaultValue = "false") pinnedOnly: Boolean,
-        @RequestParam(required = false) @Positive cursor: Long?,
+        @RequestParam(required = false) cursor: String?,
         @RequestParam(defaultValue = "20") @Min(1) @Max(50) size: Int,
     ): ResponseEntity<CommonResponse<PlanListResponse>> {
         val result =
@@ -98,7 +98,7 @@ class PreLogController(
                 userId = userId,
                 category = category,
                 pinnedOnly = pinnedOnly,
-                cursor = cursor,
+                cursor = PlanListCursorCodec.decode(cursor),
                 size = size,
             )
 
