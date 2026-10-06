@@ -14,6 +14,7 @@ import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.prelog.service.query.PlanListCursor
 import org.com.belog.prelog.service.result.MapPlanListItemResult
 import org.com.belog.prelog.service.result.MapPlanListResult
 import org.com.belog.prelog.service.result.PlanListItemResult
@@ -38,24 +39,21 @@ class PlanService(
         userId: Long,
         category: PlanCategory?,
         pinnedOnly: Boolean,
-        cursor: Long?,
+        cursor: PlanListCursor?,
         size: Int = DEFAULT_PAGE_SIZE,
     ): PlanListResult {
         require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
-        require(cursor == null || cursor > 0) { "커서는 양수여야 합니다." }
 
         val meeting = findMeeting(meetingId)
         val groupMember = findGroupMember(meeting, userId)
-
-        if (pinnedOnly) {
-            return PlanListResult(items = emptyList(), nextCursor = null, hasNext = false)
-        }
 
         val plans =
             planRepository.findPageWithCreator(
                 meetingId = meetingId,
                 category = category,
-                cursor = cursor,
+                pinnedOnly = pinnedOnly,
+                cursorPinned = cursor?.pinned,
+                cursorId = cursor?.planId,
                 pageable = PageRequest.of(0, size + 1),
             )
         val hasNext = plans.size > size
@@ -71,7 +69,16 @@ class PlanService(
                         isMeetingCreator = isMeetingCreator,
                     )
                 },
-            nextCursor = if (hasNext) pagePlans.lastOrNull()?.id else null,
+            nextCursor =
+                pagePlans
+                    .lastOrNull()
+                    ?.takeIf { hasNext }
+                    ?.let { plan ->
+                        PlanListCursor(
+                            pinned = plan.pinned,
+                            planId = checkNotNull(plan.id) { "커서 대상 계획의 ID가 없습니다." },
+                        )
+                    },
             hasNext = hasNext,
         )
     }
@@ -334,7 +341,7 @@ class PlanService(
             thumbnailUrl = null,
             likeCount = 0,
             likedByMe = false,
-            pinned = false,
+            pinned = pinned,
             canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )

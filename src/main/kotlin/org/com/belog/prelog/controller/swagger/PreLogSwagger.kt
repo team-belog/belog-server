@@ -89,8 +89,8 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 계획 목록 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 계획을 최신순으로 조회합니다. " +
-                "카테고리와 고정 여부를 필터링할 수 있으며 계획 ID 기반 커서 페이지네이션을 사용합니다.",
+            "해당 만남이 속한 그룹의 멤버가 계획을 고정 계획 우선, 계획 ID 역순으로 조회합니다. " +
+                "카테고리와 고정 여부를 필터링할 수 있으며 고정 여부와 계획 ID 기반의 복합 커서 페이지네이션을 사용합니다.",
     )
     @ApiResponses(
         value = [
@@ -154,10 +154,9 @@ interface PreLogSwagger {
         @Parameter(description = "고정 계획만 조회할지 여부", example = "false")
         @RequestParam(defaultValue = "false")
         pinnedOnly: Boolean,
-        @Parameter(description = "마지막으로 조회한 계획 ID. 첫 요청에서는 생략", example = "120")
+        @Parameter(description = "이전 응답의 nextCursor. 첫 요청에서는 생략", example = "MToxMjA")
         @RequestParam(required = false)
-        @Positive
-        cursor: Long?,
+        cursor: String?,
         @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
         @RequestParam(defaultValue = "20")
         @Min(1)
@@ -737,7 +736,7 @@ private const val UNPIN_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S008","message":"계획 핀 고정이 해제되었습니다.","data":null}"""
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
+    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":"MToxMjE","hasNext":true}}"""
 
 private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""

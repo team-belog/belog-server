@@ -418,7 +418,9 @@ class PlanServiceTest {
             planRepository.findPageWithCreator(
                 meetingId = 1L,
                 category = null,
-                cursor = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
                 pageable = PageRequest.of(0, 21),
             ),
         ).thenReturn(listOf(plan))
