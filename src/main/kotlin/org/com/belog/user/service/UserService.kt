@@ -34,7 +34,7 @@ class UserService(
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
     @Transactional(readOnly = true)
-    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNicknameAndDeletedAtIsNull(nickname)
+    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsActiveNickname(nickname)
 
     @Transactional(readOnly = true)
     fun getBankAccount(userId: Long): BankAccount {
@@ -165,7 +165,7 @@ class UserService(
         }
 
         val normalizedNickname = nickname.trim()
-        if (userRepository.existsByNicknameAndDeletedAtIsNull(normalizedNickname)) {
+        if (userRepository.existsActiveNickname(normalizedNickname)) {
             throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
         }
 
@@ -187,18 +187,14 @@ class UserService(
         email: String,
         socialProfileImageUrl: String? = null,
     ): SocialUserResult {
-        val existingUser =
-            userRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
-                provider = provider,
-                providerUserId = providerUserId,
-            )
+        val activeUser = findActiveSocialUserForUpdate(provider, providerUserId)
 
-        if (existingUser != null) {
-            existingUser.updateSocialProfileImageUrl(socialProfileImageUrl)
+        if (activeUser != null) {
+            activeUser.updateSocialProfileImageUrl(socialProfileImageUrl)
             return SocialUserResult(
-                userId = requireNotNull(existingUser.id),
-                onboardingRequired = !existingUser.isOnboardingCompleted,
-                socialProfileImageUrl = existingUser.socialProfileImageUrl,
+                userId = requireNotNull(activeUser.id),
+                onboardingRequired = !activeUser.isOnboardingCompleted,
+                socialProfileImageUrl = activeUser.socialProfileImageUrl,
             )
         }
 
@@ -215,6 +211,19 @@ class UserService(
             onboardingRequired = upsertResult.onboardingRequired,
             socialProfileImageUrl = upsertResult.socialProfileImageUrl,
         )
+    }
+
+    private fun findActiveSocialUserForUpdate(
+        provider: SocialProvider,
+        providerUserId: String,
+    ): User? {
+        val userId =
+            userRepository.findActiveSocialUserId(
+                provider = provider,
+                providerUserId = providerUserId,
+            ) ?: return null
+
+        return userRepository.findByIdForUpdate(userId)?.takeIf(User::isActive)
     }
 
     private fun updateProfileInTransaction(
@@ -234,7 +243,7 @@ class UserService(
             val normalizedNickname = nickname.trim()
             if (
                 normalizedNickname != user.nickname &&
-                userRepository.existsByNicknameAndDeletedAtIsNull(normalizedNickname)
+                userRepository.existsActiveNickname(normalizedNickname)
             ) {
                 throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
             }

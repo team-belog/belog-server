@@ -50,7 +50,7 @@ open class UserRepositoryCustomImpl(
                   AND user.activeProviderUserId = :providerUserId
                 """.trimIndent(),
                 User::class.java,
-            ).setParameter("provider", provider.name)
+            ).setParameter("provider", provider)
             .setParameter("providerUserId", providerUserId)
             .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .singleResult

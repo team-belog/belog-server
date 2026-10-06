@@ -25,6 +25,9 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
@@ -53,6 +56,9 @@ class UserServiceTest {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
 
     @MockitoBean
     private lateinit var profileImageStorage: ProfileImageStorage
@@ -306,7 +312,7 @@ class UserServiceTest {
         assertTrue(userService.isNicknameAvailable("재사용닉네임"))
         assertEquals(
             null,
-            userRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
+            userRepository.findActiveSocialUserId(
                 provider = SocialProvider.GOOGLE,
                 providerUserId = "reusable-google-subject",
             ),
@@ -323,13 +329,87 @@ class UserServiceTest {
         assertEquals("재사용닉네임", withdrawnUser.nickname)
         assertEquals(
             newUserId,
-            userRepository
-                .findByProviderAndProviderUserIdAndDeletedAtIsNull(
-                    provider = SocialProvider.GOOGLE,
-                    providerUserId = "reusable-google-subject",
-                )?.id,
+            userRepository.findActiveSocialUserId(
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "reusable-google-subject",
+            ),
         )
         assertFalse(userService.isNicknameAvailable("재사용닉네임"))
+    }
+
+    @Test
+    fun `탈퇴 후 동일 소셜 식별자로 동시에 로그인하면 신규 사용자 한 명만 생성된다`() {
+        val withdrawnUserId = createUser("concurrent-reuse-google-subject", "withdrawn@example.com")
+        withdrawUser(withdrawnUserId)
+
+        val executor = Executors.newFixedThreadPool(CONCURRENT_LOGIN_COUNT)
+        val startSignal = CountDownLatch(1)
+
+        try {
+            val logins =
+                (1..CONCURRENT_LOGIN_COUNT).map {
+                    executor.submit<SocialUserResult> {
+                        startSignal.await()
+                        userService.findOrCreateSocialUser(
+                            provider = SocialProvider.GOOGLE,
+                            providerUserId = "concurrent-reuse-google-subject",
+                            email = "new@example.com",
+                        )
+                    }
+                }
+
+            startSignal.countDown()
+            val results = logins.map { login -> login.get(10, TimeUnit.SECONDS) }
+
+            assertEquals(1, results.map(SocialUserResult::userId).distinct().size)
+            assertTrue(results.all(SocialUserResult::onboardingRequired))
+            assertTrue(results.none { result -> result.userId == withdrawnUserId })
+            assertEquals(2, userRepository.count())
+            assertFalse(userRepository.findById(withdrawnUserId).orElseThrow().isActive)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `탈퇴 커밋 직후 로그인은 탈퇴 계정을 재사용하지 않고 신규 사용자를 만든다`() {
+        val withdrawnUserId = createUser("race-google-subject", "race@example.com")
+        val executor = Executors.newFixedThreadPool(1)
+        val withdrawReadyToCommit = CountDownLatch(1)
+        val loginStarted = CountDownLatch(1)
+        val withdrawTransactionTemplate = TransactionTemplate(transactionManager)
+        withdrawTransactionTemplate.propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+
+        try {
+            val loginFuture =
+                executor.submit<SocialUserResult> {
+                    withdrawReadyToCommit.await()
+                    loginStarted.countDown()
+                    userService.findOrCreateSocialUser(
+                        provider = SocialProvider.GOOGLE,
+                        providerUserId = "race-google-subject",
+                        email = "new@example.com",
+                    )
+                }
+
+            withdrawTransactionTemplate.executeWithoutResult {
+                val user = userRepository.findByIdForUpdate(withdrawnUserId)!!
+                user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+                userRepository.saveAndFlush(user)
+                withdrawReadyToCommit.countDown()
+                assertTrue(loginStarted.await(5, TimeUnit.SECONDS))
+                Thread.sleep(LOGIN_LOCK_WAIT_MILLIS)
+            }
+
+            val result = loginFuture.get(10, TimeUnit.SECONDS)
+
+            assertNotEquals(withdrawnUserId, result.userId)
+            assertTrue(result.onboardingRequired)
+            assertEquals(2, userRepository.count())
+            assertFalse(userRepository.findById(withdrawnUserId).orElseThrow().isActive)
+        } finally {
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -566,6 +646,7 @@ class UserServiceTest {
 
     companion object {
         private const val CONCURRENT_LOGIN_COUNT = 2
+        private const val LOGIN_LOCK_WAIT_MILLIS = 200L
 
         @Container
         @ServiceConnection

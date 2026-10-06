@@ -102,6 +102,7 @@ class User protected constructor(
     )
     private var activeNickname: String? = null
 
+    @Enumerated(EnumType.STRING)
     @Column(
         name = "active_provider",
         insertable = false,
@@ -110,7 +111,7 @@ class User protected constructor(
             "VARCHAR(20) GENERATED ALWAYS AS " +
                 "(CASE WHEN deleted_at IS NULL THEN provider ELSE NULL END)",
     )
-    private var activeProvider: String? = null
+    private var activeProvider: SocialProvider? = null
 
     @Column(
         name = "active_provider_user_id",

@@ -11,12 +11,29 @@ import org.springframework.data.repository.query.Param
 interface UserRepository :
     JpaRepository<User, Long>,
     UserRepositoryCustom {
-    fun existsByNicknameAndDeletedAtIsNull(nickname: String): Boolean
+    @Query(
+        """
+        SELECT COUNT(user) > 0
+        FROM User user
+        WHERE user.activeNickname = :nickname
+        """,
+    )
+    fun existsActiveNickname(
+        @Param("nickname") nickname: String,
+    ): Boolean
 
-    fun findByProviderAndProviderUserIdAndDeletedAtIsNull(
-        provider: SocialProvider,
-        providerUserId: String,
-    ): User?
+    @Query(
+        """
+        SELECT user.id
+        FROM User user
+        WHERE user.activeProvider = :provider
+          AND user.activeProviderUserId = :providerUserId
+        """,
+    )
+    fun findActiveSocialUserId(
+        @Param("provider") provider: SocialProvider,
+        @Param("providerUserId") providerUserId: String,
+    ): Long?
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
