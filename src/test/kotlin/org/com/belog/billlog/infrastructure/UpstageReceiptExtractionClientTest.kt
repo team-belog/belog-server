@@ -5,6 +5,7 @@ import org.com.belog.billlog.config.UpstageReceiptExtractionProperties
 import org.com.belog.global.error.BusinessException
 import org.hamcrest.Matchers.allOf
 import org.hamcrest.Matchers.containsString
+import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
@@ -49,6 +50,13 @@ class UpstageReceiptExtractionClientTest {
                         containsString("\"url\":\"https://receipt.example/image.jpg\""),
                         containsString("\"response_format\""),
                         containsString("\"totalAmount\""),
+                        containsString("\"title\":{\"type\":\"string\""),
+                        containsString("\"paymentDate\":{\"type\":\"string\""),
+                        containsString("\"items\":{\"type\":\"array\""),
+                        containsString("\"name\":{\"type\":\"string\""),
+                        containsString("\"amount\":{\"type\":\"number\""),
+                        containsString("\"totalAmount\":{\"type\":\"number\""),
+                        not(containsString("[\"string\",\"null\"]")),
                     ),
                 ),
             ).andRespond(
