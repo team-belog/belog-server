@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
-class PlanLinkServiceTest {
+class PlanLocationServiceTest {
     private val planService = mock(PlanService::class.java)
     private val mapUrlDetector =
         PlanMapUrlDetector(
@@ -29,12 +29,12 @@ class PlanLinkServiceTest {
         )
 
     @Test
-    fun `일반 URL로 링크 계획을 생성할 수 없다`() {
-        val service = PlanLinkService(planService, mapUrlDetector, emptyList())
+    fun `일반 URL로 위치 계획을 생성할 수 없다`() {
+        val service = PlanLocationService(planService, mapUrlDetector, emptyList())
 
         val exception =
             assertFailsWith<BusinessException> {
-                service.createLinkPlan(
+                service.createLocationPlan(
                     meetingId = 1L,
                     creatorUserId = 15L,
                     category = PlanCategory.RESTAURANT,
@@ -49,14 +49,14 @@ class PlanLinkServiceTest {
     }
 
     @Test
-    fun `일반 URL로 링크 계획을 수정할 수 없다`() {
-        val service = PlanLinkService(planService, mapUrlDetector, emptyList())
-        `when`(planService.getLinkUrlForUpdate(planId = 7L, userId = 15L))
+    fun `일반 URL로 위치 계획을 수정할 수 없다`() {
+        val service = PlanLocationService(planService, mapUrlDetector, emptyList())
+        `when`(planService.getLocationUrlForUpdate(planId = 7L, userId = 15L))
             .thenReturn("https://example.com/restaurant")
 
         val exception =
             assertFailsWith<BusinessException> {
-                service.updateLinkPlan(
+                service.updateLocationPlan(
                     planId = 7L,
                     userId = 15L,
                     category = PlanCategory.RESTAURANT,
@@ -66,7 +66,7 @@ class PlanLinkServiceTest {
             }
 
         assertEquals(PreLogErrorCode.INVALID_MAP_URL, exception.errorCode)
-        verify(planService).getLinkUrlForUpdate(planId = 7L, userId = 15L)
+        verify(planService).getLocationUrlForUpdate(planId = 7L, userId = 15L)
         verifyNoMoreInteractions(planService)
     }
 
@@ -76,11 +76,11 @@ class PlanLinkServiceTest {
         val resolution = PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE)
         val resolver = mock(PlanLocationResolver::class.java)
         val plan = mock(Plan::class.java)
-        val service = PlanLinkService(planService, mapUrlDetector, listOf(resolver))
+        val service = PlanLocationService(planService, mapUrlDetector, listOf(resolver))
         `when`(resolver.provider).thenReturn(MapProvider.GOOGLE)
         `when`(resolver.resolve(url)).thenReturn(PlanLocationResolution.NotApplicable)
         `when`(
-            planService.createLinkPlan(
+            planService.createLocationPlan(
                 meetingId = 1L,
                 creatorUserId = 15L,
                 category = PlanCategory.RESTAURANT,
@@ -91,7 +91,7 @@ class PlanLinkServiceTest {
         ).thenReturn(plan)
 
         val result =
-            service.createLinkPlan(
+            service.createLocationPlan(
                 meetingId = 1L,
                 creatorUserId = 15L,
                 category = PlanCategory.RESTAURANT,

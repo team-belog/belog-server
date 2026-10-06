@@ -31,13 +31,13 @@ data class PlanListResponse(
 data class PlanListItemResponse(
     @field:Schema(description = "계획 ID", example = "121")
     val planId: Long,
-    @field:Schema(description = "계획 유형", example = "LINK", allowableValues = ["LINK", "MEMO"])
+    @field:Schema(description = "계획 유형", example = "LOCATION", allowableValues = ["LOCATION", "MEMO"])
     val type: PlanType,
     @field:Schema(description = "계획 카테고리", example = "ACCOMMODATION")
     val category: PlanCategory,
     @field:Schema(description = "계획 제목", example = "광주 숙소")
     val title: String,
-    @field:Schema(description = "LINK 유형의 이동 URL. MEMO 유형이면 null", nullable = true)
+    @field:Schema(description = "LOCATION 유형의 이동 URL. MEMO 유형이면 null", nullable = true)
     val url: String?,
     @field:Schema(description = "추출된 주소", nullable = true)
     val address: String?,

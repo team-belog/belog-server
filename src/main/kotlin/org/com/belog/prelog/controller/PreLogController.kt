@@ -19,7 +19,7 @@ import org.com.belog.prelog.controller.swagger.PreLogSwagger
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanLikeService
-import org.com.belog.prelog.service.PlanLinkService
+import org.com.belog.prelog.service.PlanLocationService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.springframework.http.ResponseEntity
@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController
 class PreLogController(
     private val preLogService: PreLogService,
     private val planService: PlanService,
-    private val planLinkService: PlanLinkService,
+    private val planLocationService: PlanLocationService,
     private val planLikeService: PlanLikeService,
 ) : PreLogSwagger {
     @GetMapping("/api/v1/meetings/{meetingId}/pre-log")
@@ -120,8 +120,8 @@ class PreLogController(
     ): ResponseEntity<CommonResponse<CreatePlanResponse>> {
         val plan =
             when (request.type) {
-                PlanType.LINK ->
-                    planLinkService.createLinkPlan(
+                PlanType.LOCATION ->
+                    planLocationService.createLocationPlan(
                         meetingId = meetingId,
                         creatorUserId = userId,
                         category = request.category,
@@ -157,8 +157,8 @@ class PreLogController(
     ): ResponseEntity<CommonResponse<UpdatePlanResponse>> {
         val plan =
             when (request.type) {
-                PlanType.LINK ->
-                    planLinkService.updateLinkPlan(
+                PlanType.LOCATION ->
+                    planLocationService.updateLocationPlan(
                         planId = planId,
                         userId = userId,
                         category = request.category,

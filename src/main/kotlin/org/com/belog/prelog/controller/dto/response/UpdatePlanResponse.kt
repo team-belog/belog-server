@@ -13,7 +13,7 @@ data class UpdatePlanResponse(
     val meetingId: Long,
     @field:Schema(description = "계획을 작성한 그룹 멤버 ID", example = "10")
     val creatorGroupMemberId: Long,
-    @field:Schema(description = "계획 유형", example = "LINK", allowableValues = ["LINK", "MEMO"])
+    @field:Schema(description = "계획 유형", example = "LOCATION", allowableValues = ["LOCATION", "MEMO"])
     val type: PlanType,
     @field:Schema(description = "계획 카테고리", example = "RESTAURANT")
     val category: PlanCategory,
@@ -21,7 +21,7 @@ data class UpdatePlanResponse(
     val title: String,
     @field:Schema(description = "링크 URL. MEMO 유형이면 null", nullable = true)
     val url: String?,
-    @field:Schema(description = "메모 내용. LINK 유형이면 null", nullable = true)
+    @field:Schema(description = "메모 내용. LOCATION 유형이면 null", nullable = true)
     val content: String?,
 ) {
     companion object {

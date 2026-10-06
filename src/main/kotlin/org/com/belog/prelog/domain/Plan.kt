@@ -38,7 +38,7 @@ private const val PLAN_CONTENT_MAX_LENGTH = 2000
         CheckConstraint(
             name = "chk_pre_log_plans_type_fields",
             constraint =
-                "(type = 'LINK' AND url IS NOT NULL AND content IS NULL) OR " +
+                "(type = 'LOCATION' AND url IS NOT NULL AND content IS NULL) OR " +
                     "(type = 'MEMO' AND url IS NULL AND content IS NOT NULL)",
         ),
         CheckConstraint(
@@ -122,7 +122,7 @@ class Plan protected constructor(
         pinned = false
     }
 
-    fun updateLink(
+    fun updateLocation(
         category: PlanCategory,
         title: String,
         url: String,
@@ -134,7 +134,7 @@ class Plan protected constructor(
             clearLocation()
         }
 
-        this.type = PlanType.LINK
+        this.type = PlanType.LOCATION
         this.category = category
         this.title = normalizedTitle
         this.url = normalizedUrl
@@ -158,8 +158,8 @@ class Plan protected constructor(
     }
 
     fun resolveLocation(location: PlanLocation) {
-        require(type == PlanType.LINK && url != null) {
-            "링크 계획에만 위치 정보를 저장할 수 있습니다."
+        require(type == PlanType.LOCATION && url != null) {
+            "위치 계획에만 위치 정보를 저장할 수 있습니다."
         }
         require(location.latitude != null && location.longitude != null) {
             "좌표가 있는 위치 정보만 저장할 수 있습니다."
@@ -175,8 +175,8 @@ class Plan protected constructor(
         placeName: String? = null,
         address: String? = null,
     ) {
-        require(type == PlanType.LINK && url != null) {
-            "링크 계획에만 위치 정보 추출 실패 상태를 기록할 수 있습니다."
+        require(type == PlanType.LOCATION && url != null) {
+            "위치 계획에만 위치 정보 추출 실패 상태를 기록할 수 있습니다."
         }
         require(provider != null || (externalPlaceId == null && placeName == null && address == null)) {
             "지도 제공자 없이 장소 정보를 저장할 수 없습니다."
@@ -208,7 +208,7 @@ class Plan protected constructor(
         const val CONTENT_MIN_LENGTH = PLAN_CONTENT_MIN_LENGTH
         const val CONTENT_MAX_LENGTH = PLAN_CONTENT_MAX_LENGTH
 
-        fun createLink(
+        fun createLocation(
             meeting: Meeting,
             creator: GroupMember,
             category: PlanCategory,
@@ -221,7 +221,7 @@ class Plan protected constructor(
             return Plan(
                 meeting = meeting,
                 createdBy = creator,
-                type = PlanType.LINK,
+                type = PlanType.LOCATION,
                 category = category,
                 title = normalizeTitle(title),
                 url = normalizeUrl(url),

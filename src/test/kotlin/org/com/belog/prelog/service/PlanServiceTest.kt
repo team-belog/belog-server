@@ -102,7 +102,7 @@ class PlanServiceTest {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
 
         val result =
-            planService.updateLinkPlan(
+            planService.updateLocationPlan(
                 planId = 20L,
                 userId = 15L,
                 category = PlanCategory.CAFE,
@@ -111,7 +111,7 @@ class PlanServiceTest {
             )
 
         assertSame(target.plan, result)
-        assertEquals(PlanType.LINK, result.type)
+        assertEquals(PlanType.LOCATION, result.type)
         assertEquals(PlanCategory.CAFE, result.category)
         assertEquals("수정한 카페", result.title)
         assertEquals("https://example.com/updated-cafe", result.url)
@@ -120,12 +120,12 @@ class PlanServiceTest {
     @Test
     fun `위치 해석을 생략한 사이 URL이 변경되면 위치 정보를 보존하고 충돌을 반환한다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
-        target.plan.updateLink(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
+        target.plan.updateLocation(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
         target.plan.failLocationResolution(MapProvider.GOOGLE, externalPlaceId = "new-place-id")
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.updateLinkPlan(
+                planService.updateLocationPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
@@ -158,7 +158,7 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
-        assertEquals(PlanType.LINK, target.plan.type)
+        assertEquals(PlanType.LOCATION, target.plan.type)
         assertEquals("맛집", target.plan.title)
         assertEquals("https://example.com/place", target.plan.url)
     }
@@ -203,7 +203,7 @@ class PlanServiceTest {
 
         val updateException =
             assertFailsWith<BusinessException> {
-                planService.updateLinkPlan(
+                planService.updateLocationPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
@@ -267,7 +267,7 @@ class PlanServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.createLinkPlan(
+                planService.createLocationPlan(
                     meetingId = 1L,
                     creatorUserId = 15L,
                     category = PlanCategory.RESTAURANT,
@@ -333,7 +333,7 @@ class PlanServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.createLinkPlan(
+                planService.createLocationPlan(
                     meetingId = 1L,
                     creatorUserId = 15L,
                     category = PlanCategory.CAFE,
@@ -373,7 +373,7 @@ class PlanServiceTest {
         `when`(planCreator.id).thenReturn(planCreatorId)
         `when`(plan.id).thenReturn(20L)
         `when`(plan.createdBy).thenReturn(planCreator)
-        `when`(plan.type).thenReturn(PlanType.LINK)
+        `when`(plan.type).thenReturn(PlanType.LOCATION)
         `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
         `when`(plan.title).thenReturn("맛집")
         `when`(plan.url).thenReturn("https://example.com/place")
@@ -402,7 +402,7 @@ class PlanServiceTest {
         `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
 
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = planCreator,
                 category = PlanCategory.RESTAURANT,
@@ -436,7 +436,7 @@ class PlanServiceTest {
         }
 
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = planCreator,
                 category = PlanCategory.RESTAURANT,

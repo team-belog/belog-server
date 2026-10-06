@@ -166,7 +166,7 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 지도 계획 목록 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 링크 계획을 " +
+            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 위치 계획을 " +
                 "고정 계획 우선, 계획 ID 역순으로 조회합니다. " +
                 "카테고리 필터와 고정 여부 및 계획 ID 기반의 복합 커서 페이지네이션을 지원합니다.",
     )
@@ -221,8 +221,8 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 계획 생성",
         description =
-            "해당 만남이 속한 그룹의 멤버가 링크 또는 메모 계획을 생성합니다. " +
-                "LINK는 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
+            "해당 만남이 속한 그룹의 멤버가 위치 또는 메모 계획을 생성합니다. " +
+                "LOCATION은 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
     )
     @ApiResponses(
         value = [
@@ -234,7 +234,7 @@ interface PreLogSwagger {
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         examples = [
-                            ExampleObject(name = "링크 계획 생성", value = CREATE_LINK_PLAN_SUCCESS_EXAMPLE),
+                            ExampleObject(name = "위치 계획 생성", value = CREATE_LOCATION_PLAN_SUCCESS_EXAMPLE),
                             ExampleObject(name = "메모 계획 생성", value = CREATE_MEMO_PLAN_SUCCESS_EXAMPLE),
                         ],
                     ),
@@ -305,7 +305,7 @@ interface PreLogSwagger {
                     mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = Schema(implementation = CreatePlanRequest::class),
                     examples = [
-                        ExampleObject(name = "링크 계획", value = CREATE_LINK_PLAN_REQUEST_EXAMPLE),
+                        ExampleObject(name = "위치 계획", value = CREATE_LOCATION_PLAN_REQUEST_EXAMPLE),
                         ExampleObject(name = "메모 계획", value = CREATE_MEMO_PLAN_REQUEST_EXAMPLE),
                     ],
                 ),
@@ -319,8 +319,8 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 계획 수정",
         description =
-            "계획 작성자가 링크 또는 메모 계획의 전체 내용을 수정합니다. " +
-                "LINK는 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남의 계획도 수정할 수 있습니다.",
+            "계획 작성자가 위치 또는 메모 계획의 전체 내용을 수정합니다. " +
+                "LOCATION은 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남의 계획도 수정할 수 있습니다.",
     )
     @ApiResponses(
         value = [
@@ -332,7 +332,7 @@ interface PreLogSwagger {
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         examples = [
-                            ExampleObject(name = "링크 계획 수정", value = UPDATE_LINK_PLAN_SUCCESS_EXAMPLE),
+                            ExampleObject(name = "위치 계획 수정", value = UPDATE_LOCATION_PLAN_SUCCESS_EXAMPLE),
                             ExampleObject(name = "메모 계획 수정", value = UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE),
                         ],
                     ),
@@ -381,7 +381,7 @@ interface PreLogSwagger {
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "링크 계획의 URL이 다른 요청에서 변경됨",
+                description = "위치 계획의 URL이 다른 요청에서 변경됨",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -406,7 +406,7 @@ interface PreLogSwagger {
                     mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = Schema(implementation = UpdatePlanRequest::class),
                     examples = [
-                        ExampleObject(name = "링크 계획", value = UPDATE_LINK_PLAN_REQUEST_EXAMPLE),
+                        ExampleObject(name = "위치 계획", value = UPDATE_LOCATION_PLAN_REQUEST_EXAMPLE),
                         ExampleObject(name = "메모 계획", value = UPDATE_MEMO_PLAN_REQUEST_EXAMPLE),
                     ],
                 ),
@@ -676,26 +676,26 @@ interface PreLogSwagger {
     ): ResponseEntity<CommonResponse<PlanLikeResponse>>
 }
 
-private const val CREATE_LINK_PLAN_REQUEST_EXAMPLE =
-    """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}"""
+private const val CREATE_LOCATION_PLAN_REQUEST_EXAMPLE =
+    """{"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}"""
 
 private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
 
-private const val UPDATE_LINK_PLAN_REQUEST_EXAMPLE =
-    """{"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456"}"""
+private const val UPDATE_LOCATION_PLAN_REQUEST_EXAMPLE =
+    """{"type":"LOCATION","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456"}"""
 
 private const val UPDATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"OTHER","title":"준비물","content":"우산 챙기기"}"""
 
-private const val CREATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456","content":null}}"""
+private const val CREATE_LOCATION_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456","content":null}}"""
 
 private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
 
-private const val UPDATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456","content":null}}"""
+private const val UPDATE_LOCATION_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"LOCATION","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456","content":null}}"""
 
 private const val UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"OTHER","title":"준비물","url":null,"content":"우산 챙기기"}}"""
@@ -740,7 +740,7 @@ private const val UNPIN_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S008","message":"계획 핀 고정이 해제되었습니다.","data":null}"""
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://place.map.kakao.com/123456","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":"MToxMjE","hasNext":true}}"""
+    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LOCATION","category":"ACCOMMODATION","title":"광주 숙소","url":"https://place.map.kakao.com/123456","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":"MToxMjE","hasNext":true}}"""
 
 private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""

@@ -14,8 +14,8 @@ import org.hibernate.validator.constraints.URL
 data class UpdatePlanRequest(
     @field:Schema(
         description = "계획 유형",
-        example = "LINK",
-        allowableValues = ["LINK", "MEMO"],
+        example = "LOCATION",
+        allowableValues = ["LOCATION", "MEMO"],
         requiredMode = Schema.RequiredMode.REQUIRED,
     )
     val type: PlanType,
@@ -49,7 +49,7 @@ data class UpdatePlanRequest(
     )
     val title: String,
     @field:Schema(
-        description = "LINK 유형에서 사용하는 Google Maps, Kakao Map 또는 Naver Map URL",
+        description = "LOCATION 유형에서 사용하는 Google Maps, Kakao Map 또는 Naver Map URL",
         example = "https://place.map.kakao.com/123456",
         maxLength = Plan.URL_MAX_LENGTH,
         requiredMode = Schema.RequiredMode.NOT_REQUIRED,
@@ -80,12 +80,12 @@ data class UpdatePlanRequest(
     )
     val content: String? = null,
 ) {
-    @get:AssertTrue(message = "LINK는 URL만, MEMO는 내용만 입력해야 합니다.")
+    @get:AssertTrue(message = "LOCATION은 URL만, MEMO는 내용만 입력해야 합니다.")
     @get:Schema(hidden = true)
     val isTypeFieldsValid: Boolean
         get() =
             when (type) {
-                PlanType.LINK -> !url.isNullOrBlank() && content == null
+                PlanType.LOCATION -> !url.isNullOrBlank() && content == null
                 PlanType.MEMO -> !content.isNullOrBlank() && url == null
             }
 }

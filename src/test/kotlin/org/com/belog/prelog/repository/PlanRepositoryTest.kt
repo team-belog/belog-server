@@ -69,7 +69,7 @@ class PlanRepositoryTest {
     @Test
     fun `지도 목록은 좌표가 확인된 계획만 조회한다`() {
         val context = saveMeetingContext()
-        val resolved = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "지도 맛집")
+        val resolved = createLocationPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "지도 맛집")
         resolved.resolveLocation(
             PlanLocation.create(
                 provider = MapProvider.GOOGLE,
@@ -80,9 +80,9 @@ class PlanRepositoryTest {
                 longitude = BigDecimal("126.98"),
             ),
         )
-        val failed = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "위치 실패")
+        val failed = createLocationPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "위치 실패")
         failed.failLocationResolution()
-        val ordinary = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "일반 링크")
+        val ordinary = createLocationPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "일반 URL")
         planRepository.saveAllAndFlush(listOf(resolved, failed, ordinary))
         entityManager.clear()
 
@@ -104,8 +104,8 @@ class PlanRepositoryTest {
         val context = saveMeetingContext()
         planRepository.saveAllAndFlush(
             listOf(
-                createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "맛집"),
-                createLinkPlan(context.meeting, context.owner, PlanCategory.ACCOMMODATION, "숙소"),
+                createLocationPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "맛집"),
+                createLocationPlan(context.meeting, context.owner, PlanCategory.ACCOMMODATION, "숙소"),
             ),
         )
         entityManager.clear()
@@ -131,9 +131,9 @@ class PlanRepositoryTest {
         val secondMember = saveGroupMember(context.group, "second-member", "둘째멤버")
         planRepository.saveAllAndFlush(
             listOf(
-                createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "첫 계획"),
-                createLinkPlan(context.meeting, firstMember, PlanCategory.CAFE, "둘째 계획"),
-                createLinkPlan(context.meeting, secondMember, PlanCategory.OTHER, "셋째 계획"),
+                createLocationPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "첫 계획"),
+                createLocationPlan(context.meeting, firstMember, PlanCategory.CAFE, "둘째 계획"),
+                createLocationPlan(context.meeting, secondMember, PlanCategory.OTHER, "셋째 계획"),
             ),
         )
         entityManager.clear()
@@ -177,13 +177,13 @@ class PlanRepositoryTest {
         return MeetingContext(group, owner, meeting)
     }
 
-    private fun createLinkPlan(
+    private fun createLocationPlan(
         meeting: Meeting,
         creator: GroupMember,
         category: PlanCategory,
         title: String,
     ): Plan =
-        Plan.createLink(
+        Plan.createLocation(
             meeting = meeting,
             creator = creator,
             category = category,

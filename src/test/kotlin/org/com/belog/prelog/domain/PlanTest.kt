@@ -19,11 +19,11 @@ import kotlin.test.assertSame
 
 class PlanTest {
     @Test
-    fun `LINK 계획을 생성하면 URL만 저장한다`() {
+    fun `LOCATION 계획을 생성하면 URL만 저장한다`() {
         val context = createMeetingContext()
 
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = context.groupMember,
                 category = PlanCategory.RESTAURANT,
@@ -34,7 +34,7 @@ class PlanTest {
 
         assertSame(context.meeting, plan.meeting)
         assertSame(context.groupMember, plan.createdBy)
-        assertEquals(PlanType.LINK, plan.type)
+        assertEquals(PlanType.LOCATION, plan.type)
         assertEquals(PlanCategory.RESTAURANT, plan.category)
         assertEquals("광주 맛집", plan.title)
         assertEquals("https://example.com/place", plan.url)
@@ -67,7 +67,7 @@ class PlanTest {
         val context = createMeetingContext()
         val nonParticipant = GroupMember.createMember(context.group, completedUser("non-participant"))
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = nonParticipant,
                 category = PlanCategory.CAFE,
@@ -81,7 +81,7 @@ class PlanTest {
         val otherGroupMember = GroupMember.createMember(otherGroup, completedUser("other-group-member"))
 
         assertFailsWith<IllegalArgumentException> {
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = otherGroupMember,
                 category = PlanCategory.CAFE,
@@ -127,7 +127,7 @@ class PlanTest {
 
         invalidUrls.forEach { url ->
             assertFailsWith<IllegalArgumentException> {
-                Plan.createLink(
+                Plan.createLocation(
                     meeting = context.meeting,
                     creator = context.groupMember,
                     category = PlanCategory.RESTAURANT,

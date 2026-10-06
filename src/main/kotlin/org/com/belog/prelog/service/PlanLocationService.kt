@@ -8,12 +8,12 @@ import org.com.belog.prelog.domain.PlanCategory
 import org.springframework.stereotype.Service
 
 @Service
-class PlanLinkService(
+class PlanLocationService(
     private val planService: PlanService,
     private val planMapUrlDetector: PlanMapUrlDetector,
     private val planLocationResolvers: List<PlanLocationResolver>,
 ) {
-    fun createLinkPlan(
+    fun createLocationPlan(
         meetingId: Long,
         creatorUserId: Long,
         category: PlanCategory,
@@ -25,7 +25,7 @@ class PlanLinkService(
         val provider = detectMapProvider(normalizedUrl)
         val resolution = resolveLocation(normalizedUrl, provider)
 
-        return planService.createLinkPlan(
+        return planService.createLocationPlan(
             meetingId = meetingId,
             creatorUserId = creatorUserId,
             category = category,
@@ -35,14 +35,14 @@ class PlanLinkService(
         )
     }
 
-    fun updateLinkPlan(
+    fun updateLocationPlan(
         planId: Long,
         userId: Long,
         category: PlanCategory,
         title: String,
         url: String,
     ): Plan {
-        val currentUrl = planService.getLinkUrlForUpdate(planId = planId, userId = userId)
+        val currentUrl = planService.getLocationUrlForUpdate(planId = planId, userId = userId)
         val normalizedUrl = url.trim()
         val provider = detectMapProvider(normalizedUrl)
         val unchangedUrl = currentUrl.takeIf { it == normalizedUrl }
@@ -53,7 +53,7 @@ class PlanLinkService(
                 resolveLocation(normalizedUrl, provider)
             }
 
-        return planService.updateLinkPlan(
+        return planService.updateLocationPlan(
             planId = planId,
             userId = userId,
             category = category,
