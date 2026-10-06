@@ -151,8 +151,8 @@ class UpstageReceiptExtractionClient(
                 "type" to "object",
                 "properties" to
                     mapOf(
-                        "title" to nullableString("영수증의 상호명 또는 결제 제목"),
-                        "paymentDate" to nullableString("결제일. 확인 가능한 경우 YYYY-MM-DD 형식"),
+                        "title" to stringProperty("영수증의 상호명 또는 결제 제목. 확인할 수 없으면 생략"),
+                        "paymentDate" to stringProperty("결제일. 확인 가능한 경우 YYYY-MM-DD 형식으로 기재하고 아니면 생략"),
                         "items" to
                             mapOf(
                                 "type" to "array",
@@ -162,28 +162,27 @@ class UpstageReceiptExtractionClient(
                                         "type" to "object",
                                         "properties" to
                                             mapOf(
-                                                "name" to nullableString("결제 항목명"),
-                                                "amount" to nullableNumber("해당 항목의 최종 결제 금액"),
+                                                "name" to stringProperty("결제 항목명. 확인할 수 없으면 생략"),
+                                                "amount" to numberProperty("해당 항목의 최종 결제 금액. 확인할 수 없으면 생략"),
                                             ),
-                                        "required" to listOf("name", "amount"),
                                         "additionalProperties" to false,
                                     ),
                             ),
-                        "totalAmount" to nullableNumber("영수증에 표시된 최종 결제 총액"),
+                        "totalAmount" to numberProperty("영수증에 표시된 최종 결제 총액. 확인할 수 없으면 생략"),
                     ),
-                "required" to listOf("title", "paymentDate", "items", "totalAmount"),
+                "required" to listOf("items"),
                 "additionalProperties" to false,
             )
 
-        private fun nullableString(description: String): Map<String, Any> =
+        private fun stringProperty(description: String): Map<String, Any> =
             mapOf(
-                "type" to listOf("string", "null"),
+                "type" to "string",
                 "description" to description,
             )
 
-        private fun nullableNumber(description: String): Map<String, Any> =
+        private fun numberProperty(description: String): Map<String, Any> =
             mapOf(
-                "type" to listOf("number", "null"),
+                "type" to "number",
                 "description" to description,
             )
     }

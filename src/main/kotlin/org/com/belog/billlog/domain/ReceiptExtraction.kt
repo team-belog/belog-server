@@ -3,13 +3,13 @@ package org.com.belog.billlog.domain
 import java.math.BigDecimal
 
 data class ReceiptExtraction(
-    val title: String?,
-    val paymentDate: String?,
-    val items: List<ReceiptExtractionItem>,
-    val totalAmount: BigDecimal?,
+    val title: String? = null,
+    val paymentDate: String? = null,
+    val items: List<ReceiptExtractionItem> = emptyList(),
+    val totalAmount: BigDecimal? = null,
 )
 
 data class ReceiptExtractionItem(
-    val name: String?,
-    val amount: BigDecimal?,
+    val name: String? = null,
+    val amount: BigDecimal? = null,
 )

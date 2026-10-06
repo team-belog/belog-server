@@ -2,11 +2,14 @@ package org.com.belog.billlog.controller
 
 import jakarta.validation.Valid
 import org.com.belog.billlog.code.BillLogSuccessCode
+import org.com.belog.billlog.controller.dto.request.ReceiptAnalysisRequest
 import org.com.belog.billlog.controller.dto.request.ReceiptImageUploadUrlRequest
 import org.com.belog.billlog.controller.dto.response.BillLogSummaryResponse
+import org.com.belog.billlog.controller.dto.response.ReceiptAnalysisResponse
 import org.com.belog.billlog.controller.dto.response.ReceiptImageUploadUrlResponse
 import org.com.belog.billlog.controller.swagger.BillLogSwagger
 import org.com.belog.billlog.service.BillLogService
+import org.com.belog.billlog.service.ReceiptAnalysisService
 import org.com.belog.billlog.service.ReceiptImageService
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
@@ -23,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController
 class BillLogController(
     private val billLogService: BillLogService,
     private val receiptImageService: ReceiptImageService,
+    private val receiptAnalysisService: ReceiptAnalysisService,
 ) : BillLogSwagger {
     @GetMapping
     override fun getSummary(
@@ -61,6 +65,29 @@ class BillLogController(
                 CommonResponse.success(
                     BillLogSuccessCode.RECEIPT_IMAGE_UPLOAD_URL_ISSUED,
                     ReceiptImageUploadUrlResponse.from(upload),
+                ),
+            )
+    }
+
+    @PostMapping("/receipt-analysis")
+    override fun analyzeReceipt(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: ReceiptAnalysisRequest,
+    ): ResponseEntity<CommonResponse<ReceiptAnalysisResponse>> {
+        val result =
+            receiptAnalysisService.analyze(
+                meetingId = meetingId,
+                userId = userId,
+                objectKey = request.receiptImageObjectKey,
+            )
+
+        return ResponseEntity
+            .status(BillLogSuccessCode.RECEIPT_ANALYZED.status)
+            .body(
+                CommonResponse.success(
+                    BillLogSuccessCode.RECEIPT_ANALYZED,
+                    ReceiptAnalysisResponse.from(result),
                 ),
             )
     }
