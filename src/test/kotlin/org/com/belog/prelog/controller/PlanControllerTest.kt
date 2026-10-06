@@ -6,7 +6,7 @@ import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanLikeService
-import org.com.belog.prelog.service.PlanLinkService
+import org.com.belog.prelog.service.PlanLocationService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
@@ -39,7 +39,7 @@ class PlanControllerTest {
     private lateinit var planService: PlanService
 
     @MockitoBean
-    private lateinit var planLinkService: PlanLinkService
+    private lateinit var planLocationService: PlanLocationService
 
     @MockitoBean
     private lateinit var preLogService: PreLogService
@@ -48,15 +48,15 @@ class PlanControllerTest {
     private lateinit var planLikeService: PlanLikeService
 
     @Test
-    fun `LINK 계획을 생성한다`() {
-        val plan = mockLinkPlan()
+    fun `LOCATION 계획을 생성한다`() {
+        val plan = mockLocationPlan()
         `when`(
-            planLinkService.createLinkPlan(
+            planLocationService.createLocationPlan(
                 meetingId = 1L,
                 creatorUserId = 15L,
                 category = PlanCategory.RESTAURANT,
                 title = "광주 맛집",
-                url = "https://example.com/place",
+                url = "https://place.map.kakao.com/123456",
             ),
         ).thenReturn(plan)
 
@@ -66,7 +66,7 @@ class PlanControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place"}""",
+                        """{"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}""",
                     ),
             ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.code").value("PRE_LOG-S001"))
@@ -74,10 +74,10 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.data.planId").value(7))
             .andExpect(jsonPath("$.data.meetingId").value(1))
             .andExpect(jsonPath("$.data.creatorGroupMemberId").value(10))
-            .andExpect(jsonPath("$.data.type").value("LINK"))
+            .andExpect(jsonPath("$.data.type").value("LOCATION"))
             .andExpect(jsonPath("$.data.category").value("RESTAURANT"))
             .andExpect(jsonPath("$.data.title").value("광주 맛집"))
-            .andExpect(jsonPath("$.data.url").value("https://example.com/place"))
+            .andExpect(jsonPath("$.data.url").value("https://place.map.kakao.com/123456"))
             .andExpect(jsonPath("$.data.content").isEmpty)
     }
 
@@ -89,7 +89,7 @@ class PlanControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"type":"LINK","category":"RESTAURANT","title":"맛집","content":"메모"}""",
+                        """{"type":"LOCATION","category":"RESTAURANT","title":"맛집","content":"메모"}""",
                     ),
             ).andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.code").value("CMN-E001"))
@@ -106,7 +106,24 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(planService)
-        verifyNoInteractions(planLinkService)
+        verifyNoInteractions(planLocationService)
+    }
+
+    @Test
+    fun `기존 LINK 유형으로 계획을 생성할 수 없다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/meetings/1/pre-log/plans")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"type":"LINK","category":"RESTAURANT","title":"맛집","url":"https://place.map.kakao.com/123456"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E002"))
+
+        verifyNoInteractions(planService)
+        verifyNoInteractions(planLocationService)
     }
 
     @Test
@@ -137,7 +154,7 @@ class PlanControllerTest {
         verify(planService).unpinPlan(planId = 12L, userId = 15L)
     }
 
-    private fun mockLinkPlan(): Plan {
+    private fun mockLocationPlan(): Plan {
         val meeting = mock(Meeting::class.java)
         val groupMember = mock(GroupMember::class.java)
         val plan = mock(Plan::class.java)
@@ -146,10 +163,10 @@ class PlanControllerTest {
         `when`(plan.id).thenReturn(7L)
         `when`(plan.meeting).thenReturn(meeting)
         `when`(plan.createdBy).thenReturn(groupMember)
-        `when`(plan.type).thenReturn(PlanType.LINK)
+        `when`(plan.type).thenReturn(PlanType.LOCATION)
         `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
         `when`(plan.title).thenReturn("광주 맛집")
-        `when`(plan.url).thenReturn("https://example.com/place")
+        `when`(plan.url).thenReturn("https://place.map.kakao.com/123456")
         `when`(plan.content).thenReturn(null)
         return plan
     }

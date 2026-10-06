@@ -135,7 +135,7 @@ class PlanService(
     }
 
     @Transactional
-    fun createLinkPlan(
+    fun createLocationPlan(
         meetingId: Long,
         creatorUserId: Long,
         category: PlanCategory,
@@ -150,7 +150,7 @@ class PlanService(
 
         return savePlan {
             Plan
-                .createLink(
+                .createLocation(
                     meeting = meeting,
                     creator = creator,
                     category = category,
@@ -187,7 +187,7 @@ class PlanService(
     }
 
     @Transactional
-    fun updateLinkPlan(
+    fun updateLocationPlan(
         planId: Long,
         userId: Long,
         category: PlanCategory,
@@ -200,12 +200,12 @@ class PlanService(
             if (expectedUrlWhenResolutionSkipped != null && plan.url != expectedUrlWhenResolutionSkipped) {
                 throw BusinessException(PreLogErrorCode.PLAN_UPDATE_CONFLICT)
             }
-            plan.updateLink(category = category, title = title, url = url)
+            plan.updateLocation(category = category, title = title, url = url)
             locationResolution?.let { resolution -> plan.applyLocationResolution(resolution) }
         }
 
     @Transactional(readOnly = true)
-    fun getLinkUrlForUpdate(
+    fun getLocationUrlForUpdate(
         planId: Long,
         userId: Long,
     ): String? {

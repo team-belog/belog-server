@@ -14,4 +14,5 @@ enum class PreLogErrorCode(
     PLAN_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PRE_LOG-E004", "계획 작성자만 수정할 수 있습니다."),
     PLAN_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "PRE_LOG-E005", "계획을 삭제할 권한이 없습니다."),
     PLAN_UPDATE_CONFLICT(HttpStatus.CONFLICT, "PRE_LOG-E006", "계획이 다른 요청에서 수정되었습니다. 다시 시도해 주세요."),
+    INVALID_MAP_URL(HttpStatus.BAD_REQUEST, "PRE_LOG-E007", "지원하는 지도 링크만 입력할 수 있습니다."),
 }

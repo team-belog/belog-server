@@ -160,7 +160,7 @@ class PlanLikeServiceIntegrationTest {
             )
         val plan =
             planRepository.saveAndFlush(
-                Plan.createLink(
+                Plan.createLocation(
                     meeting = meeting,
                     creator = groupMember,
                     category = PlanCategory.RESTAURANT,

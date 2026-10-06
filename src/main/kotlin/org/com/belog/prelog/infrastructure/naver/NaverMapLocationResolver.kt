@@ -12,7 +12,11 @@ import java.net.http.HttpResponse
 import java.time.Duration
 
 @Component
-class NaverMapLocationResolver : PlanLocationResolver {
+class NaverMapLocationResolver(
+    private val urlDetector: NaverMapUrlDetector,
+) : PlanLocationResolver {
+    override val provider: MapProvider = MapProvider.NAVER
+
     private val httpClient =
         HttpClient
             .newBuilder()
@@ -22,20 +26,20 @@ class NaverMapLocationResolver : PlanLocationResolver {
 
     override fun resolve(url: String): PlanLocationResolution {
         val uri = runCatching { URI.create(url.trim()) }.getOrNull() ?: return PlanLocationResolution.NotApplicable
-        if (isDirectMapUrl(uri)) {
+        if (urlDetector.isDirectMapUrl(uri)) {
             return failedResolution(uri)
         }
-        if (!isShortUrl(uri)) {
+        if (!urlDetector.isShortUrl(uri)) {
             return PlanLocationResolution.NotApplicable
         }
 
         var currentUri = uri
         repeat(MAX_REDIRECTS) {
             val nextUri = redirectTarget(currentUri) ?: return PlanLocationResolution.NotApplicable
-            if (isDirectMapUrl(nextUri)) {
+            if (urlDetector.isDirectMapUrl(nextUri)) {
                 return failedResolution(nextUri)
             }
-            if (!isShortUrl(nextUri)) {
+            if (!urlDetector.isShortUrl(nextUri)) {
                 return PlanLocationResolution.NotApplicable
             }
             currentUri = nextUri
@@ -75,22 +79,11 @@ class NaverMapLocationResolver : PlanLocationResolver {
         }
     }
 
-    private fun isDirectMapUrl(uri: URI): Boolean =
-        uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host?.lowercase() in DIRECT_MAP_HOSTS
-
-    private fun isShortUrl(uri: URI): Boolean =
-        uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host.equals("naver.me", ignoreCase = true) &&
-            !uri.path.isNullOrBlank() &&
-            uri.path != "/"
-
     companion object {
         private val CONNECTION_TIMEOUT = Duration.ofSeconds(2)
         private val READ_TIMEOUT = Duration.ofSeconds(3)
         private const val MAX_REDIRECTS = 3
         private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
-        private val DIRECT_MAP_HOSTS = setOf("map.naver.com", "m.map.naver.com")
         private val PLACE_PATH_REGEX = Regex("^/(?:p|v5)/entry/place/(\\d{1,512})/?$")
     }
 }

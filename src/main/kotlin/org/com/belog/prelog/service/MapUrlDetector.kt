@@ -1,9 +1,10 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.prelog.domain.MapProvider
+import java.net.URI
 
-interface PlanLocationResolver {
+interface MapUrlDetector {
     val provider: MapProvider
 
-    fun resolve(url: String): PlanLocationResolution
+    fun supports(uri: URI): Boolean
 }

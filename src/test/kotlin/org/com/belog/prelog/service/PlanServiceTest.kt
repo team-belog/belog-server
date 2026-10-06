@@ -15,12 +15,6 @@ import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
-import org.com.belog.prelog.infrastructure.google.GoogleMapLocationResolver
-import org.com.belog.prelog.infrastructure.google.GoogleMapShortUrlResolver
-import org.com.belog.prelog.infrastructure.google.GoogleMapUrlDetector
-import org.com.belog.prelog.infrastructure.google.GoogleMapUrlParser
-import org.com.belog.prelog.infrastructure.google.GooglePlacesClient
-import org.com.belog.prelog.infrastructure.google.GooglePlusCodeDecoder
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
@@ -39,7 +33,6 @@ import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -50,32 +43,6 @@ class PlanServiceTest {
     private val planLikeRepository = mock(PlanLikeRepository::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-22T00:00:00Z"), ZoneOffset.UTC)
     private val planService = PlanService(meetingRepository, groupMemberRepository, planRepository, planLikeRepository, clock)
-
-    @Test
-    fun `일반 URL 계획은 위치 처리 없이 저장한다`() {
-        val context = meetingContext()
-        val creator = mock(GroupMember::class.java)
-        `when`(creator.group).thenReturn(context.group)
-        `when`(creator.belongsTo(context.group)).thenCallRealMethod()
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(creator)
-        `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }
-        val resolver =
-            GoogleMapLocationResolver(
-                GoogleMapUrlDetector(),
-                mock(GoogleMapShortUrlResolver::class.java),
-                GoogleMapUrlParser(GooglePlusCodeDecoder()),
-                mock(GooglePlacesClient::class.java),
-            )
-
-        val plan =
-            PlanLinkService(planService, listOf(resolver))
-                .createLinkPlan(1L, 15L, PlanCategory.RESTAURANT, "맛집", "https://example.com/restaurant")
-
-        assertEquals(LocationResolutionStatus.NOT_APPLICABLE, plan.locationStatus)
-        assertNull(plan.location)
-        assertEquals("https://example.com/restaurant", plan.url)
-    }
 
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
@@ -135,7 +102,7 @@ class PlanServiceTest {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
 
         val result =
-            planService.updateLinkPlan(
+            planService.updateLocationPlan(
                 planId = 20L,
                 userId = 15L,
                 category = PlanCategory.CAFE,
@@ -144,7 +111,7 @@ class PlanServiceTest {
             )
 
         assertSame(target.plan, result)
-        assertEquals(PlanType.LINK, result.type)
+        assertEquals(PlanType.LOCATION, result.type)
         assertEquals(PlanCategory.CAFE, result.category)
         assertEquals("수정한 카페", result.title)
         assertEquals("https://example.com/updated-cafe", result.url)
@@ -153,12 +120,12 @@ class PlanServiceTest {
     @Test
     fun `위치 해석을 생략한 사이 URL이 변경되면 위치 정보를 보존하고 충돌을 반환한다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
-        target.plan.updateLink(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
+        target.plan.updateLocation(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
         target.plan.failLocationResolution(MapProvider.GOOGLE, externalPlaceId = "new-place-id")
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.updateLinkPlan(
+                planService.updateLocationPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
@@ -191,7 +158,7 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
-        assertEquals(PlanType.LINK, target.plan.type)
+        assertEquals(PlanType.LOCATION, target.plan.type)
         assertEquals("맛집", target.plan.title)
         assertEquals("https://example.com/place", target.plan.url)
     }
@@ -236,7 +203,7 @@ class PlanServiceTest {
 
         val updateException =
             assertFailsWith<BusinessException> {
-                planService.updateLinkPlan(
+                planService.updateLocationPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
@@ -300,7 +267,7 @@ class PlanServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.createLinkPlan(
+                planService.createLocationPlan(
                     meetingId = 1L,
                     creatorUserId = 15L,
                     category = PlanCategory.RESTAURANT,
@@ -366,7 +333,7 @@ class PlanServiceTest {
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.createLinkPlan(
+                planService.createLocationPlan(
                     meetingId = 1L,
                     creatorUserId = 15L,
                     category = PlanCategory.CAFE,
@@ -406,7 +373,7 @@ class PlanServiceTest {
         `when`(planCreator.id).thenReturn(planCreatorId)
         `when`(plan.id).thenReturn(20L)
         `when`(plan.createdBy).thenReturn(planCreator)
-        `when`(plan.type).thenReturn(PlanType.LINK)
+        `when`(plan.type).thenReturn(PlanType.LOCATION)
         `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
         `when`(plan.title).thenReturn("맛집")
         `when`(plan.url).thenReturn("https://example.com/place")
@@ -435,7 +402,7 @@ class PlanServiceTest {
         `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
 
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = planCreator,
                 category = PlanCategory.RESTAURANT,
@@ -469,7 +436,7 @@ class PlanServiceTest {
         }
 
         val plan =
-            Plan.createLink(
+            Plan.createLocation(
                 meeting = context.meeting,
                 creator = planCreator,
                 category = PlanCategory.RESTAURANT,

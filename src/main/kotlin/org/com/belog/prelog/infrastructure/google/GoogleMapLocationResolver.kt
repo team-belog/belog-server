@@ -14,9 +14,11 @@ class GoogleMapLocationResolver(
     private val urlParser: GoogleMapUrlParser,
     private val placesClient: GooglePlacesClient,
 ) : PlanLocationResolver {
+    override val provider: MapProvider = MapProvider.GOOGLE
+
     override fun resolve(url: String): PlanLocationResolution {
         val uri = runCatching { URI.create(url.trim()) }.getOrNull() ?: return PlanLocationResolution.NotApplicable
-        if (!urlDetector.isGoogleMapUrl(uri)) {
+        if (!urlDetector.supports(uri)) {
             return PlanLocationResolution.NotApplicable
         }
 
