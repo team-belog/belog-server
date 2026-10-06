@@ -28,4 +28,6 @@ enum class BillLogErrorCode(
     INVALID_RECEIPT_IMAGE_OBJECT_KEY(HttpStatus.BAD_REQUEST, "BILL_LOG-E018", "영수증 이미지 경로가 올바르지 않습니다."),
     RECEIPT_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "BILL_LOG-E019", "영수증 이미지를 찾을 수 없습니다."),
     INVALID_RECEIPT_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "BILL_LOG-E020", "영수증 이미지 정보가 올바르지 않습니다."),
+    RECEIPT_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "BILL_LOG-E021", "영수증 이미지 분석에 실패했습니다."),
+    RECEIPT_ANALYSIS_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "BILL_LOG-E022", "영수증 이미지 분석 시간이 초과되었습니다."),
 }
