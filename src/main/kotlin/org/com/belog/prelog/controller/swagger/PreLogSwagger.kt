@@ -11,7 +11,6 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.Positive
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
@@ -167,8 +166,9 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 지도 계획 목록 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 링크 계획을 조회합니다. " +
-                "카테고리 필터와 계획 ID 기반 커서 페이지네이션을 지원합니다.",
+            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 링크 계획을 " +
+                "고정 계획 우선, 계획 ID 역순으로 조회합니다. " +
+                "카테고리 필터와 고정 여부 및 계획 ID 기반의 복합 커서 페이지네이션을 지원합니다.",
     )
     @ApiResponses(
         value = [
@@ -208,10 +208,9 @@ interface PreLogSwagger {
         @Parameter(description = "계획 카테고리. 생략하면 전체 카테고리를 조회", example = "RESTAURANT")
         @RequestParam(required = false)
         category: PlanCategory?,
-        @Parameter(description = "마지막으로 조회한 계획 ID", example = "120")
+        @Parameter(description = "이전 응답의 nextCursor. 첫 요청에서는 생략", example = "MToxMjA")
         @RequestParam(required = false)
-        @Positive
-        cursor: Long?,
+        cursor: String?,
         @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
         @RequestParam(defaultValue = "20")
         @Min(1)

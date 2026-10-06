@@ -1,6 +1,7 @@
 package org.com.belog.prelog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.prelog.controller.cursor.PlanListCursorCodec
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.service.result.MapPlanListItemResult
 import org.com.belog.prelog.service.result.MapPlanListResult
@@ -11,8 +12,8 @@ import java.time.Instant
 data class MapPlanListResponse(
     @field:Schema(description = "위치 정보가 있는 계획 목록")
     val items: List<MapPlanListItemResponse>,
-    @field:Schema(description = "다음 페이지 커서", nullable = true)
-    val nextCursor: Long?,
+    @field:Schema(description = "다음 페이지 커서", example = "MToxMDE", nullable = true)
+    val nextCursor: String?,
     @field:Schema(description = "다음 페이지 존재 여부")
     val hasNext: Boolean,
 ) {
@@ -20,7 +21,7 @@ data class MapPlanListResponse(
         fun from(result: MapPlanListResult): MapPlanListResponse =
             MapPlanListResponse(
                 items = result.items.map(MapPlanListItemResponse::from),
-                nextCursor = result.nextCursor,
+                nextCursor = result.nextCursor?.let(PlanListCursorCodec::encode),
                 hasNext = result.hasNext,
             )
     }

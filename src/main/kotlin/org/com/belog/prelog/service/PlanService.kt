@@ -88,11 +88,10 @@ class PlanService(
         meetingId: Long,
         userId: Long,
         category: PlanCategory?,
-        cursor: Long?,
+        cursor: PlanListCursor?,
         size: Int = DEFAULT_PAGE_SIZE,
     ): MapPlanListResult {
         require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
-        require(cursor == null || cursor > 0) { "커서는 양수여야 합니다." }
 
         val meeting = findMeeting(meetingId)
         findGroupMember(meeting, userId)
@@ -102,7 +101,8 @@ class PlanService(
                 meetingId = meetingId,
                 category = category,
                 locationStatus = LocationResolutionStatus.RESOLVED,
-                cursor = cursor,
+                cursorPinned = cursor?.pinned,
+                cursorId = cursor?.planId,
                 pageable = PageRequest.of(0, size + 1),
             )
         val hasNext = plans.size > size
@@ -110,7 +110,16 @@ class PlanService(
 
         return MapPlanListResult(
             items = pagePlans.map { plan -> plan.toMapListItemResult() },
-            nextCursor = if (hasNext) pagePlans.lastOrNull()?.id else null,
+            nextCursor =
+                pagePlans
+                    .lastOrNull()
+                    ?.takeIf { hasNext }
+                    ?.let { plan ->
+                        PlanListCursor(
+                            pinned = plan.pinned,
+                            planId = checkNotNull(plan.id) { "커서 대상 지도 계획의 ID가 없습니다." },
+                        )
+                    },
             hasNext = hasNext,
         )
     }

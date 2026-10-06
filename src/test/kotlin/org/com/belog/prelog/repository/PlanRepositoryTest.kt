@@ -91,7 +91,8 @@ class PlanRepositoryTest {
                 meetingId = requireNotNull(context.meeting.id),
                 category = null,
                 locationStatus = LocationResolutionStatus.RESOLVED,
-                cursor = null,
+                cursorPinned = null,
+                cursorId = null,
                 pageable = PageRequest.of(0, 20),
             )
 

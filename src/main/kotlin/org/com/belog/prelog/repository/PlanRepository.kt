@@ -59,15 +59,20 @@ interface PlanRepository : JpaRepository<Plan, Long> {
         WHERE plan.meeting.id = :meetingId
           AND plan.locationStatus = :locationStatus
           AND (:category IS NULL OR plan.category = :category)
-          AND (:cursor IS NULL OR plan.id < :cursor)
-        ORDER BY plan.id DESC
+          AND (
+              :cursorId IS NULL
+              OR (:cursorPinned = TRUE AND plan.pinned = FALSE)
+              OR (plan.pinned = :cursorPinned AND plan.id < :cursorId)
+          )
+        ORDER BY plan.pinned DESC, plan.id DESC
         """,
     )
     fun findMapPage(
         @Param("meetingId") meetingId: Long,
         @Param("category") category: PlanCategory?,
         @Param("locationStatus") locationStatus: LocationResolutionStatus,
-        @Param("cursor") cursor: Long?,
+        @Param("cursorPinned") cursorPinned: Boolean?,
+        @Param("cursorId") cursorId: Long?,
         pageable: Pageable,
     ): List<Plan>
 }

@@ -1,12 +1,13 @@
 package org.com.belog.prelog.service.result
 
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.service.query.PlanListCursor
 import java.math.BigDecimal
 import java.time.Instant
 
 data class MapPlanListResult(
     val items: List<MapPlanListItemResult>,
-    val nextCursor: Long?,
+    val nextCursor: PlanListCursor?,
     val hasNext: Boolean,
 )
 
