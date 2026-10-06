@@ -34,7 +34,7 @@ class UserService(
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
     @Transactional(readOnly = true)
-    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNickname(nickname)
+    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNicknameAndDeletedAtIsNull(nickname)
 
     @Transactional(readOnly = true)
     fun getBankAccount(userId: Long): BankAccount {
@@ -165,7 +165,7 @@ class UserService(
         }
 
         val normalizedNickname = nickname.trim()
-        if (userRepository.existsByNickname(normalizedNickname)) {
+        if (userRepository.existsByNicknameAndDeletedAtIsNull(normalizedNickname)) {
             throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
         }
 
@@ -188,7 +188,7 @@ class UserService(
         socialProfileImageUrl: String? = null,
     ): SocialUserResult {
         val existingUser =
-            userRepository.findByProviderAndProviderUserId(
+            userRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
                 provider = provider,
                 providerUserId = providerUserId,
             )
@@ -232,7 +232,10 @@ class UserService(
 
         if (nickname != null) {
             val normalizedNickname = nickname.trim()
-            if (normalizedNickname != user.nickname && userRepository.existsByNickname(normalizedNickname)) {
+            if (
+                normalizedNickname != user.nickname &&
+                userRepository.existsByNicknameAndDeletedAtIsNull(normalizedNickname)
+            ) {
                 throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
             }
             user.updateNickname(normalizedNickname)

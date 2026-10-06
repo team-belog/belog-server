@@ -27,6 +27,29 @@ class UserTest {
         assertFalse(user.isOnboardingCompleted)
         assertEquals(SocialProvider.GOOGLE, user.provider)
         assertEquals("google-subject", user.providerUserId)
+        assertTrue(user.isActive)
+        assertEquals(null, user.deletedAt)
+    }
+
+    @Test
+    fun `사용자를 탈퇴 상태로 변경한다`() {
+        val user = createUser()
+        val withdrawnAt = Instant.parse("2026-10-07T00:00:00Z")
+
+        user.withdraw(withdrawnAt)
+
+        assertFalse(user.isActive)
+        assertEquals(withdrawnAt, user.deletedAt)
+    }
+
+    @Test
+    fun `이미 탈퇴한 사용자는 다시 탈퇴 상태로 변경할 수 없다`() {
+        val user = createUser()
+        user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+
+        assertFailsWith<IllegalStateException> {
+            user.withdraw(Instant.parse("2026-10-07T00:00:01Z"))
+        }
     }
 
     @Test

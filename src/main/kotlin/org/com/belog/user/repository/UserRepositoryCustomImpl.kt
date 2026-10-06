@@ -46,11 +46,11 @@ open class UserRepositoryCustomImpl(
                 """
                 SELECT user
                 FROM User user
-                WHERE user.provider = :provider
-                  AND user.providerUserId = :providerUserId
+                WHERE user.activeProvider = :provider
+                  AND user.activeProviderUserId = :providerUserId
                 """.trimIndent(),
                 User::class.java,
-            ).setParameter("provider", provider)
+            ).setParameter("provider", provider.name)
             .setParameter("providerUserId", providerUserId)
             .setLockMode(LockModeType.PESSIMISTIC_WRITE)
             .singleResult

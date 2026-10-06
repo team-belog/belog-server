@@ -7,6 +7,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.command.ProfileImageChange
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.dao.DataAccessException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
@@ -26,6 +28,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -173,11 +176,6 @@ class UserServiceTest {
     }
 
     @Test
-    fun `등록되지 않은 닉네임은 사용할 수 있다`() {
-        assertTrue(userService.isNicknameAvailable("새닉네임"))
-    }
-
-    @Test
     fun `등록된 닉네임은 사용할 수 없다`() {
         login()
         completeOnboarding()
@@ -271,21 +269,6 @@ class UserServiceTest {
     }
 
     @Test
-    fun `이미 사용 중인 닉네임으로 온보딩을 완료할 수 없다`() {
-        val firstUserId = createUser("first-google-subject", "first@example.com")
-        val secondUserId = createUser("second-google-subject", "second@example.com")
-        completeOnboarding(firstUserId, "중복닉네임")
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                completeOnboarding(secondUserId, "중복닉네임")
-            }
-
-        assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.errorCode)
-        assertFalse(requireNotNull(userRepository.findById(secondUserId).orElseThrow()).isOnboardingCompleted)
-    }
-
-    @Test
     fun `서로 다른 사용자가 같은 닉네임으로 동시에 온보딩하면 한 명만 성공한다`() {
         val firstUserId = createUser("first-google-subject", "first@example.com")
         val secondUserId = createUser("second-google-subject", "second@example.com")
@@ -311,6 +294,76 @@ class UserServiceTest {
             assertEquals(1, userRepository.findAll().count { user -> user.nickname == "동시닉네임" })
         } finally {
             executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `탈퇴한 사용자의 닉네임과 소셜 식별자를 신규 사용자가 재사용한다`() {
+        val withdrawnUserId = createUser("reusable-google-subject", "withdrawn@example.com")
+        completeOnboarding(withdrawnUserId, "재사용닉네임")
+        withdrawUser(withdrawnUserId)
+
+        assertTrue(userService.isNicknameAvailable("재사용닉네임"))
+        assertEquals(
+            null,
+            userRepository.findByProviderAndProviderUserIdAndDeletedAtIsNull(
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "reusable-google-subject",
+            ),
+        )
+
+        val newUserId = createUser("reusable-google-subject", "new@example.com")
+        completeOnboarding(newUserId, "재사용닉네임")
+
+        assertNotEquals(withdrawnUserId, newUserId)
+        val withdrawnUser = userRepository.findById(withdrawnUserId).orElseThrow()
+        assertFalse(withdrawnUser.isActive)
+        assertEquals("withdrawn@example.com", withdrawnUser.email)
+        assertEquals("reusable-google-subject", withdrawnUser.providerUserId)
+        assertEquals("재사용닉네임", withdrawnUser.nickname)
+        assertEquals(
+            newUserId,
+            userRepository
+                .findByProviderAndProviderUserIdAndDeletedAtIsNull(
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = "reusable-google-subject",
+                )?.id,
+        )
+        assertFalse(userService.isNicknameAvailable("재사용닉네임"))
+    }
+
+    @Test
+    fun `탈퇴 후 재사용된 닉네임은 다른 활성 사용자가 중복 사용할 수 없다`() {
+        val withdrawnUserId = createUser("withdrawn-google-subject", "withdrawn@example.com")
+        completeOnboarding(withdrawnUserId, "재사용닉네임")
+        withdrawUser(withdrawnUserId)
+        val activeUserId = createUser("active-google-subject", "active@example.com")
+        completeOnboarding(activeUserId, "재사용닉네임")
+        val duplicateUserId = createUser("duplicate-google-subject", "duplicate@example.com")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                completeOnboarding(duplicateUserId, "재사용닉네임")
+            }
+
+        assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.errorCode)
+        assertFalse(userRepository.findById(duplicateUserId).orElseThrow().isOnboardingCompleted)
+    }
+
+    @Test
+    fun `탈퇴 후 재사용된 소셜 식별자는 다른 활성 사용자가 중복 사용할 수 없다`() {
+        val withdrawnUserId = createUser("reusable-google-subject", "withdrawn@example.com")
+        withdrawUser(withdrawnUserId)
+        createUser("reusable-google-subject", "active@example.com")
+
+        assertFailsWith<DataIntegrityViolationException> {
+            userRepository.saveAndFlush(
+                User.createSocialUser(
+                    email = "duplicate@example.com",
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = "reusable-google-subject",
+                ),
+            )
         }
     }
 
@@ -497,6 +550,12 @@ class UserServiceTest {
                 providerUserId = providerUserId,
                 email = email,
             ).userId
+
+    private fun withdrawUser(userId: Long) {
+        val user = userRepository.findById(userId).orElseThrow()
+        user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        userRepository.saveAndFlush(user)
+    }
 
     private fun login(): SocialUserResult =
         userService.findOrCreateSocialUser(

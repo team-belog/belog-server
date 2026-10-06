@@ -16,18 +16,19 @@ import java.net.URI
 import java.time.Instant
 
 const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
+const val USER_SOCIAL_IDENTITY_UNIQUE_CONSTRAINT_NAME = "uk_users_provider_provider_user_id"
 
 @Entity
 @Table(
     name = "users",
     uniqueConstraints = [
         UniqueConstraint(
-            name = "uk_users_provider_provider_user_id",
-            columnNames = ["provider", "provider_user_id"],
+            name = USER_SOCIAL_IDENTITY_UNIQUE_CONSTRAINT_NAME,
+            columnNames = ["active_provider", "active_provider_user_id"],
         ),
         UniqueConstraint(
             name = USER_NICKNAME_UNIQUE_CONSTRAINT_NAME,
-            columnNames = ["nickname"],
+            columnNames = ["active_nickname"],
         ),
     ],
     check = [
@@ -87,12 +88,54 @@ class User protected constructor(
     var onboardingCompletedAt: Instant? = null
         protected set
 
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+        protected set
+
+    @Column(
+        name = "active_nickname",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR($NICKNAME_MAX_LENGTH) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN nickname ELSE NULL END)",
+    )
+    private var activeNickname: String? = null
+
+    @Column(
+        name = "active_provider",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR(20) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN provider ELSE NULL END)",
+    )
+    private var activeProvider: String? = null
+
+    @Column(
+        name = "active_provider_user_id",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR(255) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN provider_user_id ELSE NULL END)",
+    )
+    private var activeProviderUserId: String? = null
+
     @Column(name = "push_notification_enabled", nullable = false)
     var pushNotificationEnabled: Boolean = true
         protected set
 
     val isOnboardingCompleted: Boolean
         get() = onboardingCompletedAt != null
+
+    val isActive: Boolean
+        get() = deletedAt == null
+
+    fun withdraw(withdrawnAt: Instant) {
+        check(isActive) { "이미 탈퇴한 사용자입니다." }
+        deletedAt = withdrawnAt
+    }
 
     fun completeOnboarding(
         profileImageObjectKey: ProfileImageObjectKey?,
