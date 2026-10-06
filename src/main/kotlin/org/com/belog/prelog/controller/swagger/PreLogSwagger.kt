@@ -222,7 +222,7 @@ interface PreLogSwagger {
         summary = "Pre-log 계획 생성",
         description =
             "해당 만남이 속한 그룹의 멤버가 링크 또는 메모 계획을 생성합니다. " +
-                "LINK는 url만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
+                "LINK는 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
     )
     @ApiResponses(
         value = [
@@ -250,6 +250,7 @@ interface PreLogSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
+                            ExampleObject(name = "지원하지 않는 지도 링크", value = INVALID_MAP_URL_EXAMPLE),
                         ],
                     ),
                 ],
@@ -319,7 +320,7 @@ interface PreLogSwagger {
         summary = "Pre-log 계획 수정",
         description =
             "계획 작성자가 링크 또는 메모 계획의 전체 내용을 수정합니다. " +
-                "LINK는 url만, MEMO는 content만 입력할 수 있으며 종료된 만남의 계획도 수정할 수 있습니다.",
+                "LINK는 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남의 계획도 수정할 수 있습니다.",
     )
     @ApiResponses(
         value = [
@@ -347,6 +348,7 @@ interface PreLogSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
+                            ExampleObject(name = "지원하지 않는 지도 링크", value = INVALID_MAP_URL_EXAMPLE),
                         ],
                     ),
                 ],
@@ -675,31 +677,34 @@ interface PreLogSwagger {
 }
 
 private const val CREATE_LINK_PLAN_REQUEST_EXAMPLE =
-    """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place"}"""
+    """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}"""
 
 private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
 
 private const val UPDATE_LINK_PLAN_REQUEST_EXAMPLE =
-    """{"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://example.com/cafe"}"""
+    """{"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456"}"""
 
 private const val UPDATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"OTHER","title":"준비물","content":"우산 챙기기"}"""
 
 private const val CREATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place","content":null}}"""
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456","content":null}}"""
 
 private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
 
 private const val UPDATE_LINK_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://example.com/cafe","content":null}}"""
+    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"LINK","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456","content":null}}"""
 
 private const val UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"OTHER","title":"준비물","url":null,"content":"우산 챙기기"}}"""
 
 private const val INVALID_PLAN_EXAMPLE =
     """{"code":"PRE_LOG-E001","message":"계획 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val INVALID_MAP_URL_EXAMPLE =
+    """{"code":"PRE_LOG-E007","message":"지원하는 지도 링크만 입력할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
@@ -735,7 +740,7 @@ private const val UNPIN_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S008","message":"계획 핀 고정이 해제되었습니다.","data":null}"""
 
 private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://example.com/place","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":"MToxMjE","hasNext":true}}"""
+    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LINK","category":"ACCOMMODATION","title":"광주 숙소","url":"https://place.map.kakao.com/123456","address":null,"thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"}],"nextCursor":"MToxMjE","hasNext":true}}"""
 
 private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""

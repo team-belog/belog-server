@@ -56,7 +56,7 @@ class PlanControllerTest {
                 creatorUserId = 15L,
                 category = PlanCategory.RESTAURANT,
                 title = "광주 맛집",
-                url = "https://example.com/place",
+                url = "https://place.map.kakao.com/123456",
             ),
         ).thenReturn(plan)
 
@@ -66,7 +66,7 @@ class PlanControllerTest {
                     .principal(authenticatedUser())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(
-                        """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://example.com/place"}""",
+                        """{"type":"LINK","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}""",
                     ),
             ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.code").value("PRE_LOG-S001"))
@@ -77,7 +77,7 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.data.type").value("LINK"))
             .andExpect(jsonPath("$.data.category").value("RESTAURANT"))
             .andExpect(jsonPath("$.data.title").value("광주 맛집"))
-            .andExpect(jsonPath("$.data.url").value("https://example.com/place"))
+            .andExpect(jsonPath("$.data.url").value("https://place.map.kakao.com/123456"))
             .andExpect(jsonPath("$.data.content").isEmpty)
     }
 
@@ -149,7 +149,7 @@ class PlanControllerTest {
         `when`(plan.type).thenReturn(PlanType.LINK)
         `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
         `when`(plan.title).thenReturn("광주 맛집")
-        `when`(plan.url).thenReturn("https://example.com/place")
+        `when`(plan.url).thenReturn("https://place.map.kakao.com/123456")
         `when`(plan.content).thenReturn(null)
         return plan
     }

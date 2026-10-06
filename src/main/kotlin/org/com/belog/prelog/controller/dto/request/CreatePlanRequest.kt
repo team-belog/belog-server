@@ -49,8 +49,8 @@ data class CreatePlanRequest(
     )
     val title: String,
     @field:Schema(
-        description = "LINK 유형에서 사용하는 HTTP 또는 HTTPS URL",
-        example = "https://example.com/place",
+        description = "LINK 유형에서 사용하는 Google Maps, Kakao Map 또는 Naver Map URL",
+        example = "https://place.map.kakao.com/123456",
         maxLength = Plan.URL_MAX_LENGTH,
         requiredMode = Schema.RequiredMode.NOT_REQUIRED,
         nullable = true,

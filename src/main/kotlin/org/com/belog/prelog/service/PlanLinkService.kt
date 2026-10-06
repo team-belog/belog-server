@@ -1,5 +1,8 @@
 package org.com.belog.prelog.service
 
+import org.com.belog.global.error.BusinessException
+import org.com.belog.prelog.code.PreLogErrorCode
+import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.springframework.stereotype.Service
@@ -18,7 +21,9 @@ class PlanLinkService(
         url: String,
     ): Plan {
         planService.validatePlanCreation(meetingId = meetingId, userId = creatorUserId)
-        val resolution = resolveLocation(url)
+        val normalizedUrl = url.trim()
+        val provider = detectMapProvider(normalizedUrl)
+        val resolution = resolveLocation(normalizedUrl, provider)
 
         return planService.createLinkPlan(
             meetingId = meetingId,
@@ -39,12 +44,13 @@ class PlanLinkService(
     ): Plan {
         val currentUrl = planService.getLinkUrlForUpdate(planId = planId, userId = userId)
         val normalizedUrl = url.trim()
+        val provider = detectMapProvider(normalizedUrl)
         val unchangedUrl = currentUrl.takeIf { it == normalizedUrl }
         val resolution =
             if (unchangedUrl != null) {
                 null
             } else {
-                resolveLocation(normalizedUrl)
+                resolveLocation(normalizedUrl, provider)
             }
 
         return planService.updateLinkPlan(
@@ -58,10 +64,19 @@ class PlanLinkService(
         )
     }
 
-    private fun resolveLocation(url: String): PlanLocationResolution {
-        val provider = planMapUrlDetector.detect(url) ?: return PlanLocationResolution.NotApplicable
-        val resolver = planLocationResolvers.firstOrNull { candidate -> candidate.provider == provider }
+    private fun detectMapProvider(url: String): MapProvider =
+        planMapUrlDetector.detect(url) ?: throw BusinessException(PreLogErrorCode.INVALID_MAP_URL)
 
-        return resolver?.resolve(url) ?: PlanLocationResolution.NotApplicable
+    private fun resolveLocation(
+        url: String,
+        provider: MapProvider,
+    ): PlanLocationResolution {
+        val resolver = planLocationResolvers.firstOrNull { candidate -> candidate.provider == provider }
+        val resolution = resolver?.resolve(url)
+
+        return when (resolution) {
+            null, PlanLocationResolution.NotApplicable -> PlanLocationResolution.ProviderFailed(provider)
+            else -> resolution
+        }
     }
 }

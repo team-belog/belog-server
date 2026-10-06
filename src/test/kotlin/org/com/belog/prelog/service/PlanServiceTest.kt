@@ -15,14 +15,6 @@ import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
-import org.com.belog.prelog.infrastructure.google.GoogleMapLocationResolver
-import org.com.belog.prelog.infrastructure.google.GoogleMapShortUrlResolver
-import org.com.belog.prelog.infrastructure.google.GoogleMapUrlDetector
-import org.com.belog.prelog.infrastructure.google.GoogleMapUrlParser
-import org.com.belog.prelog.infrastructure.google.GooglePlacesClient
-import org.com.belog.prelog.infrastructure.google.GooglePlusCodeDecoder
-import org.com.belog.prelog.infrastructure.kakao.KakaoMapUrlDetector
-import org.com.belog.prelog.infrastructure.naver.NaverMapUrlDetector
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
@@ -41,7 +33,6 @@ import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -52,35 +43,6 @@ class PlanServiceTest {
     private val planLikeRepository = mock(PlanLikeRepository::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-22T00:00:00Z"), ZoneOffset.UTC)
     private val planService = PlanService(meetingRepository, groupMemberRepository, planRepository, planLikeRepository, clock)
-
-    @Test
-    fun `일반 URL 계획은 위치 처리 없이 저장한다`() {
-        val context = meetingContext()
-        val creator = mock(GroupMember::class.java)
-        `when`(creator.group).thenReturn(context.group)
-        `when`(creator.belongsTo(context.group)).thenCallRealMethod()
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(creator)
-        `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }
-        val resolver =
-            GoogleMapLocationResolver(
-                GoogleMapUrlDetector(),
-                mock(GoogleMapShortUrlResolver::class.java),
-                GoogleMapUrlParser(GooglePlusCodeDecoder()),
-                mock(GooglePlacesClient::class.java),
-            )
-
-        val plan =
-            PlanLinkService(
-                planService,
-                PlanMapUrlDetector(listOf(GoogleMapUrlDetector(), KakaoMapUrlDetector(), NaverMapUrlDetector())),
-                listOf(resolver),
-            ).createLinkPlan(1L, 15L, PlanCategory.RESTAURANT, "맛집", "https://example.com/restaurant")
-
-        assertEquals(LocationResolutionStatus.NOT_APPLICABLE, plan.locationStatus)
-        assertNull(plan.location)
-        assertEquals("https://example.com/restaurant", plan.url)
-    }
 
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
