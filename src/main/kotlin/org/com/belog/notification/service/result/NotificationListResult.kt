@@ -1,5 +1,6 @@
 package org.com.belog.notification.service.result
 
+import org.com.belog.notification.domain.NotificationTargetType
 import org.com.belog.notification.domain.NotificationType
 import java.time.Instant
 
@@ -13,7 +14,12 @@ data class NotificationListItemResult(
     val notificationId: Long,
     val type: NotificationType,
     val message: String,
-    val targetId: Long?,
+    val target: NotificationTargetResult,
     val read: Boolean,
     val createdAt: Instant,
+)
+
+data class NotificationTargetResult(
+    val type: NotificationTargetType,
+    val id: Long?,
 )

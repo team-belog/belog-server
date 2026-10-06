@@ -4,6 +4,7 @@ import org.com.belog.notification.domain.Notification
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.notification.service.result.NotificationListItemResult
 import org.com.belog.notification.service.result.NotificationListResult
+import org.com.belog.notification.service.result.NotificationTargetResult
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -47,7 +48,11 @@ class NotificationQueryService(
             notificationId = requireNotNull(id),
             type = type,
             message = message,
-            targetId = targetId,
+            target =
+                NotificationTargetResult(
+                    type = type.targetType,
+                    id = targetId,
+                ),
             read = isRead,
             createdAt = requireNotNull(createdAt),
         )

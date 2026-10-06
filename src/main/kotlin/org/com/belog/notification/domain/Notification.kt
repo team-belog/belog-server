@@ -130,8 +130,8 @@ class Notification protected constructor(
                 "알림 중복 방지 키는 비어 있을 수 없으며 ${DEDUPLICATION_KEY_MAX_LENGTH}자를 초과할 수 없습니다."
             }
             require(
-                (!type.requiresTargetId && targetId == null) ||
-                    (type.requiresTargetId && targetId != null && targetId > 0),
+                (!type.targetType.requiresId && targetId == null) ||
+                    (type.targetType.requiresId && targetId != null && targetId > 0),
             ) {
                 "그룹 삭제 알림에는 대상 ID가 없어야 하며, 그 외 알림에는 양수인 대상 ID가 필요합니다."
             }

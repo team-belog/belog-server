@@ -203,7 +203,7 @@ interface NotificationSwagger {
         private const val USER_NOT_FOUND_EXAMPLE =
             """{"code":"USER-E001","message":"사용자를 찾을 수 없습니다.","data":null}"""
         private const val NOTIFICATION_LIST_SUCCESS_EXAMPLE =
-            """{"code":"NOTIFICATION-S001","message":"알림 목록을 조회했습니다.","data":{"items":[{"notificationId":101,"type":"SETTLEMENT_REQUESTED","message":"피놀 님이 정산을 요청했어요","targetId":7,"read":false,"createdAt":"2026-10-01T04:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
+            """{"code":"NOTIFICATION-S001","message":"알림 목록을 조회했습니다.","data":{"items":[{"notificationId":101,"type":"SETTLEMENT_REQUESTED","message":"피놀 님이 정산을 요청했어요","target":{"type":"BILL_LOG","id":7},"read":false,"createdAt":"2026-10-01T04:30:00Z"}],"nextCursor":101,"hasNext":true}}"""
         private const val NOTIFICATION_NOT_FOUND_EXAMPLE =
             """{"code":"NOTIFICATION-E001","message":"알림을 찾을 수 없습니다.","data":null}"""
     }
