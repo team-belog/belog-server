@@ -21,6 +21,8 @@ import org.com.belog.prelog.infrastructure.google.GoogleMapUrlDetector
 import org.com.belog.prelog.infrastructure.google.GoogleMapUrlParser
 import org.com.belog.prelog.infrastructure.google.GooglePlacesClient
 import org.com.belog.prelog.infrastructure.google.GooglePlusCodeDecoder
+import org.com.belog.prelog.infrastructure.kakao.KakaoMapUrlDetector
+import org.com.belog.prelog.infrastructure.naver.NaverMapUrlDetector
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.junit.jupiter.api.Test
@@ -69,8 +71,11 @@ class PlanServiceTest {
             )
 
         val plan =
-            PlanLinkService(planService, listOf(resolver))
-                .createLinkPlan(1L, 15L, PlanCategory.RESTAURANT, "맛집", "https://example.com/restaurant")
+            PlanLinkService(
+                planService,
+                PlanMapUrlDetector(listOf(GoogleMapUrlDetector(), KakaoMapUrlDetector(), NaverMapUrlDetector())),
+                listOf(resolver),
+            ).createLinkPlan(1L, 15L, PlanCategory.RESTAURANT, "맛집", "https://example.com/restaurant")
 
         assertEquals(LocationResolutionStatus.NOT_APPLICABLE, plan.locationStatus)
         assertNull(plan.location)

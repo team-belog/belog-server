@@ -22,10 +22,13 @@ import java.nio.charset.StandardCharsets
 class KakaoMapLocationResolver(
     @Qualifier(KakaoMapsConfig.KAKAO_MAPS_HTTP_CLIENT) private val httpClient: HttpClient,
     private val properties: KakaoMapsProperties,
+    private val urlDetector: KakaoMapUrlDetector,
 ) : PlanLocationResolver {
+    override val provider: MapProvider = MapProvider.KAKAO
+
     override fun resolve(url: String): PlanLocationResolution {
         val uri = runCatching { URI.create(url.trim()) }.getOrNull() ?: return PlanLocationResolution.NotApplicable
-        if (uri.host?.lowercase() != PLACE_HOST || uri.scheme?.lowercase() !in setOf("http", "https")) {
+        if (!urlDetector.supports(uri)) {
             return PlanLocationResolution.NotApplicable
         }
 
@@ -33,7 +36,7 @@ class KakaoMapLocationResolver(
             PLACE_PATH_REGEX.matchEntire(uri.path.orEmpty())?.groupValues?.get(1)
                 ?: return PlanLocationResolution.ProviderFailed(MapProvider.KAKAO)
         val failed = PlanLocationResolution.ProviderFailed(MapProvider.KAKAO, placeId)
-        val placeUri = URI.create("https://$PLACE_HOST/$placeId")
+        val placeUri = URI.create("https://${KakaoMapUrlDetector.PLACE_HOST}/$placeId")
         val html = fetchPlacePage(placeUri) ?: return failed
         val metadata = parseMetadata(html)
         if (!isMatchingPlace(metadata["og:url"], placeId)) {
@@ -120,7 +123,7 @@ class KakaoMapLocationResolver(
     ): Boolean {
         val uri = runCatching { URI.create(canonicalUrl ?: return false) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
-            uri.host.equals(PLACE_HOST, ignoreCase = true) &&
+            uri.host.equals(KakaoMapUrlDetector.PLACE_HOST, ignoreCase = true) &&
             PLACE_PATH_REGEX.matchEntire(uri.path.orEmpty())?.groupValues?.get(1) == expectedPlaceId
     }
 
@@ -147,7 +150,6 @@ class KakaoMapLocationResolver(
     }
 
     companion object {
-        private const val PLACE_HOST = "place.map.kakao.com"
         private const val STATIC_MAP_HOST = "staticmap.kakao.com"
         private const val STATIC_MAP_PATH = "/staticmap/og"
         private const val MAX_HTML_BYTES = 65_536

@@ -1,11 +1,15 @@
 package org.com.belog.prelog.infrastructure.google
 
+import org.com.belog.prelog.domain.MapProvider
+import org.com.belog.prelog.service.MapUrlDetector
 import org.springframework.stereotype.Component
 import java.net.URI
 
 @Component
-class GoogleMapUrlDetector {
-    fun isGoogleMapUrl(uri: URI): Boolean = isShortUrl(uri) || isDirectMapUrl(uri)
+class GoogleMapUrlDetector : MapUrlDetector {
+    override val provider: MapProvider = MapProvider.GOOGLE
+
+    override fun supports(uri: URI): Boolean = isShortUrl(uri) || isDirectMapUrl(uri)
 
     fun isShortUrl(uri: URI): Boolean {
         if (!uri.scheme.equals("https", ignoreCase = true)) {
