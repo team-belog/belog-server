@@ -79,3 +79,12 @@ post-log:
     max-concurrent-head-requests: "${POST_LOG_PHOTO_MAX_CONCURRENT_HEAD_REQUESTS:10}"
     queue-capacity: "${POST_LOG_PHOTO_VERIFICATION_QUEUE_CAPACITY:100}"
     timeout: "${POST_LOG_PHOTO_VERIFICATION_TIMEOUT:15s}"
+
+ocr:
+  upstage:
+    base-url: "${UPSTAGE_BASE_URL:https://api.upstage.ai/v1/information-extraction}"
+    api-key: "${UPSTAGE_API_KEY}"
+    model: "${UPSTAGE_MODEL:information-extract}"
+    mode: "${UPSTAGE_EXTRACTION_MODE:standard}"
+    connection-timeout: "${UPSTAGE_CONNECTION_TIMEOUT:3s}"
+    read-timeout: "${UPSTAGE_READ_TIMEOUT:60s}"

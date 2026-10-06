@@ -54,3 +54,7 @@ storage:
 group:
   invite:
     base-url: https://belog.example/invitations
+
+ocr:
+  upstage:
+    api-key: test-upstage-api-key
