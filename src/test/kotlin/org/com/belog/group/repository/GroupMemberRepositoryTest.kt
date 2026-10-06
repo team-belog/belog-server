@@ -103,12 +103,12 @@ class GroupMemberRepositoryTest {
         groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
 
         val foundMember =
-            groupMemberRepository.findByGroupIdAndUserId(
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(
                 groupId = requireNotNull(group.id),
                 userId = requireNotNull(owner.id),
             )
         val missingMember =
-            groupMemberRepository.findByGroupIdAndUserId(
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(
                 groupId = requireNotNull(group.id),
                 userId = requireNotNull(otherUser.id),
             )
@@ -116,6 +116,23 @@ class GroupMemberRepositoryTest {
         assertNotNull(foundMember)
         assertEquals(GroupRole.OWNER, foundMember.role)
         assertNull(missingMember)
+    }
+
+    @Test
+    fun `탈퇴한 그룹 멤버는 조회되지 않는다`() {
+        val user = saveCompletedUser("withdrawn-subject", "탈퇴자")
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val member = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+        member.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        groupMemberRepository.saveAndFlush(member)
+
+        val foundMember =
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(
+                groupId = requireNotNull(group.id),
+                userId = requireNotNull(user.id),
+            )
+
+        assertNull(foundMember)
     }
 
     @Test
@@ -131,7 +148,7 @@ class GroupMemberRepositoryTest {
         groupMemberRepository.flush()
 
         val members =
-            groupMemberRepository.findAllByGroupIdAndIdIn(
+            groupMemberRepository.findAllByGroupIdAndIdInAndWithdrawnAtIsNull(
                 groupId = requireNotNull(group.id),
                 memberIds =
                     listOf(

@@ -73,7 +73,7 @@ class MeetingDetailServiceTest {
         `when`(group.id).thenReturn(GROUP_ID)
         `when`(meeting.group).thenReturn(group)
         `when`(meetingRepository.findByIdWithGroupAndCreator(MEETING_ID)).thenReturn(meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(null)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(null)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -101,7 +101,7 @@ class MeetingDetailServiceTest {
         `when`(meeting.location).thenReturn("광주광역시 000 000")
         `when`(meeting.isCreatedBy(groupMember)).thenReturn(false)
         `when`(meetingRepository.findByIdWithGroupAndCreator(MEETING_ID)).thenReturn(meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(groupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(groupMember)
     }
 
     companion object {

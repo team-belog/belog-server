@@ -10,3 +10,6 @@ ALTER TABLE users
         GENERATED ALWAYS AS (CASE WHEN deleted_at IS NULL THEN provider_user_id ELSE NULL END) STORED,
     ADD CONSTRAINT uk_users_nickname UNIQUE (active_nickname),
     ADD CONSTRAINT uk_users_provider_provider_user_id UNIQUE (active_provider, active_provider_user_id);
+
+ALTER TABLE group_members
+    ADD COLUMN withdrawn_at DATETIME(6) NULL AFTER updated_at;

@@ -167,7 +167,7 @@ class BillService(
         userId: Long,
     ): GroupMember {
         val groupId = checkNotNull(meeting.group.id) { "결제 내역 대상 만남의 그룹 ID가 없습니다." }
-        return groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+        return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 

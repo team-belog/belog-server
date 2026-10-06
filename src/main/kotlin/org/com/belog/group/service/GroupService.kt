@@ -162,7 +162,7 @@ class GroupService(
             name = group.name,
             coverImageUrl = group.coverImageObjectKey?.let(s3ObjectReadUrlProvider::generateReadUrl),
             inviteCode = group.inviteCode,
-            memberCount = groupMemberRepository.countByGroupId(groupId).toInt(),
+            memberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId).toInt(),
             canEditCoverImage = canManageGroup,
             canDeleteGroup = canManageGroup,
             schedulingMeetings = createSchedulingMeetingResults(schedulingMeetings),
@@ -179,7 +179,7 @@ class GroupService(
         groupId: Long,
         userId: Long,
     ): GroupMember =
-        groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+        groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
 
     private fun findMembersByGroupId(memberships: List<GroupMember>): Map<Long, List<GroupMember>> {

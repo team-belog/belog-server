@@ -223,6 +223,28 @@ class GroupMembershipServiceTest {
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
     }
 
+    @Test
+    fun `탈퇴한 멤버는 그룹 멤버를 조회할 수 없다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "방장")
+        val withdrawnUser = saveCompletedUser("withdrawn", "탈퇴자")
+        groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        val withdrawnMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, withdrawnUser))
+        withdrawnMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        groupMemberRepository.saveAndFlush(withdrawnMember)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.getGroupMembers(
+                    requireNotNull(group.id),
+                    requireNotNull(withdrawnUser.id),
+                    null,
+                )
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
     private fun createGroup(): Group =
         Group.create(
             name = "주말 러닝 모임",

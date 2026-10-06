@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.user.domain.User
+import java.time.Instant
 
 const val GROUP_MEMBER_UNIQUE_CONSTRAINT_NAME = "uk_group_members_group_user"
 
@@ -61,12 +62,24 @@ class GroupMember protected constructor(
     var id: Long? = null
         protected set
 
+    @Column(name = "withdrawn_at")
+    var withdrawnAt: Instant? = null
+        protected set
+
+    val isActive: Boolean
+        get() = withdrawnAt == null
+
     fun pin() {
         pinned = true
     }
 
     fun unpin() {
         pinned = false
+    }
+
+    fun withdraw(withdrawnAt: Instant) {
+        check(isActive) { "이미 탈퇴한 그룹 멤버입니다." }
+        this.withdrawnAt = withdrawnAt
     }
 
     internal fun belongsTo(group: Group): Boolean {

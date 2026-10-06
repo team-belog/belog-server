@@ -74,7 +74,7 @@ class PostLogPhotoLikeService(
     ): Long {
         val groupId = checkNotNull(meeting.group.id) { "좋아요 대상 만남의 그룹 ID가 없습니다." }
         val groupMember =
-            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
 
         return checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }

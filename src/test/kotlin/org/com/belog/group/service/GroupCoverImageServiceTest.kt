@@ -126,7 +126,7 @@ class GroupCoverImageServiceTest {
         val objectKey = GroupCoverImageObjectKey.create(15L, objectKeyValue)
         val owner = mock(GroupMember::class.java)
         `when`(groupRepository.existsById(1L)).thenReturn(true)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(owner)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(1L, 15L)).thenReturn(owner)
         `when`(owner.role).thenReturn(GroupRole.OWNER)
 
         service.updateCoverImage(1L, 15L, objectKeyValue)
@@ -139,7 +139,7 @@ class GroupCoverImageServiceTest {
     fun `MEMBER는 다른 사용자의 Object Key를 전달해도 권한 오류가 우선한다`() {
         val member = mock(GroupMember::class.java)
         `when`(groupRepository.existsById(1L)).thenReturn(true)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(member)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(1L, 15L)).thenReturn(member)
         `when`(member.role).thenReturn(GroupRole.MEMBER)
 
         val exception =
@@ -155,7 +155,7 @@ class GroupCoverImageServiceTest {
     fun `OWNER가 잘못된 Object Key를 전달하면 기존 오류 코드로 변환한다`() {
         val owner = mock(GroupMember::class.java)
         `when`(groupRepository.existsById(1L)).thenReturn(true)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(1L, 15L)).thenReturn(owner)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(1L, 15L)).thenReturn(owner)
         `when`(owner.role).thenReturn(GroupRole.OWNER)
 
         val exception =

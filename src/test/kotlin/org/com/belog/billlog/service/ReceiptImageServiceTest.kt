@@ -28,7 +28,7 @@ class ReceiptImageServiceTest {
     @Test
     fun `그룹 멤버가 자신이 업로드한 영수증 이미지를 분석 대상으로 준비한다`() {
         givenMeetingGroup()
-        `when`(groupMemberRepository.existsByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(true)
+        `when`(groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(true)
         `when`(readUrlProvider.generateReadUrl(OWN_OBJECT_KEY)).thenReturn("https://receipt.example/image.jpg")
 
         val source = service.prepareAnalysisSource(MEETING_ID, USER_ID, OWN_OBJECT_KEY)
@@ -50,7 +50,7 @@ class ReceiptImageServiceTest {
     @Test
     fun `그룹 멤버도 다른 사용자의 영수증을 분석할 수 없다`() {
         givenMeetingGroup()
-        `when`(groupMemberRepository.existsByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(true)
+        `when`(groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(true)
 
         val exception = assertFailsWith<BusinessException> { service.prepareAnalysisSource(MEETING_ID, USER_ID, OTHER_USER_OBJECT_KEY) }
 

@@ -128,7 +128,7 @@ class PostLogService(
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
         val viewer =
-            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         val viewerId = checkNotNull(viewer.id) { "조회자의 그룹 멤버 ID가 없습니다." }
 

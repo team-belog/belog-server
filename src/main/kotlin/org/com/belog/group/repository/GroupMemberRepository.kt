@@ -10,9 +10,9 @@ import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
 interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
-    fun countByGroupId(groupId: Long): Long
+    fun countByGroupIdAndWithdrawnAtIsNull(groupId: Long): Long
 
-    fun findByGroupIdAndUserId(
+    fun findByGroupIdAndUserIdAndWithdrawnAtIsNull(
         groupId: Long,
         userId: Long,
     ): GroupMember?
@@ -31,12 +31,12 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         @Param("userId") userId: Long,
     ): GroupMember?
 
-    fun findAllByGroupIdAndIdIn(
+    fun findAllByGroupIdAndIdInAndWithdrawnAtIsNull(
         groupId: Long,
         memberIds: Collection<Long>,
     ): List<GroupMember>
 
-    fun existsByGroupIdAndUserId(
+    fun existsByGroupIdAndUserIdAndWithdrawnAtIsNull(
         groupId: Long,
         userId: Long,
     ): Boolean
@@ -47,6 +47,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         SELECT member
         FROM GroupMember member
         WHERE member.user.id = :userId
+          AND member.withdrawnAt IS NULL
           AND (
               :cursorId IS NULL
               OR (:cursorPinned = TRUE AND member.pinned = FALSE)
@@ -68,6 +69,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         SELECT member
         FROM GroupMember member
         WHERE member.group.id IN :groupIds
+          AND member.withdrawnAt IS NULL
         ORDER BY member.group.id ASC, member.role DESC, member.id ASC
         """,
     )
@@ -81,6 +83,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         SELECT member
         FROM GroupMember member
         WHERE member.group.id = :groupId
+          AND member.withdrawnAt IS NULL
         ORDER BY member.role DESC, member.id ASC
         """,
     )
@@ -94,6 +97,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         SELECT member
         FROM GroupMember member
         WHERE member.group.id = :groupId
+          AND member.withdrawnAt IS NULL
           AND (
               LOCATE(LOWER(:query), LOWER(member.user.nickname)) > 0
               OR LOCATE(LOWER(:query), LOWER(member.user.name)) > 0

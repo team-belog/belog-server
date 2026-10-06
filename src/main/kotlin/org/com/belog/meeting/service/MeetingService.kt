@@ -304,7 +304,7 @@ class MeetingService(
         groupId: Long,
         creatorUserId: Long,
     ): GroupMember {
-        groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)?.let { creator ->
+        groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, creatorUserId)?.let { creator ->
             return creator
         }
 
@@ -318,7 +318,7 @@ class MeetingService(
         groupId: Long,
         userId: Long,
     ) {
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             return
         }
         if (!groupRepository.existsById(groupId)) {
@@ -342,7 +342,7 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.CREATOR_INCLUDED_AS_PARTICIPANT)
         }
 
-        val participants = groupMemberRepository.findAllByGroupIdAndIdIn(groupId, participantMemberIds)
+        val participants = groupMemberRepository.findAllByGroupIdAndIdInAndWithdrawnAtIsNull(groupId, participantMemberIds)
         if (participants.size != participantMemberIds.size) {
             throw BusinessException(MeetingErrorCode.INVALID_PARTICIPANT)
         }

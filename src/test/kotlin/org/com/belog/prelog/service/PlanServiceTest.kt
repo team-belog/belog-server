@@ -48,7 +48,7 @@ class PlanServiceTest {
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
         val context = meetingContext()
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -245,7 +245,7 @@ class PlanServiceTest {
         val plan = mock(Plan::class.java)
         `when`(plan.meeting).thenReturn(context.meeting)
         `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
 
         val pinException =
             assertFailsWith<BusinessException> {
@@ -284,7 +284,7 @@ class PlanServiceTest {
     fun `해당 만남이 속한 그룹의 멤버가 아니면 계획을 생성할 수 없다`() {
         val context = meetingContext()
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(null)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -308,7 +308,7 @@ class PlanServiceTest {
         `when`(groupMember.group).thenReturn(context.group)
         `when`(groupMember.belongsTo(context.group)).thenCallRealMethod()
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
         `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }
 
         val plan =
@@ -329,7 +329,7 @@ class PlanServiceTest {
         val context = meetingContext(endDate = LocalDate.of(2026, 9, 21))
         val groupMember = mock(GroupMember::class.java)
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -379,7 +379,7 @@ class PlanServiceTest {
         `when`(plan.url).thenReturn("https://example.com/place")
         `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
         `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(isMeetingCreator)
         `when`(
             planRepository.findPageWithCreator(
@@ -415,7 +415,7 @@ class PlanServiceTest {
             plan.pin()
         }
 
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
         `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
 
         return plan
@@ -446,7 +446,7 @@ class PlanServiceTest {
             )
         ReflectionTestUtils.setField(plan, "id", 20L)
 
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
         `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
         `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(loginIsMeetingCreator)
 

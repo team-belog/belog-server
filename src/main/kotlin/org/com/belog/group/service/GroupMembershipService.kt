@@ -70,11 +70,11 @@ class GroupMembershipService(
         if (!user.isOnboardingCompleted) {
             throw BusinessException(GroupErrorCode.ONBOARDING_REQUIRED)
         }
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER)
         }
 
-        val currentMemberCount = groupMemberRepository.countByGroupId(groupId)
+        val currentMemberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId)
         if (currentMemberCount >= Group.MAX_MEMBER_COUNT) {
             throw BusinessException(GroupErrorCode.GROUP_MEMBER_LIMIT_EXCEEDED)
         }
@@ -99,7 +99,7 @@ class GroupMembershipService(
         groupId: Long,
         userId: Long,
     ) {
-        if (groupMemberRepository.findByGroupIdAndUserId(groupId, userId) != null) {
+        if (groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId) != null) {
             return
         }
         if (!groupRepository.existsById(groupId)) {

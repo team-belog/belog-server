@@ -77,6 +77,6 @@ class PreLogServiceTest {
         `when`(meeting.isEnded(currentDate)).thenReturn(false)
         `when`(meeting.isCreatedBy(groupMember)).thenReturn(canEditMeeting)
         `when`(meetingRepository.findByIdWithGroupAndCreator(7L)).thenReturn(meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
     }
 }
