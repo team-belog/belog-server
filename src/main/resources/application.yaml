@@ -48,6 +48,18 @@ auth:
     refresh-cookie-secure: "${REFRESH_COOKIE_SECURE:true}"
     refresh-cookie-same-site: "${REFRESH_COOKIE_SAME_SITE:Lax}"
 
+google:
+  maps:
+    api-key: "${GOOGLE_MAPS_API_KEY:}"
+    connection-timeout: "${GOOGLE_MAPS_CONNECTION_TIMEOUT:2s}"
+    read-timeout: "${GOOGLE_MAPS_READ_TIMEOUT:3s}"
+    max-redirects: "${GOOGLE_MAPS_MAX_REDIRECTS:3}"
+
+kakao:
+  maps:
+    connection-timeout: "${KAKAO_MAPS_CONNECTION_TIMEOUT:2s}"
+    read-timeout: "${KAKAO_MAPS_READ_TIMEOUT:3s}"
+
 storage:
   s3:
     bucket: "${AWS_S3_BUCKET}"

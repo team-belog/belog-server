@@ -10,6 +10,7 @@ import org.com.belog.prelog.code.PreLogSuccessCode
 import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
+import org.com.belog.prelog.controller.dto.response.MapPlanListResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
@@ -18,6 +19,7 @@ import org.com.belog.prelog.controller.swagger.PreLogSwagger
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanLikeService
+import org.com.belog.prelog.service.PlanLinkService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.springframework.http.ResponseEntity
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController
 class PreLogController(
     private val preLogService: PreLogService,
     private val planService: PlanService,
+    private val planLinkService: PlanLinkService,
     private val planLikeService: PlanLikeService,
 ) : PreLogSwagger {
     @GetMapping("/api/v1/meetings/{meetingId}/pre-log")
@@ -49,6 +52,33 @@ class PreLogController(
                 CommonResponse.success(
                     PreLogSuccessCode.PRE_LOG_MAIN_RETRIEVED,
                     PreLogMainResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/api/v1/meetings/{meetingId}/pre-log/map-plans")
+    override fun getMapPlans(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @RequestParam(required = false) category: PlanCategory?,
+        @RequestParam(required = false) @Positive cursor: Long?,
+        @RequestParam(defaultValue = "20") @Min(1) @Max(50) size: Int,
+    ): ResponseEntity<CommonResponse<MapPlanListResponse>> {
+        val result =
+            planService.getMapPlans(
+                meetingId = meetingId,
+                userId = userId,
+                category = category,
+                cursor = cursor,
+                size = size,
+            )
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.MAP_PLAN_LIST_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.MAP_PLAN_LIST_RETRIEVED,
+                    MapPlanListResponse.from(result),
                 ),
             )
     }
@@ -91,7 +121,7 @@ class PreLogController(
         val plan =
             when (request.type) {
                 PlanType.LINK ->
-                    planService.createLinkPlan(
+                    planLinkService.createLinkPlan(
                         meetingId = meetingId,
                         creatorUserId = userId,
                         category = request.category,
@@ -128,7 +158,7 @@ class PreLogController(
         val plan =
             when (request.type) {
                 PlanType.LINK ->
-                    planService.updateLinkPlan(
+                    planLinkService.updateLinkPlan(
                         planId = planId,
                         userId = userId,
                         category = request.category,

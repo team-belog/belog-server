@@ -6,6 +6,7 @@ import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.service.PlanLikeService
+import org.com.belog.prelog.service.PlanLinkService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
 import org.junit.jupiter.api.Test
@@ -38,6 +39,9 @@ class PlanControllerTest {
     private lateinit var planService: PlanService
 
     @MockitoBean
+    private lateinit var planLinkService: PlanLinkService
+
+    @MockitoBean
     private lateinit var preLogService: PreLogService
 
     @MockitoBean
@@ -47,7 +51,7 @@ class PlanControllerTest {
     fun `LINK 계획을 생성한다`() {
         val plan = mockLinkPlan()
         `when`(
-            planService.createLinkPlan(
+            planLinkService.createLinkPlan(
                 meetingId = 1L,
                 creatorUserId = 15L,
                 category = PlanCategory.RESTAURANT,
@@ -102,6 +106,7 @@ class PlanControllerTest {
             .andExpect(jsonPath("$.code").value("CMN-E001"))
 
         verifyNoInteractions(planService)
+        verifyNoInteractions(planLinkService)
     }
 
     @Test

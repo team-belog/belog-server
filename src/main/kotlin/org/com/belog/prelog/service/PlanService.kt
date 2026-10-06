@@ -9,10 +9,13 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.code.PreLogErrorCode
+import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.prelog.service.result.MapPlanListItemResult
+import org.com.belog.prelog.service.result.MapPlanListResult
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
 import org.springframework.data.domain.PageRequest
@@ -73,6 +76,48 @@ class PlanService(
         )
     }
 
+    @Transactional(readOnly = true)
+    fun getMapPlans(
+        meetingId: Long,
+        userId: Long,
+        category: PlanCategory?,
+        cursor: Long?,
+        size: Int = DEFAULT_PAGE_SIZE,
+    ): MapPlanListResult {
+        require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
+        require(cursor == null || cursor > 0) { "커서는 양수여야 합니다." }
+
+        val meeting = findMeeting(meetingId)
+        findGroupMember(meeting, userId)
+
+        val plans =
+            planRepository.findMapPage(
+                meetingId = meetingId,
+                category = category,
+                locationStatus = LocationResolutionStatus.RESOLVED,
+                cursor = cursor,
+                pageable = PageRequest.of(0, size + 1),
+            )
+        val hasNext = plans.size > size
+        val pagePlans = if (hasNext) plans.take(size) else plans
+
+        return MapPlanListResult(
+            items = pagePlans.map { plan -> plan.toMapListItemResult() },
+            nextCursor = if (hasNext) pagePlans.lastOrNull()?.id else null,
+            hasNext = hasNext,
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun validatePlanCreation(
+        meetingId: Long,
+        userId: Long,
+    ) {
+        val meeting = findMeeting(meetingId)
+        findGroupMember(meeting, userId)
+        validateMeetingNotEnded(meeting, clock.currentBusinessDate())
+    }
+
     @Transactional
     fun createLinkPlan(
         meetingId: Long,
@@ -80,6 +125,7 @@ class PlanService(
         category: PlanCategory,
         title: String,
         url: String,
+        locationResolution: PlanLocationResolution = PlanLocationResolution.NotApplicable,
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
@@ -87,14 +133,15 @@ class PlanService(
         validateMeetingNotEnded(meeting, currentDate)
 
         return savePlan {
-            Plan.createLink(
-                meeting = meeting,
-                creator = creator,
-                category = category,
-                title = title,
-                url = url,
-                currentDate = currentDate,
-            )
+            Plan
+                .createLink(
+                    meeting = meeting,
+                    creator = creator,
+                    category = category,
+                    title = title,
+                    url = url,
+                    currentDate = currentDate,
+                ).apply { applyLocationResolution(locationResolution) }
         }
     }
 
@@ -130,10 +177,29 @@ class PlanService(
         category: PlanCategory,
         title: String,
         url: String,
+        locationResolution: PlanLocationResolution? = null,
+        expectedUrlWhenResolutionSkipped: String? = null,
     ): Plan =
         updatePlan(planId, userId) { plan ->
+            if (expectedUrlWhenResolutionSkipped != null && plan.url != expectedUrlWhenResolutionSkipped) {
+                throw BusinessException(PreLogErrorCode.PLAN_UPDATE_CONFLICT)
+            }
             plan.updateLink(category = category, title = title, url = url)
+            locationResolution?.let { resolution -> plan.applyLocationResolution(resolution) }
         }
+
+    @Transactional(readOnly = true)
+    fun getLinkUrlForUpdate(
+        planId: Long,
+        userId: Long,
+    ): String? {
+        val plan = findPlan(planId)
+        val groupMember = findGroupMember(plan.meeting, userId)
+        if (!plan.isCreatedBy(groupMember)) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
+        }
+        return plan.url
+    }
 
     @Transactional
     fun updateMemoPlan(
@@ -264,7 +330,7 @@ class PlanService(
             category = category,
             title = title,
             url = url,
-            address = null,
+            address = location?.address,
             thumbnailUrl = null,
             likeCount = 0,
             likedByMe = false,
@@ -272,6 +338,36 @@ class PlanService(
             canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )
+    }
+
+    private fun Plan.toMapListItemResult(): MapPlanListItemResult {
+        val planLocation = checkNotNull(location) { "지도 계획의 위치 정보가 없습니다." }
+        return MapPlanListItemResult(
+            planId = checkNotNull(id) { "조회된 계획의 ID가 없습니다." },
+            category = category,
+            title = title,
+            url = checkNotNull(url) { "지도 계획의 URL이 없습니다." },
+            address = planLocation.address,
+            latitude = checkNotNull(planLocation.latitude) { "지도 계획의 위도가 없습니다." },
+            longitude = checkNotNull(planLocation.longitude) { "지도 계획의 경도가 없습니다." },
+            pinned = pinned,
+            createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
+        )
+    }
+
+    private fun Plan.applyLocationResolution(resolution: PlanLocationResolution) {
+        when (resolution) {
+            PlanLocationResolution.NotApplicable -> Unit
+            is PlanLocationResolution.Resolved -> resolveLocation(resolution.location)
+            PlanLocationResolution.Failed -> failLocationResolution()
+            is PlanLocationResolution.ProviderFailed ->
+                failLocationResolution(
+                    provider = resolution.provider,
+                    externalPlaceId = resolution.externalPlaceId,
+                    placeName = resolution.placeName,
+                    address = resolution.address,
+                )
+        }
     }
 
     companion object {

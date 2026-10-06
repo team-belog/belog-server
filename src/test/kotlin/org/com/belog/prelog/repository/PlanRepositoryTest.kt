@@ -11,8 +11,11 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.prelog.domain.LocationResolutionStatus
+import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.domain.PlanLocation
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -28,6 +31,7 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.ActiveProfiles
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -61,6 +65,38 @@ class PlanRepositoryTest {
 
     @Autowired
     private lateinit var entityManagerFactory: EntityManagerFactory
+
+    @Test
+    fun `지도 목록은 좌표가 확인된 계획만 조회한다`() {
+        val context = saveMeetingContext()
+        val resolved = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "지도 맛집")
+        resolved.resolveLocation(
+            PlanLocation.create(
+                provider = MapProvider.GOOGLE,
+                externalPlaceId = "place-id",
+                placeName = "지도 맛집",
+                address = "서울특별시 종로구",
+                latitude = BigDecimal("37.57"),
+                longitude = BigDecimal("126.98"),
+            ),
+        )
+        val failed = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "위치 실패")
+        failed.failLocationResolution()
+        val ordinary = createLinkPlan(context.meeting, context.owner, PlanCategory.RESTAURANT, "일반 링크")
+        planRepository.saveAllAndFlush(listOf(resolved, failed, ordinary))
+        entityManager.clear()
+
+        val plans =
+            planRepository.findMapPage(
+                meetingId = requireNotNull(context.meeting.id),
+                category = null,
+                locationStatus = LocationResolutionStatus.RESOLVED,
+                cursor = null,
+                pageable = PageRequest.of(0, 20),
+            )
+
+        assertEquals(listOf("지도 맛집"), plans.map(Plan::title))
+    }
 
     @Test
     fun `카테고리 필터를 적용해 계획을 조회한다`() {
