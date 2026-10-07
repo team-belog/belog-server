@@ -8,14 +8,15 @@ import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
-import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
-import org.com.belog.postlog.domain.POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME
+import org.com.belog.postlog.domain.POST_LOG_TICKET_MEETING_CREATOR_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.postlog.domain.PostLog
+import org.com.belog.postlog.domain.PostLogTicket
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import org.com.belog.postlog.service.result.PostLogTicketMemberResult
@@ -34,6 +35,7 @@ class PostLogService(
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val postLogRepository: PostLogRepository,
+    private val postLogTicketRepository: PostLogTicketRepository,
     private val postLogPhotoRepository: PostLogPhotoRepository,
     private val billRepository: BillRepository,
     private val settlementRequestRepository: SettlementRequestRepository,
@@ -55,14 +57,13 @@ class PostLogService(
                 ?.groupMember
                 ?: throw BusinessException(MeetingErrorCode.NOT_MEETING_PARTICIPANT)
         val creatorId = checkNotNull(creator.id) { "Post-log 임시저장 작성자의 그룹 멤버 ID가 없습니다." }
+        if (postLogTicketRepository.existsBySourceMeetingIdAndCreatorGroupMemberId(meetingId, creatorId)) {
+            throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED)
+        }
 
         val postLog =
             postLogRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)
                 ?: PostLog.create(meeting, creator)
-        if (postLog.isTicketCreated) {
-            throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED)
-        }
-
         postLog.updateMemory(memory)
         postLogRepository.save(postLog)
     }
@@ -82,40 +83,40 @@ class PostLogService(
                 ?.groupMember
                 ?: throw BusinessException(MeetingErrorCode.NOT_MEETING_PARTICIPANT)
         val creatorId = checkNotNull(creator.id) { "티켓 생성자의 그룹 멤버 ID가 없습니다." }
-
-        val postLog =
-            postLogRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)
-                ?: PostLog.create(meeting, creator)
-        if (postLog.isTicketCreated) {
+        if (postLogTicketRepository.existsBySourceMeetingIdAndCreatorGroupMemberId(meetingId, creatorId)) {
             throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED)
         }
 
-        postLog.updateMemory(memory)
-        check(postLog.createTicket(Instant.now(clock))) { "티켓 생성 상태를 변경할 수 없습니다." }
-
-        val savedPostLog =
+        val ticket =
+            PostLogTicket.issue(
+                meeting = meeting,
+                creator = creator,
+                memory = memory,
+                coverImageObjectKey = findRepresentativeObjectKey(meetingId),
+                issuedAt = Instant.now(clock),
+            )
+        val savedTicket =
             try {
-                postLogRepository.saveAndFlush(postLog)
+                postLogTicketRepository.saveAndFlush(ticket)
             } catch (exception: DataIntegrityViolationException) {
-                if (exception.isMeetingMemberUniqueConstraintViolation()) {
+                if (exception.isMeetingCreatorUniqueConstraintViolation()) {
                     throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED, exception)
                 }
                 throw exception
             }
-        return toTicketResult(meeting, savedPostLog)
+        return toTicketResult(savedTicket)
     }
 
     @Transactional(readOnly = true)
     fun getTicket(
-        postLogId: Long,
+        ticketId: Long,
         userId: Long,
     ): PostLogTicketResult {
-        val postLog =
-            postLogRepository
-                .findTicketByIdAndUserId(postLogId, userId)
+        val ticket =
+            postLogTicketRepository.findByIdAndOwnerId(ticketId, userId)
                 ?: throw BusinessException(PostLogErrorCode.TICKET_NOT_FOUND)
 
-        return toTicketResult(postLog.meeting, postLog)
+        return toTicketResult(ticket)
     }
 
     @Transactional(readOnly = true)
@@ -143,16 +144,22 @@ class PostLogService(
                         meetingCreator = meeting.isCreatedBy(groupMember),
                     )
                 }
-        val postLog = postLogRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)
+        val ticket = postLogTicketRepository.findBySourceMeetingIdAndCreatorGroupMemberId(meetingId, viewerId)
+        val draftMemory =
+            if (ticket == null) {
+                postLogRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)?.memory
+            } else {
+                null
+            }
 
         return PostLogSummaryResult(
-            postLogId = postLog?.id,
+            ticketId = ticket?.id,
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
             meetingName = meeting.name,
             startDate = meeting.startDate,
             endDate = meeting.endDate,
             location = meeting.location,
-            memory = postLog?.memory,
+            memory = ticket?.memory ?: draftMemory,
             totalAmount = billRepository.sumTotalAmountByMeetingId(meetingId),
             completedParticipantCount =
                 settlementRequestRepository.countCompletedParticipantsByMeetingId(
@@ -160,7 +167,7 @@ class PostLogService(
                     pendingStatus = SettlementRequestStatus.PENDING,
                 ),
             participants = participants,
-            ticketCreated = postLog?.isTicketCreated == true,
+            ticketCreated = ticket != null,
         )
     }
 
@@ -168,14 +175,15 @@ class PostLogService(
         private const val REPRESENTATIVE_PHOTO_COUNT = 1
     }
 
-    private fun toTicketResult(
-        meeting: Meeting,
-        postLog: PostLog,
-    ): PostLogTicketResult {
-        val meetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." }
+    private fun findRepresentativeObjectKey(meetingId: Long): String? =
+        postLogPhotoRepository
+            .findRepresentativeObjectKeys(meetingId, PageRequest.of(0, REPRESENTATIVE_PHOTO_COUNT))
+            .firstOrNull()
+
+    private fun toTicketResult(ticket: PostLogTicket): PostLogTicketResult {
         val members =
             meetingParticipantRepository
-                .findAllWithMemberAndUserByMeetingId(meetingId)
+                .findAllWithUserByMeetingIdIn(listOf(ticket.sourceMeetingId))
                 .map { participant ->
                     val groupMember = participant.groupMember
                     PostLogTicketMemberResult(
@@ -183,26 +191,20 @@ class PostLogService(
                         nickname = checkNotNull(groupMember.user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
                     )
                 }
-        val coverPhotoUrl =
-            postLogPhotoRepository
-                .findRepresentativeObjectKeys(meetingId, PageRequest.of(0, REPRESENTATIVE_PHOTO_COUNT))
-                .firstOrNull()
-                ?.let(objectReadUrlProvider::generateReadUrl)
 
         return PostLogTicketResult(
-            postLogId = checkNotNull(postLog.id) { "Post-log 티켓의 ID가 없습니다." },
-            meetingId = meetingId,
-            meetingName = meeting.name,
-            memory = checkNotNull(postLog.memory) { "티켓의 추억 문구가 없습니다." },
-            coverPhotoUrl = coverPhotoUrl,
-            startDate = meeting.startDate,
-            endDate = meeting.endDate,
-            location = meeting.location,
+            ticketId = checkNotNull(ticket.id) { "Post-log 티켓의 ID가 없습니다." },
+            meetingName = ticket.meetingName,
+            memory = ticket.memory,
+            coverPhotoUrl = ticket.coverImageObjectKey?.let(objectReadUrlProvider::generateReadUrl),
+            startDate = ticket.meetingStartDate,
+            endDate = ticket.meetingEndDate,
+            location = ticket.meetingLocation,
             members = members,
         )
     }
 
-    private fun DataIntegrityViolationException.isMeetingMemberUniqueConstraintViolation(): Boolean {
+    private fun DataIntegrityViolationException.isMeetingCreatorUniqueConstraintViolation(): Boolean {
         val constraintName =
             generateSequence(this as Throwable?) { throwable -> throwable.cause }
                 .filterIsInstance<ConstraintViolationException>()
@@ -210,6 +212,6 @@ class PostLogService(
                 ?.constraintName
 
         val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
-        return unqualifiedConstraintName.equals(POST_LOG_MEETING_MEMBER_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
+        return unqualifiedConstraintName.equals(POST_LOG_TICKET_MEETING_CREATOR_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
     }
 }

@@ -8,7 +8,7 @@ import java.time.LocalDate
 @Schema(description = "Post-log 만남 정리 조회 결과")
 data class PostLogSummaryResponse(
     @field:Schema(description = "로그인한 그룹 멤버의 Post-log 티켓 ID. 생성 전이면 null", example = "11", nullable = true)
-    val postLogId: Long?,
+    val ticketId: Long?,
     @field:Schema(description = "만남 ID", example = "7")
     val meetingId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
@@ -33,7 +33,7 @@ data class PostLogSummaryResponse(
     companion object {
         fun from(result: PostLogSummaryResult): PostLogSummaryResponse =
             PostLogSummaryResponse(
-                postLogId = result.postLogId,
+                ticketId = result.ticketId,
                 meetingId = result.meetingId,
                 meetingName = result.meetingName,
                 startDate = result.startDate,

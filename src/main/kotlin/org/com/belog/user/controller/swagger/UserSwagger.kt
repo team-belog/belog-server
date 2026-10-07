@@ -36,7 +36,7 @@ interface UserSwagger {
         summary = "마이페이지 월별 티켓 달력 조회",
         description =
             "로그인한 사용자가 생성한 Post-log 티켓 중 만남 종료일이 요청 연월에 포함되는 티켓을 조회합니다. " +
-                "티켓이 생성된 Post-log만 반환하며 만남 종료일 오름차순, Post-log ID 오름차순으로 정렬합니다.",
+                "생성된 티켓만 반환하며 만남 종료일 오름차순, 티켓 ID 오름차순으로 정렬합니다. 만남이 삭제되어도 티켓은 포함합니다.",
     )
     @ApiResponses(
         value = [
@@ -519,7 +519,7 @@ private const val PROFILE_SUCCESS_EXAMPLE =
     """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":"https://belog-profile.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."}}"""
 
 private const val GET_POST_LOG_TICKET_CALENDAR_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S010","message":"월별 티켓 달력이 조회되었습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","hasUnreadNotification":true,"memoryCount":2,"tickets":[{"postLogId":31,"meetingEndDate":"2026-08-12","thumbnailUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?..."},{"postLogId":42,"meetingEndDate":"2026-08-13","thumbnailUrl":null}]}}"""
+    """{"code":"POST_LOG-S010","message":"월별 티켓 달력이 조회되었습니다.","data":{"yearMonth":"2026-08","today":"2026-08-18","hasUnreadNotification":true,"memoryCount":2,"tickets":[{"ticketId":31,"meetingEndDate":"2026-08-12","thumbnailUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?..."},{"ticketId":42,"meetingEndDate":"2026-08-13","thumbnailUrl":null}]}}"""
 
 private const val DEFAULT_PROFILE_SUCCESS_EXAMPLE =
     """{"code":"USER-S002","message":"프로필을 조회했습니다.","data":{"nickname":"피블","email":"user@example.com","profileImageUrl":null}}"""

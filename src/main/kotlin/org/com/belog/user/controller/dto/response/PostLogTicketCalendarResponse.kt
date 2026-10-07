@@ -34,7 +34,7 @@ data class PostLogTicketCalendarResponse(
 @Schema(description = "달력에 표시할 Post-log 티켓")
 data class PostLogTicketCalendarItemResponse(
     @field:Schema(description = "개인 Post-log 티켓 ID", example = "31")
-    val postLogId: Long,
+    val ticketId: Long,
     @field:Schema(description = "달력 표시 날짜인 만남 종료일", example = "2026-08-12")
     val meetingEndDate: LocalDate,
     @field:Schema(description = "대표 사진 조회 URL. 등록된 사진이 없으면 null", nullable = true)
@@ -43,7 +43,7 @@ data class PostLogTicketCalendarItemResponse(
     companion object {
         fun from(result: PostLogTicketCalendarItemResult): PostLogTicketCalendarItemResponse =
             PostLogTicketCalendarItemResponse(
-                postLogId = result.postLogId,
+                ticketId = result.ticketId,
                 meetingEndDate = result.meetingEndDate,
                 thumbnailUrl = result.thumbnailUrl,
             )

@@ -17,6 +17,7 @@ import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogRepository
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -57,6 +58,9 @@ class PostLogCalendarServiceIntegrationTest {
     private lateinit var postLogRepository: PostLogRepository
 
     @Autowired
+    private lateinit var postLogTicketRepository: PostLogTicketRepository
+
+    @Autowired
     private lateinit var photoRepository: PostLogPhotoRepository
 
     @Autowired
@@ -84,6 +88,7 @@ class PostLogCalendarServiceIntegrationTest {
     fun cleanUp() {
         photoLikeRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
+        postLogTicketRepository.deleteAllInBatch()
         postLogRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
@@ -112,7 +117,7 @@ class PostLogCalendarServiceIntegrationTest {
         val thirdTicket = createTicket(thirdMeeting, owner, "세 번째 추억")
         postLogService.saveDraft(checkNotNull(draftMeeting.id), ownerUserId, "임시저장 추억")
         createTicket(otherMeeting, otherMember, "다른 사용자의 추억")
-        createTicket(deletedMeeting, owner, "삭제된 만남의 추억")
+        val deletedMeetingTicket = createTicket(deletedMeeting, owner, "삭제된 만남의 추억")
         createTicket(outsideMeeting, owner, "다음 달 추억")
         deletedMeeting.delete(Instant.parse("2026-09-02T00:00:00Z"))
         meetingRepository.saveAndFlush(deletedMeeting)
@@ -120,13 +125,23 @@ class PostLogCalendarServiceIntegrationTest {
         val result = calendarService.getMyTicketCalendar(ownerUserId, YearMonth.of(2026, 8))
 
         assertEquals(YearMonth.of(2026, 8), result.yearMonth)
-        assertEquals(3, result.memoryCount)
+        assertEquals(4, result.memoryCount)
         assertEquals(
-            listOf(firstTicket.postLogId, secondTicket.postLogId, thirdTicket.postLogId),
-            result.tickets.map { ticket -> ticket.postLogId },
+            listOf(
+                firstTicket.ticketId,
+                secondTicket.ticketId,
+                thirdTicket.ticketId,
+                deletedMeetingTicket.ticketId,
+            ),
+            result.tickets.map { ticket -> ticket.ticketId },
         )
         assertEquals(
-            listOf(LocalDate.of(2026, 8, 12), LocalDate.of(2026, 8, 13), LocalDate.of(2026, 8, 13)),
+            listOf(
+                LocalDate.of(2026, 8, 12),
+                LocalDate.of(2026, 8, 13),
+                LocalDate.of(2026, 8, 13),
+                LocalDate.of(2026, 8, 16),
+            ),
             result.tickets.map { ticket -> ticket.meetingEndDate },
         )
     }
@@ -139,8 +154,6 @@ class PostLogCalendarServiceIntegrationTest {
         val secondLiker = saveGroupMember(group, "liker2")
         val photoMeeting = saveMeeting(group, owner, "사진 있는 만남", LocalDate.of(2026, 8, 12))
         val emptyMeeting = saveMeeting(group, owner, "사진 없는 만남", LocalDate.of(2026, 8, 13))
-        createTicket(photoMeeting, owner, "사진 있는 추억")
-        createTicket(emptyMeeting, owner, "사진 없는 추억")
         val firstPhoto = savePhoto(photoMeeting, owner, "first.jpg", "2026-08-12T10:00:00+09:00")
         val secondPhoto = savePhoto(photoMeeting, owner, "second.jpg", "2026-08-12T11:00:00+09:00")
         photoLikeRepository.saveAllAndFlush(
@@ -151,6 +164,8 @@ class PostLogCalendarServiceIntegrationTest {
                 PostLogPhotoLike.create(secondPhoto, secondLiker),
             ),
         )
+        createTicket(photoMeeting, owner, "사진 있는 추억")
+        createTicket(emptyMeeting, owner, "사진 없는 추억")
         `when`(objectReadUrlProvider.generateReadUrl(firstPhoto.objectKey)).thenReturn(REPRESENTATIVE_PHOTO_URL)
 
         val result = calendarService.getMyTicketCalendar(checkNotNull(owner.user.id), YearMonth.of(2026, 8))
