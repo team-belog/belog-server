@@ -29,9 +29,7 @@ data class CompletedMeetingListResponse(
 @Schema(description = "종료된 만남 티켓")
 data class CompletedMeetingResponse(
     @field:Schema(description = "개인 Post-log 티켓 ID", example = "31")
-    val postLogId: Long,
-    @field:Schema(description = "만남 ID", example = "7")
-    val meetingId: Long,
+    val ticketId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
     val name: String,
     @field:Schema(description = "추억 문구", example = "친구들과 다녀온 첫 여행")
@@ -52,8 +50,7 @@ data class CompletedMeetingResponse(
     companion object {
         fun from(result: CompletedMeetingResult): CompletedMeetingResponse =
             CompletedMeetingResponse(
-                postLogId = result.postLogId,
-                meetingId = result.meetingId,
+                ticketId = result.ticketId,
                 name = result.name,
                 memory = result.memory,
                 coverPhotoUrl = result.coverPhotoUrl,

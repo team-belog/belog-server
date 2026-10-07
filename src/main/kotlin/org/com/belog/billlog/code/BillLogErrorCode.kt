@@ -30,4 +30,5 @@ enum class BillLogErrorCode(
     INVALID_RECEIPT_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "BILL_LOG-E020", "영수증 이미지 정보가 올바르지 않습니다."),
     RECEIPT_ANALYSIS_FAILED(HttpStatus.BAD_GATEWAY, "BILL_LOG-E021", "영수증 이미지 분석에 실패했습니다."),
     RECEIPT_ANALYSIS_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "BILL_LOG-E022", "영수증 이미지 분석 시간이 초과되었습니다."),
+    UNSETTLED_SETTLEMENT_REQUEST_EXISTS(HttpStatus.CONFLICT, "BILL_LOG-E023", "아직 정산이 완료되지 않았어요"),
 }

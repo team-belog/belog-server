@@ -12,7 +12,7 @@ data class PostLogTicketCalendarResult(
 )
 
 data class PostLogTicketCalendarItemResult(
-    val postLogId: Long,
+    val ticketId: Long,
     val meetingEndDate: LocalDate,
     val thumbnailUrl: String?,
 )

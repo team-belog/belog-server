@@ -12,8 +12,10 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.postlog.domain.PostLog
-import org.com.belog.postlog.repository.PostLogRepository
+import org.com.belog.postlog.domain.PostLogDraft
+import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogDraftRepository
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -52,7 +54,10 @@ class HomeServiceIntegrationTest {
     private lateinit var homeService: HomeService
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
+    private lateinit var postLogDraftRepository: PostLogDraftRepository
+
+    @Autowired
+    private lateinit var postLogTicketRepository: PostLogTicketRepository
 
     @Autowired
     private lateinit var meetingParticipantRepository: MeetingParticipantRepository
@@ -74,7 +79,8 @@ class HomeServiceIntegrationTest {
 
     @AfterEach
     fun cleanUp() {
-        postLogRepository.deleteAllInBatch()
+        postLogTicketRepository.deleteAllInBatch()
+        postLogDraftRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
@@ -173,26 +179,26 @@ class HomeServiceIntegrationTest {
         val viewer = saveGroupMember(group, "viewer")
         val other = saveGroupMember(group, "other")
         val includedMeeting = saveFixedMeeting(group, viewer, "포함", date(8, 16), date(8, 17))
-        val includedTicket = savePostLog(includedMeeting, viewer, ticketCreated = true)
+        val includedTicket = saveTicket(includedMeeting, viewer)
         val endsToday = saveFixedMeeting(group, viewer, "오늘 종료", date(8, 17), date(8, 18))
-        savePostLog(endsToday, viewer, ticketCreated = true)
+        saveTicket(endsToday, viewer)
         saveFixedMeeting(group, viewer, "티켓 없음", date(8, 15), date(8, 16))
         val draftMeeting = saveFixedMeeting(group, viewer, "임시 저장", date(8, 14), date(8, 15))
-        savePostLog(draftMeeting, viewer, ticketCreated = false)
+        saveDraft(draftMeeting, viewer)
         val otherMeeting = saveFixedMeeting(group, other, "다른 사용자", date(8, 13), date(8, 14))
-        savePostLog(otherMeeting, other, ticketCreated = true)
+        saveTicket(otherMeeting, other)
         val deletedMeeting = saveFixedMeeting(group, viewer, "삭제됨", date(8, 12), date(8, 13))
-        savePostLog(deletedMeeting, viewer, ticketCreated = true)
+        val deletedMeetingTicket = saveTicket(deletedMeeting, viewer)
         deletedMeeting.delete(FIXED_INSTANT)
         meetingRepository.saveAndFlush(deletedMeeting)
 
         val result = homeService.getCompletedMeetings(checkNotNull(viewer.user.id), null, 50)
 
-        assertEquals(listOf(includedTicket.id), result.items.map { item -> item.postLogId })
+        assertEquals(listOf(includedTicket.id, deletedMeetingTicket.id), result.items.map { item -> item.ticketId })
     }
 
     @Test
-    fun `종료 목록은 종료일과 Post-log ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
+    fun `종료 목록은 종료일과 티켓 ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val tickets =
@@ -206,9 +212,9 @@ class HomeServiceIntegrationTest {
         val expectedTicketIds =
             tickets
                 .sortedWith(
-                    compareByDescending<PostLog> { postLog -> requireNotNull(postLog.meeting.endDate) }
-                        .thenByDescending { postLog -> postLog.id },
-                ).map { postLog -> postLog.id }
+                    compareByDescending<PostLogTicket> { ticket -> requireNotNull(ticket.meetingEndDate) }
+                        .thenByDescending { ticket -> ticket.id },
+                ).map { ticket -> ticket.id }
         val viewerUserId = checkNotNull(viewer.user.id)
 
         val firstPage = homeService.getCompletedMeetings(viewerUserId, null, 2)
@@ -217,7 +223,7 @@ class HomeServiceIntegrationTest {
 
         assertEquals(
             expectedTicketIds,
-            (firstPage.items + secondPage.items + thirdPage.items).map { item -> item.postLogId },
+            (firstPage.items + secondPage.items + thirdPage.items).map { item -> item.ticketId },
         )
         assertEquals(true, firstPage.hasNext)
         assertEquals(true, secondPage.hasNext)
@@ -230,23 +236,29 @@ class HomeServiceIntegrationTest {
         creator: GroupMember,
         name: String,
         endDate: LocalDate,
-    ): PostLog {
+    ): PostLogTicket {
         val meeting = saveFixedMeeting(group, creator, name, endDate.minusDays(1), endDate)
-        return savePostLog(meeting, creator, ticketCreated = true)
+        return saveTicket(meeting, creator)
     }
 
-    private fun savePostLog(
+    private fun saveTicket(
         meeting: Meeting,
         creator: GroupMember,
-        ticketCreated: Boolean,
-    ): PostLog {
-        val postLog = PostLog.create(meeting, creator)
-        postLog.updateMemory("함께한 추억")
-        if (ticketCreated) {
-            postLog.createTicket(FIXED_INSTANT)
-        }
-        return postLogRepository.saveAndFlush(postLog)
-    }
+    ): PostLogTicket =
+        postLogTicketRepository.saveAndFlush(
+            PostLogTicket.issue(
+                meeting = meeting,
+                creator = creator,
+                memory = "함께한 추억",
+                coverImageObjectKey = null,
+                issuedAt = FIXED_INSTANT,
+            ),
+        )
+
+    private fun saveDraft(
+        meeting: Meeting,
+        creator: GroupMember,
+    ): PostLogDraft = postLogDraftRepository.saveAndFlush(PostLogDraft.create(meeting, creator, "함께한 추억"))
 
     private fun saveSchedulingMeeting(
         group: Group,

@@ -1,5 +1,6 @@
 package org.com.belog.meeting.service
 
+import org.com.belog.billlog.service.SettlementRequestService
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
@@ -44,6 +45,7 @@ import kotlin.test.assertTrue
 @ActiveProfiles("test")
 @Import(
     MeetingService::class,
+    SettlementRequestService::class,
     MeetingServiceTest.FixedClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,

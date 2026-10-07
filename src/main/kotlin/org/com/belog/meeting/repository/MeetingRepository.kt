@@ -132,4 +132,18 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
     fun findByIdForUpdate(
         @Param("meetingId") meetingId: Long,
     ): Meeting?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
+        WHERE meeting.group.id = :groupId
+          AND meeting.deletedAt IS NULL
+        ORDER BY meeting.id ASC
+        """,
+    )
+    fun findAllByGroupIdForUpdate(
+        @Param("groupId") groupId: Long,
+    ): List<Meeting>
 }
