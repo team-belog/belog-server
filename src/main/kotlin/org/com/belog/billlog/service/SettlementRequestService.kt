@@ -33,14 +33,24 @@ class SettlementRequestService(
 
     @Transactional(propagation = Propagation.MANDATORY)
     fun validateMeetingSettled(meetingId: Long) {
-        if (settlementRequestRepository.existsByMeetingIdAndStatus(meetingId, SettlementRequestStatus.PENDING)) {
+        val pendingRequestId =
+            settlementRequestRepository.findFirstIdByMeetingIdAndStatusForUpdate(
+                meetingId = meetingId,
+                status = SettlementRequestStatus.PENDING.name,
+            )
+        if (pendingRequestId != null) {
             throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
         }
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     fun validateGroupSettled(groupId: Long) {
-        if (settlementRequestRepository.existsByGroupIdAndStatus(groupId, SettlementRequestStatus.PENDING)) {
+        val pendingRequestId =
+            settlementRequestRepository.findFirstIdByGroupIdAndStatusForUpdate(
+                groupId = groupId,
+                status = SettlementRequestStatus.PENDING.name,
+            )
+        if (pendingRequestId != null) {
             throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
         }
     }

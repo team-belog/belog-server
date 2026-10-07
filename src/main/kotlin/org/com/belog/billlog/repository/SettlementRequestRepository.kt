@@ -84,30 +84,39 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
     ): Long
 
     @Query(
-        """
-        SELECT COUNT(settlementRequest) > 0
-        FROM SettlementRequest settlementRequest
-        WHERE settlementRequest.bill.meeting.id = :meetingId
-          AND settlementRequest.status = :status
+        value = """
+        SELECT settlement_request.id
+        FROM bill_log_settlement_requests settlement_request
+        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
+        WHERE bill.meeting_id = :meetingId
+          AND settlement_request.status = :status
+        LIMIT 1
+        FOR UPDATE
         """,
+        nativeQuery = true,
     )
-    fun existsByMeetingIdAndStatus(
+    fun findFirstIdByMeetingIdAndStatusForUpdate(
         @Param("meetingId") meetingId: Long,
-        @Param("status") status: SettlementRequestStatus,
-    ): Boolean
+        @Param("status") status: String,
+    ): Long?
 
     @Query(
-        """
-        SELECT COUNT(settlementRequest) > 0
-        FROM SettlementRequest settlementRequest
-        WHERE settlementRequest.bill.meeting.group.id = :groupId
-          AND settlementRequest.status = :status
+        value = """
+        SELECT settlement_request.id
+        FROM bill_log_settlement_requests settlement_request
+        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
+        JOIN meetings meeting ON meeting.id = bill.meeting_id
+        WHERE meeting.group_id = :groupId
+          AND settlement_request.status = :status
+        LIMIT 1
+        FOR UPDATE
         """,
+        nativeQuery = true,
     )
-    fun existsByGroupIdAndStatus(
+    fun findFirstIdByGroupIdAndStatusForUpdate(
         @Param("groupId") groupId: Long,
-        @Param("status") status: SettlementRequestStatus,
-    ): Boolean
+        @Param("status") status: String,
+    ): Long?
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
