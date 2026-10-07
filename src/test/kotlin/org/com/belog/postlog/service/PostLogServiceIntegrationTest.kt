@@ -416,6 +416,20 @@ class PostLogServiceIntegrationTest {
     }
 
     @Test
+    fun `만남이 삭제되어도 생성한 티켓은 발급 시점 정보와 참여자로 조회한다`() {
+        val context = saveMeetingContext()
+        val createdTicket = postLogService.createTicket(context.meetingId, context.creatorUserId, "함께한 광주 여행")
+        context.meeting.delete(FIXED_INSTANT)
+        meetingRepository.saveAndFlush(context.meeting)
+
+        val result = postLogService.getTicket(createdTicket.ticketId, context.creatorUserId)
+
+        assertEquals("광주 여행", result.meetingName)
+        assertEquals("함께한 광주 여행", result.memory)
+        assertEquals(createdTicket.members, result.members)
+    }
+
+    @Test
     fun `임시저장만 한 Post-log는 티켓으로 조회할 수 없다`() {
         val context = saveMeetingContext()
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
