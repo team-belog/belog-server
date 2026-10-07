@@ -12,10 +12,10 @@ import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.POST_LOG_TICKET_MEETING_CREATOR_UNIQUE_CONSTRAINT_NAME
-import org.com.belog.postlog.domain.PostLog
+import org.com.belog.postlog.domain.PostLogDraft
 import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogDraftRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
@@ -34,7 +34,7 @@ class PostLogService(
     private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
-    private val postLogRepository: PostLogRepository,
+    private val postLogDraftRepository: PostLogDraftRepository,
     private val postLogTicketRepository: PostLogTicketRepository,
     private val postLogPhotoRepository: PostLogPhotoRepository,
     private val billRepository: BillRepository,
@@ -61,11 +61,12 @@ class PostLogService(
             throw BusinessException(PostLogErrorCode.TICKET_ALREADY_CREATED)
         }
 
-        val postLog =
-            postLogRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)
-                ?: PostLog.create(meeting, creator)
-        postLog.updateMemory(memory)
-        postLogRepository.save(postLog)
+        val draft = postLogDraftRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)
+        if (draft == null) {
+            postLogDraftRepository.save(PostLogDraft.create(meeting, creator, memory))
+        } else {
+            draft.updateMemory(memory)
+        }
     }
 
     @Transactional
@@ -104,6 +105,7 @@ class PostLogService(
                 }
                 throw exception
             }
+        postLogDraftRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)?.let(postLogDraftRepository::delete)
         return toTicketResult(savedTicket)
     }
 
@@ -147,7 +149,7 @@ class PostLogService(
         val ticket = postLogTicketRepository.findBySourceMeetingIdAndCreatorGroupMemberId(meetingId, viewerId)
         val draftMemory =
             if (ticket == null) {
-                postLogRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)?.memory
+                postLogDraftRepository.findByMeetingIdAndCreatedById(meetingId, viewerId)?.memory
             } else {
                 null
             }

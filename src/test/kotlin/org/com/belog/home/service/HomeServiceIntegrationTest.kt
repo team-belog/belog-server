@@ -12,9 +12,9 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.postlog.domain.PostLog
+import org.com.belog.postlog.domain.PostLogDraft
 import org.com.belog.postlog.domain.PostLogTicket
-import org.com.belog.postlog.repository.PostLogRepository
+import org.com.belog.postlog.repository.PostLogDraftRepository
 import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -54,7 +54,7 @@ class HomeServiceIntegrationTest {
     private lateinit var homeService: HomeService
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
+    private lateinit var postLogDraftRepository: PostLogDraftRepository
 
     @Autowired
     private lateinit var postLogTicketRepository: PostLogTicketRepository
@@ -80,7 +80,7 @@ class HomeServiceIntegrationTest {
     @AfterEach
     fun cleanUp() {
         postLogTicketRepository.deleteAllInBatch()
-        postLogRepository.deleteAllInBatch()
+        postLogDraftRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
@@ -258,11 +258,7 @@ class HomeServiceIntegrationTest {
     private fun saveDraft(
         meeting: Meeting,
         creator: GroupMember,
-    ): PostLog {
-        val postLog = PostLog.create(meeting, creator)
-        postLog.updateMemory("함께한 추억")
-        return postLogRepository.saveAndFlush(postLog)
-    }
+    ): PostLogDraft = postLogDraftRepository.saveAndFlush(PostLogDraft.create(meeting, creator, "함께한 추억"))
 
     private fun saveSchedulingMeeting(
         group: Group,

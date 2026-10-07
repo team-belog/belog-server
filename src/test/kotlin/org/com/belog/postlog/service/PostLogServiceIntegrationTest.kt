@@ -26,9 +26,9 @@ import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogDraftRepository
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -78,7 +78,7 @@ class PostLogServiceIntegrationTest {
     private lateinit var postLogService: PostLogService
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
+    private lateinit var postLogDraftRepository: PostLogDraftRepository
 
     @Autowired
     private lateinit var postLogTicketRepository: PostLogTicketRepository
@@ -124,7 +124,7 @@ class PostLogServiceIntegrationTest {
         photoLikeRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
         postLogTicketRepository.deleteAllInBatch()
-        postLogRepository.deleteAllInBatch()
+        postLogDraftRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
@@ -144,15 +144,13 @@ class PostLogServiceIntegrationTest {
         )
 
         val savedPostLog =
-            postLogRepository.findByMeetingIdAndCreatedById(
+            postLogDraftRepository.findByMeetingIdAndCreatedById(
                 context.meetingId,
                 checkNotNull(context.creator.id),
             )
         assertNotNull(savedPostLog)
         assertEquals("함께한 광주 여행", savedPostLog.memory)
-        assertNull(savedPostLog.ticketCreatedAt)
-        assertFalse(savedPostLog.isTicketCreated)
-        assertEquals(1L, postLogRepository.count())
+        assertEquals(1L, postLogDraftRepository.count())
     }
 
     @Test
@@ -161,7 +159,7 @@ class PostLogServiceIntegrationTest {
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "첫 번째 초안")
         val initialPostLog =
             checkNotNull(
-                postLogRepository.findByMeetingIdAndCreatedById(
+                postLogDraftRepository.findByMeetingIdAndCreatedById(
                     context.meetingId,
                     checkNotNull(context.creator.id),
                 ),
@@ -170,15 +168,14 @@ class PostLogServiceIntegrationTest {
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "두 번째 초안")
 
         val updatedPostLog =
-            postLogRepository.findByMeetingIdAndCreatedById(
+            postLogDraftRepository.findByMeetingIdAndCreatedById(
                 context.meetingId,
                 checkNotNull(context.creator.id),
             )
         assertNotNull(updatedPostLog)
         assertEquals(initialPostLog.id, updatedPostLog.id)
         assertEquals("두 번째 초안", updatedPostLog.memory)
-        assertNull(updatedPostLog.ticketCreatedAt)
-        assertEquals(1L, postLogRepository.count())
+        assertEquals(1L, postLogDraftRepository.count())
     }
 
     @Test
@@ -195,16 +192,16 @@ class PostLogServiceIntegrationTest {
         )
 
         val creatorPostLog =
-            postLogRepository.findByMeetingIdAndCreatedById(
+            postLogDraftRepository.findByMeetingIdAndCreatedById(
                 context.meetingId,
                 checkNotNull(context.creator.id),
             )
         val otherMemberPostLog =
-            postLogRepository.findByMeetingIdAndCreatedById(
+            postLogDraftRepository.findByMeetingIdAndCreatedById(
                 context.meetingId,
                 checkNotNull(otherMember.id),
             )
-        assertEquals(2L, postLogRepository.count())
+        assertEquals(2L, postLogDraftRepository.count())
         assertEquals("생성자의 초안", creatorPostLog?.memory)
         assertEquals("다른 멤버의 초안", otherMemberPostLog?.memory)
         assertTrue(creatorPostLog?.id != otherMemberPostLog?.id)
@@ -222,7 +219,7 @@ class PostLogServiceIntegrationTest {
 
         assertEquals(PostLogErrorCode.TICKET_ALREADY_CREATED, exception.errorCode)
         assertEquals("최종 티켓 문구", findCreatorTicket(context)?.memory)
-        assertEquals(0L, postLogRepository.count())
+        assertEquals(0L, postLogDraftRepository.count())
     }
 
     @Test
@@ -302,7 +299,7 @@ class PostLogServiceIntegrationTest {
 
         assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, draftException.errorCode)
         assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, ticketException.errorCode)
-        assertEquals(0L, postLogRepository.count())
+        assertEquals(0L, postLogDraftRepository.count())
     }
 
     @Test
@@ -395,7 +392,7 @@ class PostLogServiceIntegrationTest {
             }
 
         assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
-        assertEquals(0L, postLogRepository.count())
+        assertEquals(0L, postLogDraftRepository.count())
     }
 
     @Test
@@ -424,7 +421,7 @@ class PostLogServiceIntegrationTest {
         postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
         val draftPostLog =
             checkNotNull(
-                postLogRepository.findByMeetingIdAndCreatedById(
+                postLogDraftRepository.findByMeetingIdAndCreatedById(
                     context.meetingId,
                     checkNotNull(context.creator.id),
                 ),

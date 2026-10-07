@@ -70,3 +70,34 @@ FROM post_logs post_log
          INNER JOIN group_members creator ON creator.id = post_log.created_by_group_member_id
          INNER JOIN users creator_user ON creator_user.id = creator.user_id
 WHERE post_log.ticket_created_at IS NOT NULL;
+
+DELETE
+FROM post_logs
+WHERE ticket_created_at IS NOT NULL
+   OR memory IS NULL;
+
+ALTER TABLE post_logs
+    DROP CHECK chk_post_logs_ticket,
+    DROP CHECK chk_post_logs_memory;
+
+ALTER TABLE post_logs
+    DROP FOREIGN KEY fk_post_logs_meeting_id,
+    DROP FOREIGN KEY fk_post_logs_created_by_group_member_id;
+
+ALTER TABLE post_logs
+    DROP COLUMN ticket_created_at,
+    MODIFY COLUMN memory VARCHAR(80) NOT NULL;
+
+RENAME TABLE post_logs TO post_log_drafts;
+
+ALTER TABLE post_log_drafts
+    RENAME INDEX uk_post_logs_meeting_member TO uk_post_log_drafts_meeting_member,
+    RENAME INDEX fk_post_logs_created_by_group_member_id TO fk_post_log_drafts_created_by_group_member_id;
+
+ALTER TABLE post_log_drafts
+    ADD CONSTRAINT chk_post_log_drafts_memory
+        CHECK (CHAR_LENGTH(TRIM(memory)) BETWEEN 1 AND 80),
+    ADD CONSTRAINT fk_post_log_drafts_meeting_id
+        FOREIGN KEY (meeting_id) REFERENCES meetings (id),
+    ADD CONSTRAINT fk_post_log_drafts_created_by_group_member_id
+        FOREIGN KEY (created_by_group_member_id) REFERENCES group_members (id);

@@ -40,8 +40,7 @@ const val POST_LOG_TICKET_MEETING_CREATOR_UNIQUE_CONSTRAINT_NAME = "uk_post_log_
     check = [
         CheckConstraint(
             name = "chk_post_log_tickets_memory",
-            constraint =
-                "CHAR_LENGTH(TRIM(memory)) BETWEEN ${PostLog.MEMORY_MIN_LENGTH} AND ${PostLog.MEMORY_MAX_LENGTH}",
+            constraint = PostLogMemory.LENGTH_CHECK_CONSTRAINT,
         ),
         CheckConstraint(
             name = "chk_post_log_tickets_meeting_name",
@@ -72,7 +71,7 @@ class PostLogTicket protected constructor(
     val meetingStartDate: LocalDate?,
     @Column(name = "meeting_end_date")
     val meetingEndDate: LocalDate?,
-    @Column(nullable = false, length = PostLog.MEMORY_MAX_LENGTH)
+    @Column(nullable = false, length = PostLogMemory.MAX_LENGTH)
     val memory: String,
     @Column(name = "cover_image_object_key", length = COVER_IMAGE_OBJECT_KEY_MAX_LENGTH)
     val coverImageObjectKey: String?,
@@ -97,11 +96,6 @@ class PostLogTicket protected constructor(
             require(creator.belongsTo(meeting.group)) {
                 "티켓 생성자는 해당 만남이 속한 그룹의 멤버여야 합니다."
             }
-            val normalizedMemory = memory.trim()
-            require(normalizedMemory.length in PostLog.MEMORY_MIN_LENGTH..PostLog.MEMORY_MAX_LENGTH) {
-                "추억 문구는 ${PostLog.MEMORY_MIN_LENGTH}자 이상 ${PostLog.MEMORY_MAX_LENGTH}자 이하여야 합니다."
-            }
-
             return PostLogTicket(
                 owner = creator.user,
                 sourceMeetingId = checkNotNull(meeting.id) { "티켓 대상 만남의 ID가 없습니다." },
@@ -111,7 +105,7 @@ class PostLogTicket protected constructor(
                 meetingLocation = meeting.location,
                 meetingStartDate = meeting.startDate,
                 meetingEndDate = meeting.endDate,
-                memory = normalizedMemory,
+                memory = PostLogMemory.normalize(memory),
                 coverImageObjectKey = coverImageObjectKey,
                 issuedAt = issuedAt,
             )

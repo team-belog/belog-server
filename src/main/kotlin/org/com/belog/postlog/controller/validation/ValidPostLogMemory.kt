@@ -4,11 +4,11 @@ import jakarta.validation.Constraint
 import jakarta.validation.ConstraintValidator
 import jakarta.validation.ConstraintValidatorContext
 import jakarta.validation.Payload
-import org.com.belog.postlog.domain.PostLog
+import org.com.belog.postlog.domain.PostLogMemory
 import kotlin.reflect.KClass
 
 const val POST_LOG_MEMORY_LENGTH_MESSAGE =
-    "추억 문구는 ${PostLog.MEMORY_MIN_LENGTH}자 이상 ${PostLog.MEMORY_MAX_LENGTH}자 이하여야 합니다."
+    "추억 문구는 ${PostLogMemory.MIN_LENGTH}자 이상 ${PostLogMemory.MAX_LENGTH}자 이하여야 합니다."
 
 @Target(AnnotationTarget.FIELD, AnnotationTarget.VALUE_PARAMETER)
 @Retention(AnnotationRetention.RUNTIME)
@@ -25,6 +25,6 @@ class PostLogMemoryValidator : ConstraintValidator<ValidPostLogMemory, String> {
         context: ConstraintValidatorContext,
     ): Boolean {
         val normalizedMemory = value?.trim() ?: return false
-        return normalizedMemory.length in PostLog.MEMORY_MIN_LENGTH..PostLog.MEMORY_MAX_LENGTH
+        return normalizedMemory.length in PostLogMemory.MIN_LENGTH..PostLogMemory.MAX_LENGTH
     }
 }

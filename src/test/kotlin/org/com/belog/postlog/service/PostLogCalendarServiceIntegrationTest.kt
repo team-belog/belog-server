@@ -14,9 +14,9 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
+import org.com.belog.postlog.repository.PostLogDraftRepository
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
-import org.com.belog.postlog.repository.PostLogRepository
 import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -55,7 +55,7 @@ class PostLogCalendarServiceIntegrationTest {
     private lateinit var postLogService: PostLogService
 
     @Autowired
-    private lateinit var postLogRepository: PostLogRepository
+    private lateinit var postLogDraftRepository: PostLogDraftRepository
 
     @Autowired
     private lateinit var postLogTicketRepository: PostLogTicketRepository
@@ -89,7 +89,7 @@ class PostLogCalendarServiceIntegrationTest {
         photoLikeRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
         postLogTicketRepository.deleteAllInBatch()
-        postLogRepository.deleteAllInBatch()
+        postLogDraftRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
