@@ -21,4 +21,17 @@ interface GroupRepository : JpaRepository<Group, Long> {
     fun findByInviteCodeForUpdate(
         @Param("inviteCode") inviteCode: String,
     ): Group?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT group
+        FROM Group group
+        WHERE group.id = :groupId
+          AND group.deletedAt IS NULL
+        """,
+    )
+    fun findActiveByIdForUpdate(
+        @Param("groupId") groupId: Long,
+    ): Group?
 }

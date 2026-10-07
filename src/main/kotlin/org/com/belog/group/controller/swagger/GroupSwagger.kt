@@ -187,6 +187,69 @@ interface GroupSwagger {
     ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
+        summary = "그룹 삭제",
+        description =
+            "그룹 OWNER가 그룹을 삭제합니다. 그룹과 하위 만남 모두 삭제 시각을 기록하는 soft delete 방식이며, " +
+                "일정 조율, Pre-log, Bill-log, Post-log 데이터는 일반 조회에서 제외됩니다. " +
+                "그룹의 어떤 만남에라도 완료되지 않은 정산 요청이 있으면 삭제할 수 없으며, " +
+                "이미 생성된 Post-log 티켓은 삭제 후에도 조회할 수 있습니다. 이미 삭제된 그룹은 찾을 수 없는 그룹으로 처리합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "그룹 삭제 성공",
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아니거나 그룹 OWNER가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "OWNER 권한 없음", value = GROUP_DELETE_OWNER_REQUIRED_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "그룹을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = GROUP_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "완료되지 않은 정산 요청이 있음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun deleteGroup(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "그룹 ID", example = "1", required = true)
+        @PathVariable
+        groupId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "그룹 조회",
         description =
             "그룹 정보와 일정 조율 중인 만남, 종료되지 않은 확정 만남을 조회합니다. " +
@@ -680,6 +743,12 @@ private const val NOT_GROUP_MEMBER_EXAMPLE =
 
 private const val GROUP_OWNER_REQUIRED_EXAMPLE =
     """{"code":"GROUP-E014","message":"그룹 OWNER만 커버 이미지를 변경할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
+
+private const val GROUP_DELETE_OWNER_REQUIRED_EXAMPLE =
+    """{"code":"GROUP-E015","message":"그룹 OWNER만 그룹을 삭제할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
+
+private const val UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE =
+    """{"code":"BILL_LOG-E023","message":"아직 정산이 완료되지 않았어요","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""
 
 private const val GROUP_NOT_FOUND_EXAMPLE =
     """{"code":"GROUP-E012","message":"그룹을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-20T00:00:00Z"}}"""

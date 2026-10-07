@@ -1,5 +1,6 @@
 package org.com.belog.group.service
 
+import org.com.belog.billlog.service.SettlementRequestService
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.global.time.currentBusinessDate
@@ -33,6 +34,7 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
+import java.time.Instant
 
 @Service
 class GroupService(
@@ -44,6 +46,7 @@ class GroupService(
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val settlementRequestService: SettlementRequestService,
     private val s3ObjectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
     private val clock: Clock,
@@ -143,6 +146,25 @@ class GroupService(
     ) {
         findGroup(groupId)
         findCurrentMember(groupId, userId).unpin()
+    }
+
+    @Transactional
+    fun deleteGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        val group =
+            groupRepository.findActiveByIdForUpdate(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        if (findCurrentMember(groupId, userId).role != GroupRole.OWNER) {
+            throw BusinessException(GroupErrorCode.GROUP_DELETE_OWNER_REQUIRED)
+        }
+        val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+        settlementRequestService.validateGroupSettled(groupId)
+
+        val deletedAt = Instant.now(clock)
+        group.delete(deletedAt)
+        meetings.forEach { meeting -> meeting.delete(deletedAt) }
     }
 
     @Transactional(readOnly = true)
