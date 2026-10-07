@@ -99,13 +99,12 @@ class GroupMembershipService(
         groupId: Long,
         userId: Long,
     ) {
-        if (groupMemberRepository.findByGroupIdAndUserId(groupId, userId) != null) {
-            return
-        }
-        if (!groupRepository.existsById(groupId)) {
+        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        }
     }
 
     private fun createInviteCode(value: String): InviteCode =

@@ -53,7 +53,7 @@ class GroupCoverImageService(
         userId: Long,
         coverImageObjectKeyValue: String,
     ) {
-        if (!groupRepository.existsById(groupId)) {
+        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
 

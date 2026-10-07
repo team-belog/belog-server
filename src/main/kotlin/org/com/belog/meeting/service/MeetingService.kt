@@ -307,27 +307,23 @@ class MeetingService(
         groupId: Long,
         creatorUserId: Long,
     ): GroupMember {
-        groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)?.let { creator ->
-            return creator
-        }
+        groupRepository.findActiveByIdForShare(groupId)
+            ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
-        if (!groupRepository.existsById(groupId)) {
-            throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        }
-        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)
+            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
     private fun validateGroupMember(
         groupId: Long,
         userId: Long,
     ) {
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            return
-        }
-        if (!groupRepository.existsById(groupId)) {
+        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        }
     }
 
     private fun findParticipants(

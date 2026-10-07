@@ -193,9 +193,8 @@ class GroupService(
     }
 
     private fun findGroup(groupId: Long): Group =
-        groupRepository.findById(groupId).orElseThrow {
-            BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        }
+        groupRepository.findActiveById(groupId)
+            ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
     private fun findCurrentMember(
         groupId: Long,
