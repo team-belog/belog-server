@@ -1,9 +1,11 @@
 package org.com.belog.billlog.service
 
 import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.global.error.BusinessException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
@@ -27,5 +29,19 @@ class SettlementRequestService(
         }
 
         settlementRequest.complete(Instant.now(clock))
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun validateMeetingSettled(meetingId: Long) {
+        if (settlementRequestRepository.existsByMeetingIdAndStatus(meetingId, SettlementRequestStatus.PENDING)) {
+            throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
+        }
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun validateGroupSettled(groupId: Long) {
+        if (settlementRequestRepository.existsByGroupIdAndStatus(groupId, SettlementRequestStatus.PENDING)) {
+            throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
+        }
     }
 }
