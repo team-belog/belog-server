@@ -89,6 +89,18 @@ class GroupController(
             .body(CommonResponse.success(GroupSuccessCode.GROUP_UNPINNED))
     }
 
+    @DeleteMapping("/{groupId}")
+    override fun deleteGroup(
+        @LoginUserId userId: Long,
+        @PathVariable groupId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        groupService.deleteGroup(groupId = groupId, userId = userId)
+
+        return ResponseEntity
+            .status(GroupSuccessCode.GROUP_DELETED.status)
+            .build()
+    }
+
     @GetMapping("/{groupId}")
     override fun getGroup(
         @LoginUserId userId: Long,

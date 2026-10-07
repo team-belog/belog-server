@@ -17,4 +17,5 @@ enum class GroupSuccessCode(
     MY_GROUPS_RETRIEVED(HttpStatus.OK, "GROUP-S007", "내 그룹 목록을 조회했습니다."),
     GROUP_PINNED(HttpStatus.OK, "GROUP-S008", "그룹이 고정되었습니다."),
     GROUP_UNPINNED(HttpStatus.OK, "GROUP-S009", "그룹 고정이 해제되었습니다."),
+    GROUP_DELETED(HttpStatus.NO_CONTENT, "GROUP-S010", "그룹이 삭제되었습니다."),
 }

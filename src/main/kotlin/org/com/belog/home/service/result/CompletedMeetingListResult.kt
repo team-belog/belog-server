@@ -10,8 +10,7 @@ data class CompletedMeetingListResult(
 )
 
 data class CompletedMeetingResult(
-    val postLogId: Long,
-    val meetingId: Long,
+    val ticketId: Long,
     val name: String,
     val memory: String,
     val coverPhotoUrl: String?,

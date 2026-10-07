@@ -44,7 +44,7 @@ class BillService(
     fun registerBill(command: RegisterBillCommand): RegisteredBill {
         validateCommand(command)
 
-        val meeting = findMeeting(command.meetingId)
+        val meeting = findMeetingForUpdate(command.meetingId)
         val creator = findGroupMember(meeting, command.creatorUserId)
         val participantsByMemberId = findParticipantsByMemberId(meeting, command)
         val payer =
@@ -158,8 +158,8 @@ class BillService(
             throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
         }
 
-    private fun findMeeting(meetingId: Long): Meeting =
-        meetingRepository.findByIdWithGroupAndCreator(meetingId)
+    private fun findMeetingForUpdate(meetingId: Long): Meeting =
+        meetingRepository.findByIdWithGroupForUpdate(meetingId)
             ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
 
     private fun findGroupMember(

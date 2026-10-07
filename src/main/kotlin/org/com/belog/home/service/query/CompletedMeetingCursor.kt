@@ -4,9 +4,9 @@ import java.time.LocalDate
 
 data class CompletedMeetingCursor(
     val endDate: LocalDate,
-    val postLogId: Long,
+    val ticketId: Long,
 ) {
     init {
-        require(postLogId > 0) { "종료된 만남 목록 커서의 Post-log ID는 양수여야 합니다." }
+        require(ticketId > 0) { "종료된 만남 목록 커서의 티켓 ID는 양수여야 합니다." }
     }
 }

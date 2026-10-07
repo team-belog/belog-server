@@ -3,7 +3,7 @@ package org.com.belog.postlog.service.result
 import java.time.LocalDate
 
 data class PostLogSummaryResult(
-    val postLogId: Long?,
+    val ticketId: Long?,
     val meetingId: Long,
     val meetingName: String,
     val startDate: LocalDate?,

@@ -47,6 +47,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         SELECT member
         FROM GroupMember member
         WHERE member.user.id = :userId
+          AND member.group.deletedAt IS NULL
           AND (
               :cursorId IS NULL
               OR (:cursorPinned = TRUE AND member.pinned = FALSE)

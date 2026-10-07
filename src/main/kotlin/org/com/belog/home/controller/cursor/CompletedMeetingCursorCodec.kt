@@ -9,7 +9,7 @@ internal object CompletedMeetingCursorCodec {
     private const val SEPARATOR = ":"
 
     fun encode(cursor: CompletedMeetingCursor): String {
-        val rawCursor = "${cursor.endDate}$SEPARATOR${cursor.postLogId}"
+        val rawCursor = "${cursor.endDate}$SEPARATOR${cursor.ticketId}"
         return Base64.getUrlEncoder().withoutPadding().encodeToString(rawCursor.toByteArray(StandardCharsets.UTF_8))
     }
 
@@ -25,7 +25,7 @@ internal object CompletedMeetingCursorCodec {
 
             CompletedMeetingCursor(
                 endDate = LocalDate.parse(parts[0]),
-                postLogId = parts[1].toLong(),
+                ticketId = parts[1].toLong(),
             )
         }
     }

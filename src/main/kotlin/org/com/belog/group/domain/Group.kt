@@ -9,6 +9,7 @@ import jakarta.persistence.Id
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
+import java.time.Instant
 
 const val GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME = "uk_groups_invite_code"
 private const val GROUP_NAME_MIN_LENGTH = 1
@@ -50,8 +51,17 @@ class Group protected constructor(
     var id: Long? = null
         protected set
 
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+        protected set
+
     fun changeCoverImage(coverImageObjectKey: GroupCoverImageObjectKey) {
         this.coverImageObjectKey = coverImageObjectKey.value
+    }
+
+    fun delete(deletedAt: Instant) {
+        require(this.deletedAt == null) { "이미 삭제된 그룹입니다." }
+        this.deletedAt = deletedAt
     }
 
     companion object {

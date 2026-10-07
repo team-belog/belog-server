@@ -17,9 +17,8 @@ class GroupCoverImageUpdateService(
         coverImageObjectKey: GroupCoverImageObjectKey,
     ) {
         val group =
-            groupRepository.findById(groupId).orElseThrow {
-                BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-            }
+            groupRepository.findActiveById(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
         group.changeCoverImage(coverImageObjectKey)
     }

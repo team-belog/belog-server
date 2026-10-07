@@ -83,6 +83,41 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         @Param("pendingStatus") pendingStatus: SettlementRequestStatus,
     ): Long
 
+    @Query(
+        value = """
+        SELECT settlement_request.id
+        FROM bill_log_settlement_requests settlement_request
+        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
+        WHERE bill.meeting_id = :meetingId
+          AND settlement_request.status = :status
+        LIMIT 1
+        FOR UPDATE
+        """,
+        nativeQuery = true,
+    )
+    fun findFirstIdByMeetingIdAndStatusForUpdate(
+        @Param("meetingId") meetingId: Long,
+        @Param("status") status: String,
+    ): Long?
+
+    @Query(
+        value = """
+        SELECT settlement_request.id
+        FROM bill_log_settlement_requests settlement_request
+        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
+        JOIN meetings meeting ON meeting.id = bill.meeting_id
+        WHERE meeting.group_id = :groupId
+          AND settlement_request.status = :status
+        LIMIT 1
+        FOR UPDATE
+        """,
+        nativeQuery = true,
+    )
+    fun findFirstIdByGroupIdAndStatusForUpdate(
+        @Param("groupId") groupId: Long,
+        @Param("status") status: String,
+    ): Long?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """

@@ -1,5 +1,6 @@
 package org.com.belog.meeting.service
 
+import org.com.belog.billlog.service.SettlementRequestService
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
@@ -34,6 +35,7 @@ class MeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
+    private val settlementRequestService: SettlementRequestService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -259,6 +261,7 @@ class MeetingService(
     ) {
         val meeting = findMeetingForUpdate(meetingId)
         validateScheduleManager(meeting, userId)
+        settlementRequestService.validateMeetingSettled(meetingId)
         meeting.delete(Instant.now(clock))
     }
 
@@ -304,27 +307,23 @@ class MeetingService(
         groupId: Long,
         creatorUserId: Long,
     ): GroupMember {
-        groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)?.let { creator ->
-            return creator
-        }
+        groupRepository.findActiveByIdForShare(groupId)
+            ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
-        if (!groupRepository.existsById(groupId)) {
-            throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        }
-        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        return groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)
+            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
     private fun validateGroupMember(
         groupId: Long,
         userId: Long,
     ) {
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
-            return
-        }
-        if (!groupRepository.existsById(groupId)) {
+        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        }
     }
 
     private fun findParticipants(

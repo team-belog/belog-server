@@ -7,7 +7,6 @@ import org.com.belog.group.repository.GroupRepository
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
-import java.util.Optional
 import kotlin.test.assertEquals
 
 class GroupCoverImageUpdateServiceTest {
@@ -18,7 +17,7 @@ class GroupCoverImageUpdateServiceTest {
     fun `그룹 커버 이미지 Object Key를 변경한다`() {
         val group = createGroup()
         val objectKey = GroupCoverImageObjectKey.create(15L, "group-covers/15/image.webp")
-        `when`(groupRepository.findById(1L)).thenReturn(Optional.of(group))
+        `when`(groupRepository.findActiveById(1L)).thenReturn(group)
 
         service.update(1L, objectKey)
 
