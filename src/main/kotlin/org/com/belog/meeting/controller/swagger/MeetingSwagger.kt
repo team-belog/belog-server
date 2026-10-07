@@ -231,7 +231,8 @@ interface MeetingSwagger {
         summary = "만남 삭제",
         description =
             "만남 생성자가 만남을 삭제합니다. 삭제 시각을 기록하는 soft delete 방식이며, " +
-                "연관 데이터와 S3 객체는 보존됩니다. 이미 삭제된 만남은 찾을 수 없는 만남으로 처리합니다.",
+                "연관 데이터와 S3 객체는 보존됩니다. 이미 삭제된 만남은 찾을 수 없는 만남으로 처리합니다. " +
+                "완료되지 않은 정산 요청이 있으면 삭제할 수 없으며, 이미 생성된 Post-log 티켓은 삭제 후에도 조회할 수 있습니다.",
     )
     @ApiResponses(
         value = [
@@ -259,6 +260,17 @@ interface MeetingSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "완료되지 않은 정산 요청이 있음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE)],
                     ),
                 ],
             ),
@@ -379,6 +391,9 @@ private const val MEETING_NOT_FOUND_EXAMPLE =
 
 private const val NOT_MEETING_CREATOR_EXAMPLE =
     """{"code":"MEETING-E018","message":"만남 생성자만 만남을 관리할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE =
+    """{"code":"BILL_LOG-E023","message":"아직 정산이 완료되지 않았어요","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
 private const val MEETING_ALREADY_ENDED_EXAMPLE =
     """{"code":"MEETING-E019","message":"종료된 만남의 일정은 변경할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
