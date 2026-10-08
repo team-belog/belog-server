@@ -86,9 +86,10 @@ class NotificationDevice protected constructor(
         this.deactivatedAt = null
     }
 
-    fun deactivate(deactivatedAt: Instant) {
-        check(isActive) { "이미 비활성화된 기기입니다." }
+    fun deactivate(deactivatedAt: Instant): Boolean {
+        if (!isActive) return false
         this.deactivatedAt = deactivatedAt
+        return true
     }
 
     companion object {
