@@ -4,13 +4,19 @@ import org.com.belog.auth.code.AuthErrorCode
 import org.com.belog.auth.config.JwtProperties
 import org.com.belog.auth.config.JwtTokenConfig
 import org.com.belog.global.error.BusinessException
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import org.springframework.security.oauth2.jwt.JwtClaimsSet
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Optional
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
@@ -50,8 +56,16 @@ class JwtTokenProviderTest {
     @Test
     fun `Access Token에는 jti를 추가하지 않는다`() {
         val accessToken = tokenProvider.createTokens(1L).accessToken
+        val activeUser =
+            User.createSocialUser(
+                email = "user@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-subject",
+            )
+        val userRepository = mock(UserRepository::class.java)
+        `when`(userRepository.findById(1L)).thenReturn(Optional.of(activeUser))
 
-        val jwt = config.accessTokenJwtDecoder(properties).decode(accessToken)
+        val jwt = config.accessTokenJwtDecoder(properties, userRepository).decode(accessToken)
 
         assertNull(jwt.id)
     }

@@ -1,6 +1,7 @@
 package org.com.belog.auth.config
 
 import org.com.belog.auth.infrastructure.JwtIdGenerator
+import org.com.belog.user.repository.UserRepository
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -37,11 +38,15 @@ class JwtTokenConfig {
 
     @Bean
     @Qualifier(ACCESS_TOKEN_JWT_DECODER)
-    fun accessTokenJwtDecoder(properties: JwtProperties): JwtDecoder =
+    fun accessTokenJwtDecoder(
+        properties: JwtProperties,
+        userRepository: UserRepository,
+    ): JwtDecoder =
         createDecoder(
             properties = properties,
             tokenType = ACCESS_TOKEN_TYPE,
             invalidTokenMessage = "Access Token이 아닙니다.",
+            additionalValidators = listOf(activeUserValidator(userRepository)),
         )
 
     @Bean
@@ -57,6 +62,7 @@ class JwtTokenConfig {
         properties: JwtProperties,
         tokenType: String,
         invalidTokenMessage: String,
+        additionalValidators: List<OAuth2TokenValidator<Jwt>> = emptyList(),
     ): JwtDecoder {
         val decoder =
             NimbusJwtDecoder
@@ -75,12 +81,30 @@ class JwtTokenConfig {
             }
         decoder.setJwtValidator(
             DelegatingOAuth2TokenValidator(
-                JwtValidators.createDefaultWithIssuer(properties.issuer),
-                tokenTypeValidator,
+                listOf(JwtValidators.createDefaultWithIssuer(properties.issuer), tokenTypeValidator) +
+                    additionalValidators,
             ),
         )
         return decoder
     }
+
+    private fun activeUserValidator(userRepository: UserRepository): OAuth2TokenValidator<Jwt> =
+        OAuth2TokenValidator<Jwt> { jwt ->
+            val isActiveUser =
+                jwt.subject
+                    ?.toLongOrNull()
+                    ?.let { userId -> userRepository.findById(userId).orElse(null) }
+                    ?.isActive
+                    ?: false
+
+            if (isActiveUser) {
+                OAuth2TokenValidatorResult.success()
+            } else {
+                OAuth2TokenValidatorResult.failure(
+                    OAuth2Error("invalid_token", "탈퇴한 사용자입니다.", null),
+                )
+            }
+        }
 
     private fun secretKey(properties: JwtProperties) =
         SecretKeySpec(

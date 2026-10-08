@@ -61,9 +61,11 @@ class RefreshTokenServiceTest {
 
     @Test
     fun `저장된 Refresh Token이 일치하면 새로운 토큰으로 교체한다`() {
+        val activeUser = mock(User::class.java)
+        `when`(activeUser.isActive).thenReturn(true)
         val savedToken =
             RefreshToken.issue(
-                user = mock(User::class.java),
+                user = activeUser,
                 tokenHash = "0eb17643d4e9261163783a420859c92c7d212fa9624106a12b510afbec266120",
                 expiresAt = Instant.parse("2026-09-12T00:00:00Z"),
             )
