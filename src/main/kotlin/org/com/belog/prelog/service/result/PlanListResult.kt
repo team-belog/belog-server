@@ -17,7 +17,7 @@ data class PlanListItemResult(
     val category: PlanCategory,
     val title: String,
     val url: String?,
-    val address: String?,
+    val content: String?,
     val thumbnailUrl: String?,
     val likeCount: Long,
     val likedByMe: Boolean,

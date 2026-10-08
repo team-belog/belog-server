@@ -12,6 +12,7 @@ import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.prelog.service.query.PlanListCursor
@@ -346,7 +347,11 @@ class PlanService(
             category = category,
             title = title,
             url = url,
-            address = location?.address,
+            content =
+                when (type) {
+                    PlanType.LOCATION -> location?.address
+                    PlanType.MEMO -> content
+                },
             thumbnailUrl = null,
             likeCount = 0,
             likedByMe = false,
