@@ -181,6 +181,9 @@ class GroupMembershipServiceTest {
                 "https://example.com/s3-profile"
             }
         }
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
 
         val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), ownerId, null)
 

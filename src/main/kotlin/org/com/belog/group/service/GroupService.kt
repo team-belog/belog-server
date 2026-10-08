@@ -275,7 +275,7 @@ class GroupService(
         val user = member.user
         return GroupPreviewMemberResult(
             groupMemberId = requireNotNull(member.id),
-            nickname = requireNotNull(user.nickname),
+            nickname = userService.resolveDisplayNickname(user),
             profileImageUrl = userService.resolveProfileImageUrl(user),
         )
     }
@@ -299,7 +299,7 @@ class GroupService(
                 name = meeting.name,
                 participantNicknames =
                     participants.map { participant ->
-                        requireNotNull(participant.groupMember.user.nickname)
+                        userService.resolveDisplayNickname(participant.groupMember.user)
                     },
                 participantCount = participants.size,
             )

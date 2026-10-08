@@ -45,7 +45,7 @@ class GroupMembershipService(
             val memberUser = member.user
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
-                nickname = requireNotNull(memberUser.nickname),
+                nickname = userService.resolveDisplayNickname(memberUser),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )

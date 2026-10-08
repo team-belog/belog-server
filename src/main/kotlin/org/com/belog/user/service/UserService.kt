@@ -94,8 +94,12 @@ class UserService(
         return profileImageStorage.issueUploadUrl(userId, format, fileSize)
     }
 
-    fun resolveProfileImageUrl(user: User): String? =
-        when (user.profileImageSource) {
+    fun resolveProfileImageUrl(user: User): String? {
+        if (!user.isActive) {
+            return null
+        }
+
+        return when (user.profileImageSource) {
             ProfileImageSource.SOCIAL -> user.socialProfileImageUrl
             ProfileImageSource.CUSTOM -> {
                 val objectKey =
@@ -105,6 +109,14 @@ class UserService(
                 profileImageStorage.generateReadUrl(objectKey)
             }
             ProfileImageSource.DEFAULT -> null
+        }
+    }
+
+    fun resolveDisplayNickname(user: User): String =
+        if (user.isActive) {
+            requireNotNull(user.nickname)
+        } else {
+            WITHDRAWN_USER_DISPLAY_NICKNAME
         }
 
     fun completeOnboarding(
@@ -292,5 +304,9 @@ class UserService(
 
         val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
         return unqualifiedConstraintName.equals(USER_NICKNAME_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
+    }
+
+    companion object {
+        private const val WITHDRAWN_USER_DISPLAY_NICKNAME = "탈퇴한 사용자"
     }
 }

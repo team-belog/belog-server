@@ -113,10 +113,7 @@ class BillLogService(
                                 BillListItemResult(
                                     billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
                                     title = bill.title,
-                                    payerNickname =
-                                        checkNotNull(bill.payer.groupMember.user.nickname) {
-                                            "조회된 결제자의 닉네임이 없습니다."
-                                        },
+                                    payerNickname = userService.resolveDisplayNickname(bill.payer.groupMember.user),
                                     totalAmount = bill.totalAmount,
                                 )
                             },
@@ -230,7 +227,7 @@ class BillLogService(
     ): SettlementParticipantResult =
         SettlementParticipantResult(
             meetingParticipantId = checkNotNull(id) { "조회된 만남 참여자의 ID가 없습니다." },
-            nickname = checkNotNull(user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
+            nickname = userService.resolveDisplayNickname(user),
             profileImageUrl = userService.resolveProfileImageUrl(user),
             isMe = isMe,
         )
