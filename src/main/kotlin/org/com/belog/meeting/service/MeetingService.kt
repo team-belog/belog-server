@@ -288,9 +288,14 @@ class MeetingService(
                     excludedGroupMemberId = requireNotNull(meeting.owner.id),
                     pageable = PageRequest.of(0, 1),
                 ).firstOrNull()
-                ?: return
+                ?.groupMember
 
-        meeting.delegateOwnerTo(successor.groupMember)
+        if (successor == null) {
+            meeting.delete(Instant.now(clock))
+            return
+        }
+
+        meeting.delegateOwnerTo(successor)
     }
 
     private fun updateConfirmedDate(
