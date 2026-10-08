@@ -52,9 +52,10 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         """
         SELECT participant
         FROM MeetingParticipant participant
-        JOIN FETCH participant.groupMember
+        JOIN FETCH participant.groupMember groupMember
         WHERE participant.meeting.id = :meetingId
-          AND participant.groupMember.id IN :groupMemberIds
+          AND groupMember.id IN :groupMemberIds
+          AND groupMember.withdrawnAt IS NULL
         """,
     )
     fun findAllByMeetingIdAndGroupMemberIdIn(
