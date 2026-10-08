@@ -39,8 +39,8 @@ data class PlanListItemResponse(
     val title: String,
     @field:Schema(description = "LOCATION 유형의 이동 URL. MEMO 유형이면 null", nullable = true)
     val url: String?,
-    @field:Schema(description = "추출된 주소", nullable = true)
-    val address: String?,
+    @field:Schema(description = "LOCATION은 추출된 주소(없으면 null), MEMO는 메모 본문 전체", nullable = true)
+    val content: String?,
     @field:Schema(description = "추출된 썸네일 URL", nullable = true)
     val thumbnailUrl: String?,
     @field:Schema(description = "좋아요 수", example = "3")
@@ -62,7 +62,7 @@ data class PlanListItemResponse(
                 category = result.category,
                 title = result.title,
                 url = result.url,
-                address = result.address,
+                content = result.content,
                 thumbnailUrl = result.thumbnailUrl,
                 likeCount = result.likeCount,
                 likedByMe = result.likedByMe,

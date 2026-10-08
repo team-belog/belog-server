@@ -14,6 +14,7 @@ import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.domain.PlanLocation
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
@@ -33,6 +34,7 @@ import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -67,20 +69,34 @@ class PlanServiceTest {
 
     @Test
     fun `계획 작성자는 계획을 삭제할 수 있다`() {
-        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 10L, isMeetingCreator = false)
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 10L,
+            isMeetingCreator = false,
+            address = "광주광역시 동구",
+        )
 
         val result = getPlans()
 
         assertTrue(result.items.single().canDelete)
+        assertEquals("광주광역시 동구", result.items.single().content)
     }
 
     @Test
     fun `만남 생성자는 다른 사용자의 계획도 삭제할 수 있다`() {
-        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 11L, isMeetingCreator = true)
+        val memoContent = "가".repeat(Plan.CONTENT_MAX_LENGTH)
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 11L,
+            isMeetingCreator = true,
+            type = PlanType.MEMO,
+            content = memoContent,
+        )
 
         val result = getPlans()
 
         assertTrue(result.items.single().canDelete)
+        assertEquals(memoContent, result.items.single().content)
     }
 
     @Test
@@ -95,6 +111,7 @@ class PlanServiceTest {
         val result = getPlans()
 
         assertFalse(result.items.single().canDelete)
+        assertNull(result.items.single().content)
     }
 
     @Test
@@ -363,6 +380,9 @@ class PlanServiceTest {
         planCreatorId: Long,
         isMeetingCreator: Boolean,
         loginRole: GroupRole = GroupRole.MEMBER,
+        type: PlanType = PlanType.LOCATION,
+        content: String? = null,
+        address: String? = null,
     ) {
         val context = meetingContext()
         val loginGroupMember = mock(GroupMember::class.java)
@@ -373,10 +393,12 @@ class PlanServiceTest {
         `when`(planCreator.id).thenReturn(planCreatorId)
         `when`(plan.id).thenReturn(20L)
         `when`(plan.createdBy).thenReturn(planCreator)
-        `when`(plan.type).thenReturn(PlanType.LOCATION)
+        `when`(plan.type).thenReturn(type)
         `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
         `when`(plan.title).thenReturn("맛집")
-        `when`(plan.url).thenReturn("https://example.com/place")
+        `when`(plan.url).thenReturn(if (type == PlanType.LOCATION) "https://example.com/place" else null)
+        `when`(plan.content).thenReturn(content)
+        `when`(plan.location).thenReturn(address?.let { PlanLocation.unresolved(MapProvider.KAKAO, null, address = it) })
         `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
