@@ -353,7 +353,7 @@ private const val MEETING_DATE_CONFIRMED_EXAMPLE =
     """{"code":"MEETING-S005","message":"만남 일정을 확정했습니다.","data":null}"""
 
 private const val NOT_MEETING_OWNER_EXAMPLE =
-    """{"code":"MEETING-E018","message":"만남 방장만 일정을 관리할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+    """{"code":"MEETING-E018","message":"만남 방장만 만남을 관리할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val MEETING_DATE_NOT_SCHEDULING_EXAMPLE =
     """{"code":"MEETING-E020","message":"일정 조율 중인 만남만 확정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
