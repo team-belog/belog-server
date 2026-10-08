@@ -41,6 +41,8 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         userId: Long,
     ): Boolean
 
+    fun findAllByUserIdAndWithdrawnAtIsNull(userId: Long): List<GroupMember>
+
     @Query(
         """
         SELECT member

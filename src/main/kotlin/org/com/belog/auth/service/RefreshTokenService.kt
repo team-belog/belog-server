@@ -84,6 +84,12 @@ class RefreshTokenService(
         refreshTokenRepository.delete(savedToken)
     }
 
+    @Transactional
+    fun deleteByUserId(userId: Long) {
+        val savedToken = refreshTokenRepository.findByUserIdForUpdate(userId) ?: return
+        refreshTokenRepository.delete(savedToken)
+    }
+
     private fun matches(
         refreshToken: String,
         savedTokenHash: String,
