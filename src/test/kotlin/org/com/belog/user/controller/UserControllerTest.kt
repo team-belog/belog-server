@@ -1,10 +1,14 @@
 package org.com.belog.user.controller
 
+import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.global.error.BusinessException
 import org.com.belog.postlog.service.PostLogCalendarService
+import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageUpload
 import org.com.belog.user.service.UserService
+import org.com.belog.user.service.UserWithdrawalService
 import org.com.belog.user.service.command.ProfileImageChange
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
@@ -19,10 +23,12 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -40,7 +46,59 @@ class UserControllerTest {
     private lateinit var userService: UserService
 
     @MockitoBean
+    private lateinit var userWithdrawalService: UserWithdrawalService
+
+    @MockitoBean
     private lateinit var postLogCalendarService: PostLogCalendarService
+
+    @Test
+    fun `인증된 사용자를 탈퇴 처리하고 204를 반환한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/users/me")
+                    .principal(authenticatedUser(15L)),
+            ).andExpect(status().isNoContent)
+            .andExpect(content().string(""))
+
+        verify(userWithdrawalService).withdraw(15L)
+    }
+
+    @Test
+    fun `완료되지 않은 정산 요청이 있으면 탈퇴를 거절한다`() {
+        `when`(userWithdrawalService.withdraw(15L))
+            .thenThrow(BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS))
+
+        mockMvc
+            .perform(
+                delete("/api/v1/users/me")
+                    .principal(authenticatedUser(15L)),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("BILL_LOG-E023"))
+    }
+
+    @Test
+    fun `이미 탈퇴한 사용자는 다시 탈퇴할 수 없다`() {
+        `when`(userWithdrawalService.withdraw(15L)).thenThrow(BusinessException(UserErrorCode.ALREADY_WITHDRAWN))
+
+        mockMvc
+            .perform(
+                delete("/api/v1/users/me")
+                    .principal(authenticatedUser(15L)),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("USER-E011"))
+    }
+
+    @Test
+    fun `탈퇴 처리 중 충돌이 발생하면 409를 반환한다`() {
+        `when`(userWithdrawalService.withdraw(15L)).thenThrow(BusinessException(UserErrorCode.WITHDRAWAL_CONFLICT))
+
+        mockMvc
+            .perform(
+                delete("/api/v1/users/me")
+                    .principal(authenticatedUser(15L)),
+            ).andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("USER-E012"))
+    }
 
     @Test
     fun `닉네임만 수정하면 기존 프로필 이미지를 유지하도록 요청한다`() {

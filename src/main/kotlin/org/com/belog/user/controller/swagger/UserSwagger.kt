@@ -33,6 +33,46 @@ import java.time.YearMonth
 @Tag(name = "User", description = "사용자 관련 API")
 interface UserSwagger {
     @Operation(
+        summary = "회원 탈퇴",
+        description =
+            "로그인한 사용자를 탈퇴 처리합니다. 요청 본문은 없습니다. " +
+                "보내거나 받는 정산 요청 중 완료되지 않은 건이 있으면 탈퇴할 수 없습니다. " +
+                "방장인 그룹은 다른 멤버에게 자동으로 위임되거나, 마지막 멤버인 경우 그룹이 삭제됩니다. " +
+                "방장인 여정도 같은 방식으로 위임됩니다. 탈퇴 후에도 이름, 닉네임 등 개인정보는 유지되지만 " +
+                "다른 사용자에게는 \"탈퇴한 사용자\"로 표시되며, 기존 그룹·여정 콘텐츠와 완료된 정산 기록은 그대로 유지됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "회원 탈퇴 성공",
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "409",
+                description = "미정산 내역 존재, 이미 탈퇴함 또는 탈퇴 처리 중 충돌",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "완료되지 않은 정산 요청 존재", value = UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE),
+                            ExampleObject(name = "이미 탈퇴한 사용자", value = ALREADY_WITHDRAWN_EXAMPLE),
+                            ExampleObject(name = "탈퇴 처리 중 충돌", value = WITHDRAWAL_CONFLICT_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun withdraw(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "마이페이지 월별 티켓 달력 조회",
         description =
             "로그인한 사용자가 생성한 Post-log 티켓 중 만남 종료일이 요청 연월에 포함되는 티켓을 조회합니다. " +
@@ -580,3 +620,12 @@ private const val NICKNAME_ALREADY_EXISTS_EXAMPLE =
 
 private const val ONBOARDING_ALREADY_COMPLETED_EXAMPLE =
     """{"code":"USER-E003","message":"이미 온보딩을 완료했습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
+
+private const val UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE =
+    """{"code":"BILL_LOG-E023","message":"아직 정산이 완료되지 않았어요","data":{"fieldErrors":[],"timestamp":"2026-10-08T00:00:00Z"}}"""
+
+private const val ALREADY_WITHDRAWN_EXAMPLE =
+    """{"code":"USER-E011","message":"이미 탈퇴한 사용자입니다.","data":{"fieldErrors":[],"timestamp":"2026-10-08T00:00:00Z"}}"""
+
+private const val WITHDRAWAL_CONFLICT_EXAMPLE =
+    """{"code":"USER-E012","message":"탈퇴 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-10-08T00:00:00Z"}}"""

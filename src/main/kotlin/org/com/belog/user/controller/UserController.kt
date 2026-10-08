@@ -23,10 +23,12 @@ import org.com.belog.user.controller.swagger.UserSwagger
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.service.UserService
+import org.com.belog.user.service.UserWithdrawalService
 import org.com.belog.user.service.command.ProfileImageChange
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PostMapping
@@ -41,8 +43,20 @@ import java.time.YearMonth
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userService: UserService,
+    private val userWithdrawalService: UserWithdrawalService,
     private val postLogCalendarService: PostLogCalendarService,
 ) : UserSwagger {
+    @DeleteMapping("/me")
+    override fun withdraw(
+        @LoginUserId userId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        userWithdrawalService.withdraw(userId)
+
+        return ResponseEntity
+            .status(UserSuccessCode.WITHDRAWN.status)
+            .build()
+    }
+
     @GetMapping("/me/post-logs/calendar")
     override fun getMyTicketCalendar(
         @LoginUserId userId: Long,

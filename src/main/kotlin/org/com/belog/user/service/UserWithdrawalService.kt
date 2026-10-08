@@ -8,6 +8,7 @@ import org.com.belog.group.service.GroupService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
+import org.springframework.dao.CannotAcquireLockException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -25,6 +26,14 @@ class UserWithdrawalService(
 ) {
     @Transactional
     fun withdraw(userId: Long) {
+        try {
+            withdrawInTransaction(userId)
+        } catch (exception: CannotAcquireLockException) {
+            throw BusinessException(UserErrorCode.WITHDRAWAL_CONFLICT, exception)
+        }
+    }
+
+    private fun withdrawInTransaction(userId: Long) {
         val user =
             userRepository.findByIdForUpdate(userId)
                 ?: throw BusinessException(UserErrorCode.USER_NOT_FOUND)
