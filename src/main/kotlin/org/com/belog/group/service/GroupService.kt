@@ -191,6 +191,7 @@ class GroupService(
 
         if (successor == null) {
             val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+            settlementRequestService.validateGroupSettled(groupId)
             deleteGroupAndMeetings(group, meetings, Instant.now(clock))
             return
         }
