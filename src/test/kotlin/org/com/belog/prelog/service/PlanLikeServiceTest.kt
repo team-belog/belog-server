@@ -86,7 +86,7 @@ class PlanLikeServiceTest {
         val plan = mock(Plan::class.java)
         `when`(plan.meeting).thenReturn(meeting)
         `when`(planRepository.findByIdWithMeetingAndCreator(PLAN_ID)).thenReturn(plan)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(null)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(null)
 
         val likeException =
             assertFailsWith<BusinessException> {
@@ -112,7 +112,7 @@ class PlanLikeServiceTest {
         `when`(groupMember.id).thenReturn(GROUP_MEMBER_ID)
         `when`(plan.id).thenReturn(PLAN_ID)
         `when`(plan.meeting).thenReturn(meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(GROUP_ID, USER_ID)).thenReturn(groupMember)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(groupMember)
         `when`(planRepository.findByIdWithMeetingAndCreator(PLAN_ID)).thenReturn(plan)
     }
 

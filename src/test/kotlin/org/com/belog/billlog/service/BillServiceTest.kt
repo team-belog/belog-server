@@ -32,7 +32,10 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
@@ -92,6 +95,19 @@ class BillServiceTest {
 
     @MockitoBean
     private lateinit var userService: UserService
+
+    @BeforeEach
+    fun stubUserService() {
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
+    }
 
     @Test
     fun `그룹 멤버가 결제 내역을 등록하면 항목과 개인별 부담 금액 및 정산 요청이 저장된다`() {

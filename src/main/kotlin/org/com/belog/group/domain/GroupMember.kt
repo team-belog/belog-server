@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.user.domain.User
+import java.time.Instant
 
 const val GROUP_MEMBER_UNIQUE_CONSTRAINT_NAME = "uk_group_members_group_user"
 
@@ -48,10 +49,13 @@ class GroupMember protected constructor(
         foreignKey = ForeignKey(name = "fk_group_members_user_id"),
     )
     val user: User,
+    role: GroupRole,
+) : BaseEntity() {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    val role: GroupRole,
-) : BaseEntity() {
+    var role: GroupRole = role
+        protected set
+
     @Column(nullable = false)
     var pinned: Boolean = false
         protected set
@@ -61,12 +65,33 @@ class GroupMember protected constructor(
     var id: Long? = null
         protected set
 
+    @Column(name = "withdrawn_at")
+    var withdrawnAt: Instant? = null
+        protected set
+
+    val isActive: Boolean
+        get() = withdrawnAt == null
+
     fun pin() {
         pinned = true
     }
 
     fun unpin() {
         pinned = false
+    }
+
+    fun withdraw(withdrawnAt: Instant) {
+        check(isActive) { "이미 탈퇴한 그룹 멤버입니다." }
+        this.withdrawnAt = withdrawnAt
+    }
+
+    fun delegateOwnerTo(newOwner: GroupMember) {
+        check(role == GroupRole.OWNER) { "방장만 방장 권한을 위임할 수 있습니다." }
+        check(newOwner.belongsTo(group)) { "같은 그룹의 멤버에게만 방장을 위임할 수 있습니다." }
+        check(newOwner.isActive) { "탈퇴한 멤버에게는 방장을 위임할 수 없습니다." }
+
+        role = GroupRole.MEMBER
+        newOwner.role = GroupRole.OWNER
     }
 
     internal fun belongsTo(group: Group): Boolean {

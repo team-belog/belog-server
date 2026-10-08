@@ -162,7 +162,48 @@ class GroupService(
         val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
         settlementRequestService.validateGroupSettled(groupId)
 
-        val deletedAt = Instant.now(clock)
+        deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+    }
+
+    @Transactional
+    fun delegateOwnerOrDeleteGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        val group =
+            groupRepository.findActiveByIdForUpdate(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        val departingOwner =
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
+                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+
+        if (departingOwner.role != GroupRole.OWNER) {
+            return
+        }
+
+        val successor =
+            groupMemberRepository
+                .findEarliestActiveMember(
+                    groupId = groupId,
+                    excludedMemberId = requireNotNull(departingOwner.id),
+                    pageable = PageRequest.of(0, 1),
+                ).firstOrNull()
+
+        if (successor == null) {
+            val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+            settlementRequestService.validateGroupSettled(groupId)
+            deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+            return
+        }
+
+        departingOwner.delegateOwnerTo(successor)
+    }
+
+    private fun deleteGroupAndMeetings(
+        group: Group,
+        meetings: List<Meeting>,
+        deletedAt: Instant,
+    ) {
         group.delete(deletedAt)
         meetings.forEach { meeting -> meeting.delete(deletedAt) }
     }
@@ -184,7 +225,7 @@ class GroupService(
             name = group.name,
             coverImageUrl = group.coverImageObjectKey?.let(s3ObjectReadUrlProvider::generateReadUrl),
             inviteCode = group.inviteCode,
-            memberCount = groupMemberRepository.countByGroupId(groupId).toInt(),
+            memberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId).toInt(),
             canEditCoverImage = canManageGroup,
             canDeleteGroup = canManageGroup,
             schedulingMeetings = createSchedulingMeetingResults(schedulingMeetings),
@@ -200,7 +241,7 @@ class GroupService(
         groupId: Long,
         userId: Long,
     ): GroupMember =
-        groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+        groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
 
     private fun findMembersByGroupId(memberships: List<GroupMember>): Map<Long, List<GroupMember>> {
@@ -235,7 +276,7 @@ class GroupService(
         val user = member.user
         return GroupPreviewMemberResult(
             groupMemberId = requireNotNull(member.id),
-            nickname = requireNotNull(user.nickname),
+            nickname = userService.resolveDisplayNickname(user),
             profileImageUrl = userService.resolveProfileImageUrl(user),
         )
     }
@@ -259,7 +300,7 @@ class GroupService(
                 name = meeting.name,
                 participantNicknames =
                     participants.map { participant ->
-                        requireNotNull(participant.groupMember.user.nickname)
+                        userService.resolveDisplayNickname(participant.groupMember.user)
                     },
                 participantCount = participants.size,
             )

@@ -53,8 +53,9 @@ class NotificationService(
         }
 
         val usersById = findUsersById(commands)
+        val activeCommands = commands.filter { command -> usersById.getUser(command.recipientUserId).isActive }
 
-        commands.forEach { command ->
+        activeCommands.forEach { command ->
             notificationRepository.saveIfAbsent(
                 Notification.create(
                     recipient = usersById.getUser(command.recipientUserId),

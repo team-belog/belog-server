@@ -265,6 +265,40 @@ class MeetingService(
         meeting.delete(Instant.now(clock))
     }
 
+    @Transactional
+    fun delegateOwnersForWithdrawal(userId: Long) {
+        meetingRepository.findAllActiveByOwnerUserId(userId).forEach { meeting ->
+            delegateOwnerOrNoOp(requireNotNull(meeting.id), userId)
+        }
+    }
+
+    private fun delegateOwnerOrNoOp(
+        meetingId: Long,
+        departingUserId: Long,
+    ) {
+        val meeting = meetingRepository.findByIdForUpdate(meetingId) ?: return
+        if (meeting.owner.user.id != departingUserId) {
+            return
+        }
+
+        val successor =
+            meetingParticipantRepository
+                .findEarliestActiveParticipant(
+                    meetingId = meetingId,
+                    excludedGroupMemberId = requireNotNull(meeting.owner.id),
+                    pageable = PageRequest.of(0, 1),
+                ).firstOrNull()
+                ?.groupMember
+
+        if (successor == null) {
+            settlementRequestService.validateMeetingSettled(meetingId)
+            meeting.delete(Instant.now(clock))
+            return
+        }
+
+        meeting.delegateOwnerTo(successor)
+    }
+
     private fun updateConfirmedDate(
         meeting: Meeting,
         dateRange: MeetingDateRange,
@@ -298,8 +332,8 @@ class MeetingService(
         meeting: Meeting,
         userId: Long,
     ) {
-        if (meeting.createdBy.user.id != userId) {
-            throw BusinessException(MeetingErrorCode.NOT_MEETING_CREATOR)
+        if (meeting.owner.user.id != userId) {
+            throw BusinessException(MeetingErrorCode.NOT_MEETING_OWNER)
         }
     }
 
@@ -310,7 +344,7 @@ class MeetingService(
         groupRepository.findActiveByIdForShare(groupId)
             ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
-        return groupMemberRepository.findByGroupIdAndUserId(groupId, creatorUserId)
+        return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, creatorUserId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
     }
 
@@ -321,7 +355,7 @@ class MeetingService(
         if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
     }
@@ -341,7 +375,7 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.CREATOR_INCLUDED_AS_PARTICIPANT)
         }
 
-        val participants = groupMemberRepository.findAllByGroupIdAndIdIn(groupId, participantMemberIds)
+        val participants = groupMemberRepository.findAllByGroupIdAndIdInAndWithdrawnAtIsNull(groupId, participantMemberIds)
         if (participants.size != participantMemberIds.size) {
             throw BusinessException(MeetingErrorCode.INVALID_PARTICIPANT)
         }

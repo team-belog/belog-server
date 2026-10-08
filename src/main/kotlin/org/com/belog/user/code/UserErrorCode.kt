@@ -18,4 +18,6 @@ enum class UserErrorCode(
     ONBOARDING_REQUIRED(HttpStatus.FORBIDDEN, "USER-E008", "온보딩을 완료한 사용자만 이용할 수 있습니다."),
     PROFILE_IMAGE_NOT_FOUND(HttpStatus.BAD_REQUEST, "USER-E009", "업로드된 프로필 이미지를 찾을 수 없습니다."),
     INVALID_PROFILE_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "USER-E010", "프로필 이미지 정보가 올바르지 않습니다."),
+    ALREADY_WITHDRAWN(HttpStatus.CONFLICT, "USER-E011", "이미 탈퇴한 사용자입니다."),
+    WITHDRAWAL_CONFLICT(HttpStatus.CONFLICT, "USER-E012", "탈퇴 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해 주세요."),
 }

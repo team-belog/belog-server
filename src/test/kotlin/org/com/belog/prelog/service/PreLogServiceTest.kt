@@ -75,8 +75,8 @@ class PreLogServiceTest {
         `when`(meeting.endDate).thenReturn(LocalDate.of(2026, 9, 24))
         `when`(meeting.location).thenReturn("광주광역시")
         `when`(meeting.isEnded(currentDate)).thenReturn(false)
-        `when`(meeting.isCreatedBy(groupMember)).thenReturn(canEditMeeting)
-        `when`(meetingRepository.findByIdWithGroupAndCreator(7L)).thenReturn(meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserId(3L, 15L)).thenReturn(groupMember)
+        `when`(meeting.isOwnedBy(groupMember)).thenReturn(canEditMeeting)
+        `when`(meetingRepository.findByIdWithGroupOwnerAndCreator(7L)).thenReturn(meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
     }
 }

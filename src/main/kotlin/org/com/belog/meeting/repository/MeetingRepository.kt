@@ -110,11 +110,12 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         FROM Meeting meeting
         JOIN FETCH meeting.group
         JOIN FETCH meeting.createdBy
+        JOIN FETCH meeting.owner
         WHERE meeting.id = :meetingId
           AND meeting.deletedAt IS NULL
         """,
     )
-    fun findByIdWithGroupAndCreator(
+    fun findByIdWithGroupOwnerAndCreator(
         @Param("meetingId") meetingId: Long,
     ): Meeting?
 
@@ -123,8 +124,8 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         """
         SELECT meeting
         FROM Meeting meeting
-        JOIN FETCH meeting.createdBy creator
-        JOIN FETCH creator.user
+        JOIN FETCH meeting.owner owner
+        JOIN FETCH owner.user
         WHERE meeting.id = :meetingId
           AND meeting.deletedAt IS NULL
         """,
@@ -132,6 +133,18 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
     fun findByIdForUpdate(
         @Param("meetingId") meetingId: Long,
     ): Meeting?
+
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
+        WHERE meeting.owner.user.id = :userId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findAllActiveByOwnerUserId(
+        @Param("userId") userId: Long,
+    ): List<Meeting>
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(

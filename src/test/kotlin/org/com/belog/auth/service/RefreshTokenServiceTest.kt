@@ -61,9 +61,11 @@ class RefreshTokenServiceTest {
 
     @Test
     fun `저장된 Refresh Token이 일치하면 새로운 토큰으로 교체한다`() {
+        val activeUser = mock(User::class.java)
+        `when`(activeUser.isActive).thenReturn(true)
         val savedToken =
             RefreshToken.issue(
-                user = mock(User::class.java),
+                user = activeUser,
                 tokenHash = "0eb17643d4e9261163783a420859c92c7d212fa9624106a12b510afbec266120",
                 expiresAt = Instant.parse("2026-09-12T00:00:00Z"),
             )
@@ -78,6 +80,31 @@ class RefreshTokenServiceTest {
 
         assertEquals("c40dd1765d767caae2588f0ee1de9181d8a44cc9306261eb2c9e526351188338", savedToken.tokenHash)
         assertEquals(Instant.parse("2026-09-25T00:00:00Z"), savedToken.expiresAt)
+    }
+
+    @Test
+    fun `탈퇴한 사용자는 Refresh Token을 재발급받을 수 없다`() {
+        val withdrawnUser = mock(User::class.java)
+        `when`(withdrawnUser.isActive).thenReturn(false)
+        val savedToken =
+            RefreshToken.issue(
+                user = withdrawnUser,
+                tokenHash = "0eb17643d4e9261163783a420859c92c7d212fa9624106a12b510afbec266120",
+                expiresAt = Instant.parse("2026-09-12T00:00:00Z"),
+            )
+        `when`(refreshTokenRepository.findByUserIdForUpdate(1L)).thenReturn(savedToken)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                refreshTokenService.validateAndRotate(
+                    userId = 1L,
+                    currentRefreshToken = "refresh-token",
+                    newRefreshToken = "new-refresh-token",
+                    expiration = Duration.ofDays(14),
+                )
+            }
+
+        assertEquals(AuthErrorCode.INVALID_REFRESH_TOKEN, exception.errorCode)
     }
 
     @Test

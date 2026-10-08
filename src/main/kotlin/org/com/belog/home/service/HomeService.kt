@@ -150,7 +150,7 @@ class HomeService(
                                 val groupMember = participant.groupMember
                                 ActiveMeetingParticipantResult(
                                     groupMemberId = requireNotNull(groupMember.id),
-                                    nickname = requireNotNull(groupMember.user.nickname),
+                                    nickname = userService.resolveDisplayNickname(groupMember.user),
                                     profileImageUrl = userService.resolveProfileImageUrl(groupMember.user),
                                 )
                             },
@@ -227,7 +227,7 @@ class HomeService(
                                 val groupMember = participant.groupMember
                                 CompletedMeetingParticipantResult(
                                     groupMemberId = requireNotNull(groupMember.id),
-                                    nickname = requireNotNull(groupMember.user.nickname),
+                                    nickname = userService.resolveDisplayNickname(groupMember.user),
                                 )
                             },
                     )

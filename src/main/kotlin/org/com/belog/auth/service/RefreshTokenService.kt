@@ -63,6 +63,9 @@ class RefreshTokenService(
         if (!matches(currentRefreshToken, savedToken.tokenHash) || !savedToken.expiresAt.isAfter(now)) {
             throw BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN)
         }
+        if (!savedToken.user.isActive) {
+            throw BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN)
+        }
 
         savedToken.rotate(
             tokenHash = hash(newRefreshToken),
@@ -81,6 +84,12 @@ class RefreshTokenService(
             return
         }
 
+        refreshTokenRepository.delete(savedToken)
+    }
+
+    @Transactional
+    fun deleteByUserId(userId: Long) {
+        val savedToken = refreshTokenRepository.findByUserIdForUpdate(userId) ?: return
         refreshTokenRepository.delete(savedToken)
     }
 

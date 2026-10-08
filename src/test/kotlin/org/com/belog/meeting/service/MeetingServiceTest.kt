@@ -562,7 +562,7 @@ class MeetingServiceTest {
                 )
             }
 
-        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
         assertEquals("광주 여행", meeting.name)
         assertEquals(null, meeting.location)
     }
@@ -589,7 +589,7 @@ class MeetingServiceTest {
                 )
             }
 
-        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
         assertEquals(null, meeting.deletedAt)
     }
 
@@ -643,7 +643,7 @@ class MeetingServiceTest {
                 )
             }
 
-        assertEquals(MeetingErrorCode.NOT_MEETING_CREATOR, exception.errorCode)
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
         assertEquals(MeetingStatus.SCHEDULING, meeting.status)
     }
 

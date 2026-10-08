@@ -82,7 +82,7 @@ class ReceiptImageService(
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Bill-log 대상 만남의 그룹 ID가 없습니다." }
 
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
     }

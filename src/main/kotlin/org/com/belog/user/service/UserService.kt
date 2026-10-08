@@ -34,7 +34,7 @@ class UserService(
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
     @Transactional(readOnly = true)
-    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsByNickname(nickname)
+    fun isNicknameAvailable(nickname: String): Boolean = !userRepository.existsActiveNickname(nickname)
 
     @Transactional(readOnly = true)
     fun getBankAccount(userId: Long): BankAccount {
@@ -94,8 +94,12 @@ class UserService(
         return profileImageStorage.issueUploadUrl(userId, format, fileSize)
     }
 
-    fun resolveProfileImageUrl(user: User): String? =
-        when (user.profileImageSource) {
+    fun resolveProfileImageUrl(user: User): String? {
+        if (!user.isActive) {
+            return null
+        }
+
+        return when (user.profileImageSource) {
             ProfileImageSource.SOCIAL -> user.socialProfileImageUrl
             ProfileImageSource.CUSTOM -> {
                 val objectKey =
@@ -105,6 +109,14 @@ class UserService(
                 profileImageStorage.generateReadUrl(objectKey)
             }
             ProfileImageSource.DEFAULT -> null
+        }
+    }
+
+    fun resolveDisplayNickname(user: User): String =
+        if (user.isActive) {
+            requireNotNull(user.nickname)
+        } else {
+            WITHDRAWN_USER_DISPLAY_NICKNAME
         }
 
     fun completeOnboarding(
@@ -165,7 +177,7 @@ class UserService(
         }
 
         val normalizedNickname = nickname.trim()
-        if (userRepository.existsByNickname(normalizedNickname)) {
+        if (userRepository.existsActiveNickname(normalizedNickname)) {
             throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
         }
 
@@ -187,18 +199,14 @@ class UserService(
         email: String,
         socialProfileImageUrl: String? = null,
     ): SocialUserResult {
-        val existingUser =
-            userRepository.findByProviderAndProviderUserId(
-                provider = provider,
-                providerUserId = providerUserId,
-            )
+        val activeUser = findActiveSocialUserForUpdate(provider, providerUserId)
 
-        if (existingUser != null) {
-            existingUser.updateSocialProfileImageUrl(socialProfileImageUrl)
+        if (activeUser != null) {
+            activeUser.updateSocialProfileImageUrl(socialProfileImageUrl)
             return SocialUserResult(
-                userId = requireNotNull(existingUser.id),
-                onboardingRequired = !existingUser.isOnboardingCompleted,
-                socialProfileImageUrl = existingUser.socialProfileImageUrl,
+                userId = requireNotNull(activeUser.id),
+                onboardingRequired = !activeUser.isOnboardingCompleted,
+                socialProfileImageUrl = activeUser.socialProfileImageUrl,
             )
         }
 
@@ -217,6 +225,19 @@ class UserService(
         )
     }
 
+    private fun findActiveSocialUserForUpdate(
+        provider: SocialProvider,
+        providerUserId: String,
+    ): User? {
+        val userId =
+            userRepository.findActiveSocialUserId(
+                provider = provider,
+                providerUserId = providerUserId,
+            ) ?: return null
+
+        return userRepository.findByIdForUpdate(userId)?.takeIf(User::isActive)
+    }
+
     private fun updateProfileInTransaction(
         userId: Long,
         nickname: String?,
@@ -232,7 +253,10 @@ class UserService(
 
         if (nickname != null) {
             val normalizedNickname = nickname.trim()
-            if (normalizedNickname != user.nickname && userRepository.existsByNickname(normalizedNickname)) {
+            if (
+                normalizedNickname != user.nickname &&
+                userRepository.existsActiveNickname(normalizedNickname)
+            ) {
                 throw BusinessException(UserErrorCode.NICKNAME_ALREADY_EXISTS)
             }
             user.updateNickname(normalizedNickname)
@@ -280,5 +304,9 @@ class UserService(
 
         val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
         return unqualifiedConstraintName.equals(USER_NICKNAME_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
+    }
+
+    companion object {
+        private const val WITHDRAWN_USER_DISPLAY_NICKNAME = "탈퇴한 사용자"
     }
 }

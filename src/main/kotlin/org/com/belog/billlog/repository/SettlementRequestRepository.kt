@@ -118,6 +118,27 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         @Param("status") status: String,
     ): Long?
 
+    @Query(
+        value = """
+        SELECT settlement_request.id
+        FROM bill_log_settlement_requests settlement_request
+        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
+        JOIN meeting_participants sender ON sender.id = settlement_request.meeting_participant_id
+        JOIN meeting_participants receiver ON receiver.id = bill.payer_meeting_participant_id
+        JOIN group_members sender_member ON sender_member.id = sender.group_member_id
+        JOIN group_members receiver_member ON receiver_member.id = receiver.group_member_id
+        WHERE settlement_request.status = :status
+          AND (sender_member.user_id = :userId OR receiver_member.user_id = :userId)
+        LIMIT 1
+        FOR UPDATE
+        """,
+        nativeQuery = true,
+    )
+    fun findFirstIdByUserIdAndStatusForUpdate(
+        @Param("userId") userId: Long,
+        @Param("status") status: String,
+    ): Long?
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """

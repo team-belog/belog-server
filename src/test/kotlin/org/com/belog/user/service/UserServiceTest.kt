@@ -7,6 +7,7 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.ProfileImageObjectKey
 import org.com.belog.user.domain.ProfileImageSource
 import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.command.ProfileImageChange
@@ -19,13 +20,18 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.dao.DataAccessException
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.TransactionDefinition
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.time.Instant
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -50,6 +56,9 @@ class UserServiceTest {
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
 
     @MockitoBean
     private lateinit var profileImageStorage: ProfileImageStorage
@@ -173,11 +182,6 @@ class UserServiceTest {
     }
 
     @Test
-    fun `등록되지 않은 닉네임은 사용할 수 있다`() {
-        assertTrue(userService.isNicknameAvailable("새닉네임"))
-    }
-
-    @Test
     fun `등록된 닉네임은 사용할 수 없다`() {
         login()
         completeOnboarding()
@@ -271,21 +275,6 @@ class UserServiceTest {
     }
 
     @Test
-    fun `이미 사용 중인 닉네임으로 온보딩을 완료할 수 없다`() {
-        val firstUserId = createUser("first-google-subject", "first@example.com")
-        val secondUserId = createUser("second-google-subject", "second@example.com")
-        completeOnboarding(firstUserId, "중복닉네임")
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                completeOnboarding(secondUserId, "중복닉네임")
-            }
-
-        assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.errorCode)
-        assertFalse(requireNotNull(userRepository.findById(secondUserId).orElseThrow()).isOnboardingCompleted)
-    }
-
-    @Test
     fun `서로 다른 사용자가 같은 닉네임으로 동시에 온보딩하면 한 명만 성공한다`() {
         val firstUserId = createUser("first-google-subject", "first@example.com")
         val secondUserId = createUser("second-google-subject", "second@example.com")
@@ -311,6 +300,150 @@ class UserServiceTest {
             assertEquals(1, userRepository.findAll().count { user -> user.nickname == "동시닉네임" })
         } finally {
             executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `탈퇴한 사용자의 닉네임과 소셜 식별자를 신규 사용자가 재사용한다`() {
+        val withdrawnUserId = createUser("reusable-google-subject", "withdrawn@example.com")
+        completeOnboarding(withdrawnUserId, "재사용닉네임")
+        withdrawUser(withdrawnUserId)
+
+        assertTrue(userService.isNicknameAvailable("재사용닉네임"))
+        assertEquals(
+            null,
+            userRepository.findActiveSocialUserId(
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "reusable-google-subject",
+            ),
+        )
+
+        val newUserId = createUser("reusable-google-subject", "new@example.com")
+        completeOnboarding(newUserId, "재사용닉네임")
+
+        assertNotEquals(withdrawnUserId, newUserId)
+        val withdrawnUser = userRepository.findById(withdrawnUserId).orElseThrow()
+        assertFalse(withdrawnUser.isActive)
+        assertEquals("withdrawn@example.com", withdrawnUser.email)
+        assertEquals("reusable-google-subject", withdrawnUser.providerUserId)
+        assertEquals("재사용닉네임", withdrawnUser.nickname)
+        assertEquals(
+            newUserId,
+            userRepository.findActiveSocialUserId(
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "reusable-google-subject",
+            ),
+        )
+        assertFalse(userService.isNicknameAvailable("재사용닉네임"))
+    }
+
+    @Test
+    fun `탈퇴 후 동일 소셜 식별자로 동시에 로그인하면 신규 사용자 한 명만 생성된다`() {
+        val withdrawnUserId = createUser("concurrent-reuse-google-subject", "withdrawn@example.com")
+        withdrawUser(withdrawnUserId)
+
+        val executor = Executors.newFixedThreadPool(CONCURRENT_LOGIN_COUNT)
+        val startSignal = CountDownLatch(1)
+
+        try {
+            val logins =
+                (1..CONCURRENT_LOGIN_COUNT).map {
+                    executor.submit<SocialUserResult> {
+                        startSignal.await()
+                        userService.findOrCreateSocialUser(
+                            provider = SocialProvider.GOOGLE,
+                            providerUserId = "concurrent-reuse-google-subject",
+                            email = "new@example.com",
+                        )
+                    }
+                }
+
+            startSignal.countDown()
+            val results = logins.map { login -> login.get(10, TimeUnit.SECONDS) }
+
+            assertEquals(1, results.map(SocialUserResult::userId).distinct().size)
+            assertTrue(results.all(SocialUserResult::onboardingRequired))
+            assertTrue(results.none { result -> result.userId == withdrawnUserId })
+            assertEquals(2, userRepository.count())
+            assertFalse(userRepository.findById(withdrawnUserId).orElseThrow().isActive)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `탈퇴 커밋 직후 로그인은 탈퇴 계정을 재사용하지 않고 신규 사용자를 만든다`() {
+        val withdrawnUserId = createUser("race-google-subject", "race@example.com")
+        val executor = Executors.newFixedThreadPool(1)
+        val withdrawReadyToCommit = CountDownLatch(1)
+        val loginStarted = CountDownLatch(1)
+        val withdrawTransactionTemplate = TransactionTemplate(transactionManager)
+        withdrawTransactionTemplate.propagationBehavior = TransactionDefinition.PROPAGATION_REQUIRES_NEW
+
+        try {
+            val loginFuture =
+                executor.submit<SocialUserResult> {
+                    withdrawReadyToCommit.await()
+                    loginStarted.countDown()
+                    userService.findOrCreateSocialUser(
+                        provider = SocialProvider.GOOGLE,
+                        providerUserId = "race-google-subject",
+                        email = "new@example.com",
+                    )
+                }
+
+            withdrawTransactionTemplate.executeWithoutResult {
+                val user = userRepository.findByIdForUpdate(withdrawnUserId)!!
+                user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+                userRepository.saveAndFlush(user)
+                withdrawReadyToCommit.countDown()
+                assertTrue(loginStarted.await(5, TimeUnit.SECONDS))
+                Thread.sleep(LOGIN_LOCK_WAIT_MILLIS)
+            }
+
+            val result = loginFuture.get(10, TimeUnit.SECONDS)
+
+            assertNotEquals(withdrawnUserId, result.userId)
+            assertTrue(result.onboardingRequired)
+            assertEquals(2, userRepository.count())
+            assertFalse(userRepository.findById(withdrawnUserId).orElseThrow().isActive)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `탈퇴 후 재사용된 닉네임은 다른 활성 사용자가 중복 사용할 수 없다`() {
+        val withdrawnUserId = createUser("withdrawn-google-subject", "withdrawn@example.com")
+        completeOnboarding(withdrawnUserId, "재사용닉네임")
+        withdrawUser(withdrawnUserId)
+        val activeUserId = createUser("active-google-subject", "active@example.com")
+        completeOnboarding(activeUserId, "재사용닉네임")
+        val duplicateUserId = createUser("duplicate-google-subject", "duplicate@example.com")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                completeOnboarding(duplicateUserId, "재사용닉네임")
+            }
+
+        assertEquals(UserErrorCode.NICKNAME_ALREADY_EXISTS, exception.errorCode)
+        assertFalse(userRepository.findById(duplicateUserId).orElseThrow().isOnboardingCompleted)
+    }
+
+    @Test
+    fun `탈퇴 후 재사용된 소셜 식별자는 다른 활성 사용자가 중복 사용할 수 없다`() {
+        val withdrawnUserId = createUser("reusable-google-subject", "withdrawn@example.com")
+        withdrawUser(withdrawnUserId)
+        createUser("reusable-google-subject", "active@example.com")
+
+        assertFailsWith<DataIntegrityViolationException> {
+            userRepository.saveAndFlush(
+                User.createSocialUser(
+                    email = "duplicate@example.com",
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = "reusable-google-subject",
+                ),
+            )
         }
     }
 
@@ -498,6 +631,12 @@ class UserServiceTest {
                 email = email,
             ).userId
 
+    private fun withdrawUser(userId: Long) {
+        val user = userRepository.findById(userId).orElseThrow()
+        user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        userRepository.saveAndFlush(user)
+    }
+
     private fun login(): SocialUserResult =
         userService.findOrCreateSocialUser(
             provider = SocialProvider.GOOGLE,
@@ -507,6 +646,7 @@ class UserServiceTest {
 
     companion object {
         private const val CONCURRENT_LOGIN_COUNT = 2
+        private const val LOGIN_LOCK_WAIT_MILLIS = 200L
 
         @Container
         @ServiceConnection

@@ -18,6 +18,7 @@ import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
+import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -30,6 +31,7 @@ class MeetingDatePollService(
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
     private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
     private val meetingAvailableDateRepository: MeetingAvailableDateRepository,
+    private val userService: UserService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -207,6 +209,6 @@ class MeetingDatePollService(
     private fun MeetingParticipant.toMemberResult(): DatePollMemberResult =
         DatePollMemberResult(
             groupMemberId = requireNotNull(groupMember.id),
-            nickname = requireNotNull(groupMember.user.nickname),
+            nickname = userService.resolveDisplayNickname(groupMember.user),
         )
 }

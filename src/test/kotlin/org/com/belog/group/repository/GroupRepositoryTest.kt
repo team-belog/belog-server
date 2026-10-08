@@ -49,9 +49,9 @@ class GroupRepositoryTest {
         val member = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, user))
 
         assertEquals(GroupRole.OWNER, member.role)
-        assertEquals(1L, groupMemberRepository.countByGroupId(requireNotNull(group.id)))
+        assertEquals(1L, groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(requireNotNull(group.id)))
         assertTrue(
-            groupMemberRepository.existsByGroupIdAndUserId(
+            groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(
                 groupId = requireNotNull(group.id),
                 userId = requireNotNull(user.id),
             ),

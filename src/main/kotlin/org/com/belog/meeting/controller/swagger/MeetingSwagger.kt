@@ -173,7 +173,7 @@ interface MeetingSwagger {
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_MEETING_CREATOR_EXAMPLE)],
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
                     ),
                 ],
             ),
@@ -248,7 +248,7 @@ interface MeetingSwagger {
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_MEETING_CREATOR_EXAMPLE)],
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
                     ),
                 ],
             ),
@@ -389,8 +389,8 @@ private const val GROUP_NOT_FOUND_EXAMPLE =
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
-private const val NOT_MEETING_CREATOR_EXAMPLE =
-    """{"code":"MEETING-E018","message":"만남 생성자만 만남을 관리할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+private const val NOT_MEETING_OWNER_EXAMPLE =
+    """{"code":"MEETING-E018","message":"만남 방장만 만남을 관리할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
 
 private const val UNSETTLED_SETTLEMENT_REQUEST_EXISTS_EXAMPLE =
     """{"code":"BILL_LOG-E023","message":"아직 정산이 완료되지 않았어요","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

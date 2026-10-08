@@ -21,6 +21,7 @@ import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import org.com.belog.postlog.service.result.PostLogTicketMemberResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
+import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
@@ -40,6 +41,7 @@ class PostLogService(
     private val billRepository: BillRepository,
     private val settlementRequestRepository: SettlementRequestRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val userService: UserService,
     private val clock: Clock,
 ) {
     @Transactional
@@ -127,11 +129,11 @@ class PostLogService(
         userId: Long,
     ): PostLogSummaryResult {
         val meeting =
-            meetingRepository.findByIdWithGroupAndCreator(meetingId)
+            meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
         val viewer =
-            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         val viewerId = checkNotNull(viewer.id) { "조회자의 그룹 멤버 ID가 없습니다." }
 
@@ -142,7 +144,7 @@ class PostLogService(
                     val groupMember = participant.groupMember
                     PostLogParticipantResult(
                         groupMemberId = checkNotNull(groupMember.id) { "조회된 그룹 멤버의 ID가 없습니다." },
-                        nickname = checkNotNull(groupMember.user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
+                        nickname = userService.resolveDisplayNickname(groupMember.user),
                         meetingCreator = meeting.isCreatedBy(groupMember),
                     )
                 }
@@ -190,7 +192,7 @@ class PostLogService(
                     val groupMember = participant.groupMember
                     PostLogTicketMemberResult(
                         groupMemberId = checkNotNull(groupMember.id) { "조회된 그룹 멤버의 ID가 없습니다." },
-                        nickname = checkNotNull(groupMember.user.nickname) { "조회된 참여자의 닉네임이 없습니다." },
+                        nickname = userService.resolveDisplayNickname(groupMember.user),
                     )
                 }
 

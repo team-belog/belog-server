@@ -45,7 +45,7 @@ class GroupMembershipService(
             val memberUser = member.user
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
-                nickname = requireNotNull(memberUser.nickname),
+                nickname = userService.resolveDisplayNickname(memberUser),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
             )
@@ -70,11 +70,11 @@ class GroupMembershipService(
         if (!user.isOnboardingCompleted) {
             throw BusinessException(GroupErrorCode.ONBOARDING_REQUIRED)
         }
-        if (groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER)
         }
 
-        val currentMemberCount = groupMemberRepository.countByGroupId(groupId)
+        val currentMemberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId)
         if (currentMemberCount >= Group.MAX_MEMBER_COUNT) {
             throw BusinessException(GroupErrorCode.GROUP_MEMBER_LIMIT_EXCEEDED)
         }
@@ -102,7 +102,7 @@ class GroupMembershipService(
         if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        if (!groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
     }

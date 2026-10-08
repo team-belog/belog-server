@@ -9,7 +9,9 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class GroupTest {
     @Test
@@ -51,6 +53,26 @@ class GroupTest {
 
         assertFailsWith<IllegalArgumentException> {
             GroupMember.createOwner(createGroup("러닝 모임"), user)
+        }
+    }
+
+    @Test
+    fun `그룹 멤버가 탈퇴하면 비활성 상태가 된다`() {
+        val groupMember = GroupMember.createMember(createGroup("러닝 모임"), completedUser())
+        assertTrue(groupMember.isActive)
+
+        groupMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+
+        assertFalse(groupMember.isActive)
+    }
+
+    @Test
+    fun `이미 탈퇴한 그룹 멤버는 다시 탈퇴할 수 없다`() {
+        val groupMember = GroupMember.createMember(createGroup("러닝 모임"), completedUser())
+        groupMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+
+        assertFailsWith<IllegalStateException> {
+            groupMember.withdraw(Instant.parse("2026-10-07T00:00:01Z"))
         }
     }
 

@@ -58,7 +58,7 @@ class GroupCoverImageService(
         }
 
         val currentMember =
-            groupMemberRepository.findByGroupIdAndUserId(groupId, userId)
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
 
         if (currentMember.role != GroupRole.OWNER) {

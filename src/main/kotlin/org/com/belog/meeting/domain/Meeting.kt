@@ -72,6 +72,7 @@ class Meeting protected constructor(
         foreignKey = ForeignKey(name = "fk_meetings_created_by_group_member_id"),
     )
     val createdBy: GroupMember,
+    owner: GroupMember,
     name: String,
     location: String?,
     @Enumerated(EnumType.STRING)
@@ -85,6 +86,15 @@ class Meeting protected constructor(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
+        protected set
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "owner_group_member_id",
+        nullable = false,
+        foreignKey = ForeignKey(name = "fk_meetings_owner_group_member_id"),
+    )
+    var owner: GroupMember = owner
         protected set
 
     @Column(nullable = false, length = MEETING_NAME_MAX_LENGTH)
@@ -124,6 +134,23 @@ class Meeting protected constructor(
         val creatorId = createdBy.id
         val groupMemberId = groupMember.id
         return creatorId != null && groupMemberId != null && creatorId == groupMemberId
+    }
+
+    fun isOwnedBy(groupMember: GroupMember): Boolean {
+        if (owner === groupMember) {
+            return true
+        }
+
+        val ownerId = owner.id
+        val groupMemberId = groupMember.id
+        return ownerId != null && groupMemberId != null && ownerId == groupMemberId
+    }
+
+    fun delegateOwnerTo(newOwner: GroupMember) {
+        require(newOwner.belongsTo(group)) { "같은 그룹의 멤버에게만 여정 방장을 위임할 수 있습니다." }
+        require(newOwner.isActive) { "탈퇴한 멤버에게는 여정 방장을 위임할 수 없습니다." }
+
+        owner = newOwner
     }
 
     fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
@@ -230,6 +257,7 @@ class Meeting protected constructor(
             return Meeting(
                 group = group,
                 createdBy = creator,
+                owner = creator,
                 name = normalizedName,
                 location = normalizedLocation,
                 scheduleType = MeetingScheduleType.FIXED,
@@ -254,6 +282,7 @@ class Meeting protected constructor(
             return Meeting(
                 group = group,
                 createdBy = creator,
+                owner = creator,
                 name = normalizedName,
                 location = normalizedLocation,
                 scheduleType = MeetingScheduleType.POLL,
