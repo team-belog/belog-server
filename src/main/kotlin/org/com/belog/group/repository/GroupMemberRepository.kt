@@ -41,6 +41,22 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
         userId: Long,
     ): Boolean
 
+    @Query(
+        """
+        SELECT member
+        FROM GroupMember member
+        WHERE member.group.id = :groupId
+          AND member.id <> :excludedMemberId
+          AND member.withdrawnAt IS NULL
+        ORDER BY member.createdAt ASC, member.id ASC
+        """,
+    )
+    fun findEarliestActiveMember(
+        @Param("groupId") groupId: Long,
+        @Param("excludedMemberId") excludedMemberId: Long,
+        pageable: Pageable,
+    ): List<GroupMember>
+
     @EntityGraph(attributePaths = ["group"])
     @Query(
         """

@@ -162,7 +162,47 @@ class GroupService(
         val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
         settlementRequestService.validateGroupSettled(groupId)
 
-        val deletedAt = Instant.now(clock)
+        deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+    }
+
+    @Transactional
+    fun delegateOwnerOrDeleteGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        val group =
+            groupRepository.findActiveByIdForUpdate(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        val departingOwner =
+            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
+                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+
+        if (departingOwner.role != GroupRole.OWNER) {
+            return
+        }
+
+        val successor =
+            groupMemberRepository
+                .findEarliestActiveMember(
+                    groupId = groupId,
+                    excludedMemberId = requireNotNull(departingOwner.id),
+                    pageable = PageRequest.of(0, 1),
+                ).firstOrNull()
+
+        if (successor == null) {
+            val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+            deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+            return
+        }
+
+        departingOwner.delegateOwnerTo(successor)
+    }
+
+    private fun deleteGroupAndMeetings(
+        group: Group,
+        meetings: List<Meeting>,
+        deletedAt: Instant,
+    ) {
         group.delete(deletedAt)
         meetings.forEach { meeting -> meeting.delete(deletedAt) }
     }
