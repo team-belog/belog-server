@@ -8,7 +8,7 @@ import org.com.belog.group.service.GroupService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
-import org.springframework.dao.CannotAcquireLockException
+import org.springframework.dao.PessimisticLockingFailureException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -28,7 +28,7 @@ class UserWithdrawalService(
     fun withdraw(userId: Long) {
         try {
             withdrawInTransaction(userId)
-        } catch (exception: CannotAcquireLockException) {
+        } catch (exception: PessimisticLockingFailureException) {
             throw BusinessException(UserErrorCode.WITHDRAWAL_CONFLICT, exception)
         }
     }
