@@ -54,4 +54,16 @@ class SettlementRequestService(
             throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
         }
     }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    fun validateUserSettled(userId: Long) {
+        val pendingRequestId =
+            settlementRequestRepository.findFirstIdByUserIdAndStatusForUpdate(
+                userId = userId,
+                status = SettlementRequestStatus.PENDING.name,
+            )
+        if (pendingRequestId != null) {
+            throw BusinessException(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS)
+        }
+    }
 }
