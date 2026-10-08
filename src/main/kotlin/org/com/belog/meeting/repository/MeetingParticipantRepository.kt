@@ -2,6 +2,7 @@ package org.com.belog.meeting.repository
 
 import jakarta.persistence.LockModeType
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
@@ -95,4 +96,21 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         @Param("meetingId") meetingId: Long,
         @Param("userId") userId: Long,
     ): MeetingParticipant?
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id <> :excludedGroupMemberId
+          AND groupMember.withdrawnAt IS NULL
+        ORDER BY participant.createdAt ASC, participant.id ASC
+        """,
+    )
+    fun findEarliestActiveParticipant(
+        @Param("meetingId") meetingId: Long,
+        @Param("excludedGroupMemberId") excludedGroupMemberId: Long,
+        pageable: Pageable,
+    ): List<MeetingParticipant>
 }

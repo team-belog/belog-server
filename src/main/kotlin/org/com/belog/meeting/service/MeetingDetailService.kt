@@ -27,7 +27,7 @@ class MeetingDetailService(
         userId: Long,
     ): MeetingDetailResult {
         val meeting =
-            meetingRepository.findByIdWithGroupAndCreator(meetingId)
+            meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "조회된 만남의 그룹 ID가 없습니다." }
         val groupMember =
@@ -44,7 +44,7 @@ class MeetingDetailService(
             startDate = meeting.startDate,
             endDate = meeting.endDate,
             location = meeting.location,
-            canEditMeeting = meeting.isCreatedBy(groupMember),
+            canEditMeeting = meeting.isOwnedBy(groupMember),
             preLogStatus = toLogStatus(planRepository.existsByMeetingId(meetingId)),
             billLogStatus = toLogStatus(billRepository.existsByMeetingId(meetingId)),
             postLogStatus = toLogStatus(postLogPhotoRepository.existsByMeetingId(meetingId)),

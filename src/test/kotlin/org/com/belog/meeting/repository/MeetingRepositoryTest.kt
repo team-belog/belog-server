@@ -172,7 +172,7 @@ class MeetingRepositoryTest {
         assertFalse(meetingRepository.existsByIdAndDeletedAtIsNull(confirmedMeetingId))
         assertNull(meetingRepository.findByIdWithGroup(confirmedMeetingId))
         assertNull(meetingRepository.findByIdWithGroupForUpdate(confirmedMeetingId))
-        assertNull(meetingRepository.findByIdWithGroupAndCreator(confirmedMeetingId))
+        assertNull(meetingRepository.findByIdWithGroupOwnerAndCreator(confirmedMeetingId))
         assertNull(meetingRepository.findByIdForUpdate(confirmedMeetingId))
         assertTrue(meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING).isEmpty())
         assertTrue(

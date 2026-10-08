@@ -72,7 +72,7 @@ class MeetingDetailServiceTest {
         val meeting = mock(Meeting::class.java)
         `when`(group.id).thenReturn(GROUP_ID)
         `when`(meeting.group).thenReturn(group)
-        `when`(meetingRepository.findByIdWithGroupAndCreator(MEETING_ID)).thenReturn(meeting)
+        `when`(meetingRepository.findByIdWithGroupOwnerAndCreator(MEETING_ID)).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(null)
 
         val exception =
@@ -99,8 +99,8 @@ class MeetingDetailServiceTest {
         `when`(meeting.startDate).thenReturn(LocalDate.of(2026, 10, 3))
         `when`(meeting.endDate).thenReturn(LocalDate.of(2026, 10, 4))
         `when`(meeting.location).thenReturn("광주광역시 000 000")
-        `when`(meeting.isCreatedBy(groupMember)).thenReturn(false)
-        `when`(meetingRepository.findByIdWithGroupAndCreator(MEETING_ID)).thenReturn(meeting)
+        `when`(meeting.isOwnedBy(groupMember)).thenReturn(false)
+        `when`(meetingRepository.findByIdWithGroupOwnerAndCreator(MEETING_ID)).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(groupMember)
     }
 

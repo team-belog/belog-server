@@ -127,7 +127,7 @@ class PostLogService(
         userId: Long,
     ): PostLogSummaryResult {
         val meeting =
-            meetingRepository.findByIdWithGroupAndCreator(meetingId)
+            meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
         val viewer =

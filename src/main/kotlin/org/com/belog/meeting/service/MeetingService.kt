@@ -265,6 +265,34 @@ class MeetingService(
         meeting.delete(Instant.now(clock))
     }
 
+    @Transactional
+    fun delegateOwnersForWithdrawal(userId: Long) {
+        meetingRepository.findAllActiveByOwnerUserId(userId).forEach { meeting ->
+            delegateOwnerOrNoOp(requireNotNull(meeting.id), userId)
+        }
+    }
+
+    private fun delegateOwnerOrNoOp(
+        meetingId: Long,
+        departingUserId: Long,
+    ) {
+        val meeting = meetingRepository.findByIdForUpdate(meetingId) ?: return
+        if (meeting.owner.user.id != departingUserId) {
+            return
+        }
+
+        val successor =
+            meetingParticipantRepository
+                .findEarliestActiveParticipant(
+                    meetingId = meetingId,
+                    excludedGroupMemberId = requireNotNull(meeting.owner.id),
+                    pageable = PageRequest.of(0, 1),
+                ).firstOrNull()
+                ?: return
+
+        meeting.delegateOwnerTo(successor.groupMember)
+    }
+
     private fun updateConfirmedDate(
         meeting: Meeting,
         dateRange: MeetingDateRange,
@@ -298,8 +326,8 @@ class MeetingService(
         meeting: Meeting,
         userId: Long,
     ) {
-        if (meeting.createdBy.user.id != userId) {
-            throw BusinessException(MeetingErrorCode.NOT_MEETING_CREATOR)
+        if (meeting.owner.user.id != userId) {
+            throw BusinessException(MeetingErrorCode.NOT_MEETING_OWNER)
         }
     }
 

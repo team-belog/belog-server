@@ -23,7 +23,7 @@ class PreLogService(
         userId: Long,
     ): PreLogMainResult {
         val meeting =
-            meetingRepository.findByIdWithGroupAndCreator(meetingId)
+            meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
         val groupId = checkNotNull(meeting.group.id) { "Pre-log 대상 만남의 그룹 ID가 없습니다." }
         val groupMember =
@@ -41,7 +41,7 @@ class PreLogService(
             endDate = meeting.endDate,
             location = meeting.location,
             isEnded = meeting.isEnded(currentDate),
-            canEditMeeting = meeting.isCreatedBy(groupMember),
+            canEditMeeting = meeting.isOwnedBy(groupMember),
         )
     }
 }
