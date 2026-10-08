@@ -12,6 +12,7 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
 import org.springframework.security.oauth2.jwt.JwtClaimsSet
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters
+import org.springframework.security.oauth2.jwt.JwtException
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
@@ -68,6 +69,24 @@ class JwtTokenProviderTest {
         val jwt = config.accessTokenJwtDecoder(properties, userRepository).decode(accessToken)
 
         assertNull(jwt.id)
+    }
+
+    @Test
+    fun `탈퇴한 사용자의 Access Token은 decode에 실패한다`() {
+        val accessToken = tokenProvider.createTokens(1L).accessToken
+        val withdrawnUser =
+            User.createSocialUser(
+                email = "user@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-subject",
+            )
+        withdrawnUser.withdraw(Instant.now(clock))
+        val userRepository = mock(UserRepository::class.java)
+        `when`(userRepository.findById(1L)).thenReturn(Optional.of(withdrawnUser))
+
+        assertFailsWith<JwtException> {
+            config.accessTokenJwtDecoder(properties, userRepository).decode(accessToken)
+        }
     }
 
     @Test
