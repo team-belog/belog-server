@@ -3,6 +3,7 @@ package org.com.belog.notification.service
 import org.com.belog.global.error.BusinessException
 import org.com.belog.notification.code.NotificationErrorCode
 import org.com.belog.notification.domain.Notification
+import org.com.belog.notification.repository.NotificationOutboxRepository
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.code.UserErrorCode
@@ -16,6 +17,7 @@ import java.time.Instant
 @Service
 class NotificationService(
     private val notificationRepository: NotificationRepository,
+    private val notificationOutboxRepository: NotificationOutboxRepository,
     private val userRepository: UserRepository,
     private val clock: Clock,
 ) {
@@ -66,6 +68,7 @@ class NotificationService(
                     deduplicationKey = command.deduplicationKey,
                 ),
             )
+            notificationOutboxRepository.saveIfAbsentByDeduplicationKey(command.deduplicationKey)
         }
     }
 
