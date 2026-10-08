@@ -291,6 +291,7 @@ class MeetingService(
                 ?.groupMember
 
         if (successor == null) {
+            settlementRequestService.validateMeetingSettled(meetingId)
             meeting.delete(Instant.now(clock))
             return
         }
