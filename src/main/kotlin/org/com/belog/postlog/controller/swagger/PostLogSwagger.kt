@@ -529,7 +529,7 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "503",
-                description = "S3 객체 검증 제한 시간 초과 또는 검증 요청 과부하",
+                description = "S3 객체 검증 실패, 제한 시간 초과 또는 검증 요청 과부하",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,

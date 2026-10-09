@@ -229,6 +229,17 @@ interface BillLogSwagger {
                 ],
             ),
             ApiResponse(
+                responseCode = "503",
+                description = "업로드된 영수증 이미지 확인 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = RECEIPT_IMAGE_VERIFICATION_UNAVAILABLE_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
                 responseCode = "504",
                 description = "Upstage 분석 시간 초과",
                 content = [
@@ -293,6 +304,9 @@ private const val INVALID_RECEIPT_IMAGE_OBJECT_KEY_EXAMPLE =
 
 private const val RECEIPT_IMAGE_NOT_FOUND_EXAMPLE =
     """{"code":"BILL_LOG-E019","message":"영수증 이미지를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-10-06T03:10:00Z"}}"""
+
+private const val RECEIPT_IMAGE_VERIFICATION_UNAVAILABLE_EXAMPLE =
+    """{"code":"BILL_LOG-E024","message":"업로드된 영수증 이미지를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-10-09T00:00:00Z"}}"""
 
 private const val RECEIPT_ANALYSIS_FAILED_EXAMPLE =
     """{"code":"BILL_LOG-E021","message":"영수증 이미지 분석에 실패했습니다.","data":{"fieldErrors":[],"timestamp":"2026-10-06T03:10:00Z"}}"""

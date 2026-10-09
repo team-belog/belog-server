@@ -23,4 +23,5 @@ enum class GroupErrorCode(
     NOT_GROUP_MEMBER(HttpStatus.FORBIDDEN, "GROUP-E013", "그룹 멤버만 접근할 수 있습니다."),
     GROUP_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "GROUP-E014", "그룹 OWNER만 커버 이미지를 변경할 수 있습니다."),
     GROUP_DELETE_OWNER_REQUIRED(HttpStatus.FORBIDDEN, "GROUP-E015", "그룹 OWNER만 그룹을 삭제할 수 있습니다."),
+    COVER_IMAGE_VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "GROUP-E016", "업로드된 그룹 커버 이미지를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
 }

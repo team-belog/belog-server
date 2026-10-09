@@ -20,4 +20,5 @@ enum class UserErrorCode(
     INVALID_PROFILE_IMAGE_METADATA(HttpStatus.BAD_REQUEST, "USER-E010", "프로필 이미지 정보가 올바르지 않습니다."),
     ALREADY_WITHDRAWN(HttpStatus.CONFLICT, "USER-E011", "이미 탈퇴한 사용자입니다."),
     WITHDRAWAL_CONFLICT(HttpStatus.CONFLICT, "USER-E012", "탈퇴 처리 중 충돌이 발생했습니다. 잠시 후 다시 시도해 주세요."),
+    PROFILE_IMAGE_VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "USER-E013", "업로드된 프로필 이미지를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
 }

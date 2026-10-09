@@ -4,6 +4,7 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadata
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupCoverImageFormat
 import org.com.belog.group.domain.GroupCoverImageObjectKey
@@ -94,17 +95,18 @@ class S3GroupCoverImageObjectVerifierTest {
     }
 
     @Test
-    fun `S3 조회 중 404가 아닌 오류는 그대로 전파한다`() {
+    fun `S3 객체를 확인할 수 없으면 재시도 가능한 오류를 반환한다`() {
         val objectKey = objectKey("image.webp")
-        val s3Exception = S3Exception.builder().statusCode(503).build()
-        `when`(s3ObjectMetadataProvider.get(objectKey.value)).thenThrow(s3Exception)
+        val unavailableException =
+            S3ObjectUnavailableException(objectKey.value, S3Exception.builder().statusCode(503).build())
+        `when`(s3ObjectMetadataProvider.get(objectKey.value)).thenThrow(unavailableException)
 
         val exception =
-            assertFailsWith<S3Exception> {
+            assertFailsWith<BusinessException> {
                 verifier.verify(objectKey)
             }
 
-        assertSame(s3Exception, exception)
+        assertEquals(GroupErrorCode.COVER_IMAGE_VERIFICATION_UNAVAILABLE, exception.errorCode)
     }
 
     private fun objectKey(fileName: String): GroupCoverImageObjectKey = GroupCoverImageObjectKey.create(15L, "group-covers/15/$fileName")

@@ -1,7 +1,9 @@
 package org.com.belog.global.storage
 
 import org.com.belog.global.config.S3StorageProperties
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
+import software.amazon.awssdk.core.exception.SdkException
 import software.amazon.awssdk.services.s3.S3Client
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest
 import software.amazon.awssdk.services.s3.model.S3Exception
@@ -25,7 +27,17 @@ class S3ObjectMetadataProvider(
                 if (exception.statusCode() == NOT_FOUND_STATUS_CODE) {
                     throw S3ObjectNotFoundException(objectKey, exception)
                 }
-                throw exception
+                log.error(
+                    "S3 object metadata request failed: status={}, errorCode={}, requestId={}",
+                    exception.statusCode(),
+                    exception.awsErrorDetails()?.errorCode(),
+                    exception.requestId(),
+                    exception,
+                )
+                throw S3ObjectUnavailableException(objectKey, exception)
+            } catch (exception: SdkException) {
+                log.error("S3 object metadata request could not be completed", exception)
+                throw S3ObjectUnavailableException(objectKey, exception)
             }
 
         return S3ObjectMetadata(
@@ -36,5 +48,6 @@ class S3ObjectMetadataProvider(
 
     companion object {
         private const val NOT_FOUND_STATUS_CODE = 404
+        private val log = LoggerFactory.getLogger(S3ObjectMetadataProvider::class.java)
     }
 }
