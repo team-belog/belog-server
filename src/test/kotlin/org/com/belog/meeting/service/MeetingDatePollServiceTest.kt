@@ -17,6 +17,9 @@ import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -28,6 +31,7 @@ import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -84,6 +88,9 @@ class MeetingDatePollServiceTest {
     @MockitoBean
     private lateinit var userService: UserService
 
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
     @BeforeEach
     fun stubUserService() {
         `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
@@ -123,6 +130,50 @@ class MeetingDatePollServiceTest {
 
         assertEquals(1L, meetingScheduleResponseRepository.count())
         assertEquals(2L, meetingAvailableDateRepository.count())
+    }
+
+    @Test
+    fun `참여자가 후보 일정에 응답하면 만남 방장에게 응답 알림이 저장된다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val memberUserId = requireNotNull(context.member.user.id)
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = meetingId,
+            userId = memberUserId,
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val responseParticipantId =
+            requireNotNull(meetingParticipantRepository.findByMeetingIdAndGroupMemberUserId(meetingId, memberUserId)?.id)
+        assertEquals(
+            listOf(
+                CreateNotificationCommand(
+                    recipientUserId = requireNotNull(context.creator.user.id),
+                    actorUserId = memberUserId,
+                    type = NotificationType.DATE_POLL_RESPONDED,
+                    message = "참여자 님이 일정 조율에 응답했어요",
+                    targetId = meetingId,
+                    deduplicationKey = "DATE_POLL_RESPONDED:$meetingId:$responseParticipantId",
+                ),
+            ),
+            requestedNotificationCommands(),
+        )
+    }
+
+    @Test
+    fun `만남 방장이 직접 응답하면 응답 알림이 저장되지 않는다`() {
+        val context = savePollContext()
+        context.meeting.delegateOwnerTo(context.member)
+        meetingRepository.flush()
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        assertEquals(emptyList(), requestedNotificationCommands())
     }
 
     @Test
@@ -340,6 +391,12 @@ class MeetingDatePollServiceTest {
         assertEquals(1L, meetingScheduleResponseRepository.count())
         assertEquals(0L, meetingAvailableDateRepository.count())
     }
+
+    private fun requestedNotificationCommands(): List<Any?> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "create" }
+            .map { invocation -> invocation.arguments.single() }
 
     private fun savePollContext(): PollContext {
         val group = groupRepository.save(createGroup("AB12CD"))

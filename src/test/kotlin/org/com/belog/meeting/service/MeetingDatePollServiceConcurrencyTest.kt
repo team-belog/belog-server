@@ -14,6 +14,8 @@ import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.notification.repository.NotificationOutboxRepository
+import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -67,8 +69,16 @@ class MeetingDatePollServiceConcurrencyTest {
     @Autowired
     private lateinit var userRepository: UserRepository
 
+    @Autowired
+    private lateinit var notificationRepository: NotificationRepository
+
+    @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
+
     @AfterEach
     fun cleanUp() {
+        notificationOutboxRepository.deleteAllInBatch()
+        notificationRepository.deleteAllInBatch()
         meetingAvailableDateRepository.deleteAll()
         meetingScheduleResponseRepository.deleteAll()
         meetingCandidateDateRangeRepository.deleteAll()

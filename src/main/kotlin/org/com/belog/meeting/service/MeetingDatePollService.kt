@@ -18,6 +18,7 @@ import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -32,6 +33,7 @@ class MeetingDatePollService(
     private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
     private val meetingAvailableDateRepository: MeetingAvailableDateRepository,
     private val userService: UserService,
+    private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -176,6 +178,27 @@ class MeetingDatePollService(
             )
         meetingAvailableDateRepository.saveAll(
             selectedCandidates.map { candidate -> MeetingAvailableDate.create(response, candidate) },
+        )
+        notifyOwnerOfResponse(meeting, participant, userId)
+    }
+
+    private fun notifyOwnerOfResponse(
+        meeting: Meeting,
+        participant: MeetingParticipant,
+        responderUserId: Long,
+    ) {
+        if (meeting.isOwnedBy(participant.groupMember)) {
+            return
+        }
+
+        notificationService.create(
+            MeetingNotificationCommands.datePollResponded(
+                meetingId = requireNotNull(meeting.id),
+                responseParticipantId = requireNotNull(participant.id),
+                recipientUserId = requireNotNull(meeting.owner.user.id),
+                responderUserId = responderUserId,
+                responderNickname = userService.resolveDisplayNickname(participant.groupMember.user),
+            ),
         )
     }
 
