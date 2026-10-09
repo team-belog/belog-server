@@ -95,7 +95,7 @@ class MeetingController(
     override fun deleteMeeting(
         @LoginUserId userId: Long,
         @PathVariable meetingId: Long,
-    ): ResponseEntity<CommonResponse<Nothing>> {
+    ): ResponseEntity<Void> {
         meetingService.deleteMeeting(meetingId = meetingId, userId = userId)
 
         return ResponseEntity
