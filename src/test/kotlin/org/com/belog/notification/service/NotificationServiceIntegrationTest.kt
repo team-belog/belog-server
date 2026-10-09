@@ -3,6 +3,7 @@ package org.com.belog.notification.service
 import org.com.belog.global.error.BusinessException
 import org.com.belog.notification.code.NotificationErrorCode
 import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.repository.NotificationOutboxRepository
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.domain.SocialProvider
@@ -41,6 +42,9 @@ class NotificationServiceIntegrationTest {
     private lateinit var notificationRepository: NotificationRepository
 
     @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
+
+    @Autowired
     private lateinit var userRepository: UserRepository
 
     @MockitoBean
@@ -48,6 +52,7 @@ class NotificationServiceIntegrationTest {
 
     @AfterEach
     fun cleanUp() {
+        notificationOutboxRepository.deleteAllInBatch()
         notificationRepository.deleteAllInBatch()
         userRepository.deleteAllInBatch()
     }
@@ -61,6 +66,7 @@ class NotificationServiceIntegrationTest {
         notificationService.create(command)
 
         assertEquals(1L, notificationRepository.count())
+        assertEquals(1L, notificationOutboxRepository.count())
     }
 
     @Test
@@ -94,6 +100,7 @@ class NotificationServiceIntegrationTest {
             requests.forEach { request -> request.get(10, TimeUnit.SECONDS) }
 
             assertEquals(1L, notificationRepository.count())
+            assertEquals(1L, notificationOutboxRepository.count())
         } finally {
             executor.shutdownNow()
         }
