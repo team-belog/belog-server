@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
+import java.util.UUID
 
 @Service
 class MeetingDatePollService(
@@ -180,6 +181,42 @@ class MeetingDatePollService(
             selectedCandidates.map { candidate -> MeetingAvailableDate.create(response, candidate) },
         )
         notifyOwnerOfResponse(meeting, participant, userId)
+    }
+
+    @Transactional
+    fun remindUnrespondedParticipants(
+        meetingId: Long,
+        userId: Long,
+    ) {
+        val meeting =
+            meetingRepository.findByIdForUpdate(meetingId)
+                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+        if (meeting.owner.user.id != userId) {
+            throw BusinessException(MeetingErrorCode.NOT_MEETING_OWNER)
+        }
+        validateDatePollMeeting(meeting)
+        if (meeting.status != MeetingStatus.SCHEDULING) {
+            throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
+        }
+
+        val unrespondedParticipants = meetingParticipantRepository.findAllUnrespondedActiveWithUserByMeetingId(meetingId)
+        if (unrespondedParticipants.isEmpty()) {
+            throw BusinessException(MeetingErrorCode.DATE_POLL_REMINDER_TARGET_NOT_FOUND)
+        }
+
+        val remindedAt = Instant.now(clock)
+        val reminderId = UUID.randomUUID()
+        notificationService.createAll(
+            unrespondedParticipants.map { participant ->
+                MeetingNotificationCommands.datePollReminder(
+                    meetingId = meetingId,
+                    recipientUserId = requireNotNull(participant.groupMember.user.id),
+                    ownerUserId = userId,
+                    remindedAt = remindedAt,
+                    reminderId = reminderId,
+                )
+            },
+        )
     }
 
     private fun notifyOwnerOfResponse(

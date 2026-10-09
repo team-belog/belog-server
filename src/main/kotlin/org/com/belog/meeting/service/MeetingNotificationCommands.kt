@@ -3,11 +3,14 @@ package org.com.belog.meeting.service
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.command.CreateNotificationCommand
+import java.time.Instant
 import java.time.LocalDate
+import java.util.UUID
 
 internal object MeetingNotificationCommands {
     private const val DATE_POLL_STARTED_MESSAGE = "새로운 일정 조율이 시작됐어요, 되는 날짜를 체크해주세요"
     private const val DATE_POLL_RESPONDED_MESSAGE_SUFFIX = " 님이 일정 조율에 응답했어요"
+    private const val DATE_POLL_REMINDER_MESSAGE = "아직 응답 안 하셨어요, 되는 날짜를 체크해주세요"
 
     fun datePollStarted(
         meetingId: Long,
@@ -37,6 +40,23 @@ internal object MeetingNotificationCommands {
             message = responderNickname + DATE_POLL_RESPONDED_MESSAGE_SUFFIX,
             targetId = meetingId,
             deduplicationKey = "${NotificationType.DATE_POLL_RESPONDED}:$meetingId:$responseParticipantId",
+        )
+
+    fun datePollReminder(
+        meetingId: Long,
+        recipientUserId: Long,
+        ownerUserId: Long,
+        remindedAt: Instant,
+        reminderId: UUID,
+    ): CreateNotificationCommand =
+        CreateNotificationCommand(
+            recipientUserId = recipientUserId,
+            actorUserId = ownerUserId,
+            type = NotificationType.DATE_POLL_REMINDER,
+            message = DATE_POLL_REMINDER_MESSAGE,
+            targetId = meetingId,
+            deduplicationKey =
+                "${NotificationType.DATE_POLL_REMINDER}:$meetingId:${remindedAt.toEpochMilli()}:$reminderId:$recipientUserId",
         )
 
     fun meetingDateConfirmed(

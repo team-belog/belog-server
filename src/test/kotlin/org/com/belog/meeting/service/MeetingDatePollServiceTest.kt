@@ -47,6 +47,7 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -391,6 +392,94 @@ class MeetingDatePollServiceTest {
         assertEquals(1L, meetingScheduleResponseRepository.count())
         assertEquals(0L, meetingAvailableDateRepository.count())
     }
+
+    @Test
+    fun `만남 방장이 리마인드를 요청하면 미응답 참여자에게 리마인드 알림이 저장된다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val memberUserId = requireNotNull(context.member.user.id)
+
+        meetingDatePollService.remindUnrespondedParticipants(
+            meetingId = meetingId,
+            userId = requireNotNull(context.creator.user.id),
+        )
+
+        val command = requestedReminderCommands().single().single() as CreateNotificationCommand
+        assertEquals(memberUserId, command.recipientUserId)
+        assertEquals(context.creator.user.id, command.actorUserId)
+        assertEquals(NotificationType.DATE_POLL_REMINDER, command.type)
+        assertEquals("아직 응답 안 하셨어요, 되는 날짜를 체크해주세요", command.message)
+        assertEquals(meetingId, command.targetId)
+        assertTrue(
+            Regex("DATE_POLL_REMINDER:$meetingId:${FIXED_INSTANT.toEpochMilli()}:[0-9a-f-]{36}:$memberUserId")
+                .matches(command.deduplicationKey),
+        )
+    }
+
+    @Test
+    fun `만남 방장이 아니면 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
+        assertEquals(emptyList(), requestedReminderCommands())
+    }
+
+    @Test
+    fun `미응답 참여자가 없으면 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.creator.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TARGET_NOT_FOUND, exception.errorCode)
+        assertEquals(emptyList(), requestedReminderCommands())
+    }
+
+    @Test
+    fun `일정이 확정된 만남에는 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+        context.meeting.confirmDate(
+            candidateDateRange = context.candidates.first(),
+            confirmedAt = FIXED_INSTANT,
+            currentDate = LocalDate.of(2026, 9, 22),
+        )
+        meetingRepository.flush()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.creator.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING, exception.errorCode)
+        assertEquals(emptyList(), requestedReminderCommands())
+    }
+
+    private fun requestedReminderCommands(): List<List<*>> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .map { invocation -> invocation.arguments.single() as List<*> }
 
     private fun requestedNotificationCommands(): List<Any?> =
         mockingDetails(notificationService)
