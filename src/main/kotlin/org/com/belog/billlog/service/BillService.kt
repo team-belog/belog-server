@@ -63,6 +63,7 @@ class BillService(
         val shares = saveShares(command, bill, shareParticipants)
         val settlementRequests = saveSettlementRequests(shares, payer)
         notifySettlementRequested(meeting, payer, settlementRequests)
+        notifyBillRegistered(meeting, bill, creator, settlementRequests)
 
         return RegisteredBill(
             billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
@@ -279,6 +280,38 @@ class BillService(
                         },
                     payerUserId = payerUserId,
                     payerNickname = payerNickname,
+                )
+            },
+        )
+    }
+
+    private fun notifyBillRegistered(
+        meeting: Meeting,
+        bill: Bill,
+        creator: GroupMember,
+        settlementRequests: List<SettlementRequest>,
+    ) {
+        val meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." }
+        val creatorUser = creator.user
+        val creatorUserId = checkNotNull(creatorUser.id) { "결제 내역 등록자의 사용자 ID가 없습니다." }
+        val creatorNickname = userService.resolveDisplayNickname(creatorUser)
+        val settlementParticipantIds = settlementRequests.map { settlementRequest -> settlementRequest.participant.id }.toSet()
+        val recipients =
+            meetingParticipantRepository
+                .findAllActiveWithUserByMeetingId(meetingId)
+                .filter { participant ->
+                    participant.id !in settlementParticipantIds && participant.groupMember.id != creator.id
+                }
+
+        notificationService.createAll(
+            recipients.map { participant ->
+                BillLogNotificationCommands.billRegistered(
+                    meetingId = meetingId,
+                    billId = billId,
+                    recipientUserId = checkNotNull(participant.groupMember.user.id) { "만남 참여자의 사용자 ID가 없습니다." },
+                    creatorUserId = creatorUserId,
+                    creatorNickname = creatorNickname,
                 )
             },
         )

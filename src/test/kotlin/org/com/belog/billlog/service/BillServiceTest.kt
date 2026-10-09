@@ -263,9 +263,33 @@ class BillServiceTest {
                     deduplicationKey = "SETTLEMENT_REQUESTED:${settlementRequest.id}",
                 ),
             )
-        assertEquals(listOf(expectedCommands), requestedNotificationCommands())
+        assertEquals(expectedCommands, requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED))
         assertEquals(1L, billRepository.count())
         assertEquals(result.billId, billRepository.findAll().single().id)
+    }
+
+    @Test
+    fun `결제 내역을 등록하면 등록자와 정산 대상자를 제외한 만남 참여자에게 영수증 등록 알림이 저장된다`() {
+        val context = saveMeetingContext()
+        val observer = saveGroupMember(context.group, "observer-subject", "관전자")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, observer))
+
+        val result = billService.registerBill(createCommand(context, payerMemberId = requireNotNull(context.member.id)))
+
+        val expectedCommands =
+            listOf(context.member, observer)
+                .map { recipient ->
+                    val recipientUserId = requireNotNull(recipient.user.id)
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.creator.user.id,
+                        type = NotificationType.BILL_REGISTERED,
+                        message = "작성자 님이 영수증을 등록했어요",
+                        targetId = context.meeting.id,
+                        deduplicationKey = "BILL_REGISTERED:${result.billId}:$recipientUserId",
+                    )
+                }.toSet()
+        assertEquals(expectedCommands, requestedNotificationCommands(NotificationType.BILL_REGISTERED))
     }
 
     @Test
@@ -393,11 +417,14 @@ class BillServiceTest {
             shares = shares,
         )
 
-    private fun requestedNotificationCommands(): List<Set<Any?>> =
+    private fun requestedNotificationCommands(type: NotificationType): Set<CreateNotificationCommand> =
         mockingDetails(notificationService)
             .invocations
             .filter { invocation -> invocation.method.name == "createAll" }
-            .map { invocation -> (invocation.arguments.single() as List<*>).toSet() }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
+            .filter { command -> command.type == type }
+            .toSet()
 
     private fun assertBillDataIsEmpty() {
         assertEquals(0L, billRepository.count())
