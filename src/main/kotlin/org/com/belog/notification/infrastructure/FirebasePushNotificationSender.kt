@@ -55,6 +55,7 @@ class FirebasePushNotificationSender(
             .setNotification(
                 FirebaseNotification
                     .builder()
+                    .setTitle(NOTIFICATION_TITLE)
                     .setBody(payload.message)
                     .build(),
             ).putData(DATA_KEY_NOTIFICATION_ID, payload.notificationId.toString())
@@ -75,6 +76,7 @@ class FirebasePushNotificationSender(
 
     companion object {
         private const val MAX_TOKENS_PER_MULTICAST = 500
+        private const val NOTIFICATION_TITLE = "BELOG"
         private const val DATA_KEY_NOTIFICATION_ID = "notificationId"
         private const val DATA_KEY_TYPE = "type"
         private const val DATA_KEY_TARGET_TYPE = "targetType"
