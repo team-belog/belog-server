@@ -88,3 +88,11 @@ ocr:
     mode: "${UPSTAGE_EXTRACTION_MODE:standard}"
     connection-timeout: "${UPSTAGE_CONNECTION_TIMEOUT:3s}"
     read-timeout: "${UPSTAGE_READ_TIMEOUT:60s}"
+
+notification:
+  outbox:
+    polling-interval-ms: "${NOTIFICATION_OUTBOX_POLLING_INTERVAL_MS:10000}"
+    batch-size: "${NOTIFICATION_OUTBOX_BATCH_SIZE:50}"
+    max-attempts: "${NOTIFICATION_OUTBOX_MAX_ATTEMPTS:5}"
+    processing-timeout: "${NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT:5m}"
+    retry-base-delay: "${NOTIFICATION_OUTBOX_RETRY_BASE_DELAY:30s}"
