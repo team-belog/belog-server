@@ -1,19 +1,17 @@
 package org.com.belog.meeting.service
 
-import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
-import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
-import org.com.belog.meeting.repository.MeetingAvailableDateRepository
-import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
+import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.repository.NotificationOutboxRepository
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.user.domain.Bank
@@ -23,25 +21,25 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.time.Clock
 import java.time.Instant
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 
 @SpringBootTest
 @ActiveProfiles("test")
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class MeetingDatePollServiceConcurrencyTest {
+class MeetingDatePollReminderIntegrationTest {
     @Autowired
     private lateinit var meetingDatePollService: MeetingDatePollService
 
@@ -52,13 +50,7 @@ class MeetingDatePollServiceConcurrencyTest {
     private lateinit var meetingParticipantRepository: MeetingParticipantRepository
 
     @Autowired
-    private lateinit var meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository
-
-    @Autowired
     private lateinit var meetingScheduleResponseRepository: MeetingScheduleResponseRepository
-
-    @Autowired
-    private lateinit var meetingAvailableDateRepository: MeetingAvailableDateRepository
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
@@ -75,61 +67,72 @@ class MeetingDatePollServiceConcurrencyTest {
     @Autowired
     private lateinit var notificationOutboxRepository: NotificationOutboxRepository
 
+    @MockitoBean
+    private lateinit var clock: Clock
+
     @AfterEach
     fun cleanUp() {
         notificationOutboxRepository.deleteAllInBatch()
         notificationRepository.deleteAllInBatch()
-        meetingAvailableDateRepository.deleteAll()
-        meetingScheduleResponseRepository.deleteAll()
-        meetingCandidateDateRangeRepository.deleteAll()
-        meetingParticipantRepository.deleteAll()
-        meetingRepository.deleteAll()
-        groupMemberRepository.deleteAll()
-        groupRepository.deleteAll()
-        userRepository.deleteAll()
+        meetingScheduleResponseRepository.deleteAllInBatch()
+        meetingParticipantRepository.deleteAllInBatch()
+        meetingRepository.deleteAllInBatch()
+        groupMemberRepository.deleteAllInBatch()
+        groupRepository.deleteAllInBatch()
+        userRepository.deleteAllInBatch()
     }
 
     @Test
-    fun `동일한 참여자가 동시에 응답해도 한 번만 저장된다`() {
+    fun `리마인드를 요청하면 미응답 참여자에게만 알림과 Outbox가 저장된다`() {
+        val context = saveReminderContext()
+        `when`(clock.instant()).thenReturn(REMINDED_AT)
+
+        meetingDatePollService.remindUnrespondedParticipants(context.meetingId, context.ownerUserId)
+
+        val notifications = notificationRepository.findAll()
+        assertEquals(listOf(context.unrespondedUserId), notifications.map { notification -> notification.recipient.id })
+        assertEquals(NotificationType.DATE_POLL_REMINDER, notifications.single().type)
+        assertEquals(1L, notificationOutboxRepository.count())
+    }
+
+    @Test
+    fun `같은 시각에 리마인드를 다시 요청해도 새 알림이 저장된다`() {
+        val context = saveReminderContext()
+        `when`(clock.instant()).thenReturn(REMINDED_AT)
+
+        repeat(2) {
+            meetingDatePollService.remindUnrespondedParticipants(context.meetingId, context.ownerUserId)
+        }
+
+        assertEquals(2L, notificationRepository.count())
+        assertEquals(2L, notificationOutboxRepository.count())
+    }
+
+    private fun saveReminderContext(): ReminderContext {
         val group = groupRepository.save(createGroup())
-        val creator = saveGroupMember(group, "creator-subject", "생성자")
-        val member = saveGroupMember(group, "member-subject", "참여자")
-        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
-        meetingParticipantRepository.saveAllAndFlush(
-            listOf(
-                MeetingParticipant.create(meeting, creator),
-                MeetingParticipant.create(meeting, member),
+        val owner = saveGroupMember(group, "owner-subject", "방장")
+        val unrespondedMember = saveGroupMember(group, "unresponded-subject", "미응답자")
+        val respondedMember = saveGroupMember(group, "responded-subject", "응답자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, owner))
+        val participants =
+            meetingParticipantRepository.saveAllAndFlush(
+                listOf(owner, unrespondedMember, respondedMember).map { member ->
+                    MeetingParticipant.create(meeting, member)
+                },
+            )
+        meetingScheduleResponseRepository.saveAndFlush(
+            MeetingScheduleResponse.create(
+                meeting = meeting,
+                participant = participants[2],
+                respondedAt = Instant.parse("2026-09-20T00:00:00Z"),
             ),
         )
-        val meetingId = requireNotNull(meeting.id)
-        val userId = requireNotNull(member.user.id)
-        val executor = Executors.newFixedThreadPool(CONCURRENT_RESPONSE_COUNT)
-        val startSignal = CountDownLatch(1)
 
-        try {
-            val responses =
-                (1..CONCURRENT_RESPONSE_COUNT).map {
-                    executor.submit<MeetingErrorCode?> {
-                        startSignal.await()
-                        try {
-                            meetingDatePollService.respondDatePoll(meetingId, userId, emptyList())
-                            null
-                        } catch (exception: BusinessException) {
-                            exception.errorCode as MeetingErrorCode
-                        }
-                    }
-                }
-
-            startSignal.countDown()
-            val results = responses.map { response -> response.get(10, TimeUnit.SECONDS) }
-
-            assertEquals(1, results.count { it == null })
-            assertEquals(1, results.count { it == MeetingErrorCode.DATE_POLL_ALREADY_RESPONDED })
-            assertEquals(1L, meetingScheduleResponseRepository.count())
-            assertEquals(0L, meetingAvailableDateRepository.count())
-        } finally {
-            executor.shutdownNow()
-        }
+        return ReminderContext(
+            meetingId = requireNotNull(meeting.id),
+            ownerUserId = requireNotNull(owner.user.id),
+            unrespondedUserId = requireNotNull(unrespondedMember.user.id),
+        )
     }
 
     private fun createGroup(): Group =
@@ -179,8 +182,14 @@ class MeetingDatePollServiceConcurrencyTest {
         return groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
     }
 
+    private data class ReminderContext(
+        val meetingId: Long,
+        val ownerUserId: Long,
+        val unrespondedUserId: Long,
+    )
+
     companion object {
-        private const val CONCURRENT_RESPONSE_COUNT = 2
+        private val REMINDED_AT: Instant = Instant.parse("2026-09-21T00:00:00Z")
 
         @Container
         @ServiceConnection

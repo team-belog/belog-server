@@ -13,11 +13,15 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -26,6 +30,7 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mockingDetails
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -33,6 +38,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -72,6 +78,9 @@ class MeetingServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
 
     @Test
     fun `그룹 멤버가 확정 날짜 만남을 생성하면 생성자와 선택한 멤버가 참여자로 저장된다`() {
@@ -153,6 +162,54 @@ class MeetingServiceTest {
         assertEquals(1L, meetingRepository.count())
         assertEquals(2L, meetingParticipantRepository.count())
         assertEquals(2L, meetingCandidateDateRangeRepository.count())
+    }
+
+    @Test
+    fun `일정 조율 만남을 생성하면 생성자를 제외한 참여자에게 일정 조율 요청 알림이 저장된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val firstParticipant = saveGroupMember(group, "first-participant-subject", "참여자1")
+        val secondParticipant = saveGroupMember(group, "second-participant-subject", "참여자2")
+
+        val result =
+            meetingService.createPollMeeting(
+                groupId = requireNotNull(group.id),
+                creatorUserId = requireNotNull(creator.user.id),
+                name = "광주 여행",
+                location = null,
+                participantMemberIds = listOf(requireNotNull(firstParticipant.id), requireNotNull(secondParticipant.id)),
+                candidateDateRanges =
+                    listOf(
+                        MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                        MeetingDateRange(LocalDate.of(2026, 9, 29), LocalDate.of(2026, 9, 30)),
+                    ),
+            )
+
+        val expectedCommands =
+            listOf(firstParticipant, secondParticipant)
+                .map { participant ->
+                    val recipientUserId = requireNotNull(participant.user.id)
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = creator.user.id,
+                        type = NotificationType.DATE_POLL_STARTED,
+                        message = "새로운 일정 조율이 시작됐어요, 되는 날짜를 체크해주세요",
+                        targetId = result.meetingId,
+                        deduplicationKey = "DATE_POLL_STARTED:${result.meetingId}:$recipientUserId",
+                    )
+                }.toSet()
+        assertEquals(listOf(expectedCommands), requestedNotificationCommands())
+    }
+
+    @Test
+    fun `확정 날짜 만남을 생성하면 일정 조율 요청 알림이 저장되지 않는다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+
+        createMeeting(group, creator, listOf(requireNotNull(participant.id)))
+
+        assertEquals(emptyList(), requestedNotificationCommands())
     }
 
     @Test
@@ -386,6 +443,49 @@ class MeetingServiceTest {
         assertEquals(candidateDateRange.startDate, meeting.startDate)
         assertEquals(candidateDateRange.endDate, meeting.endDate)
         assertEquals(FIXED_INSTANT, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `후보 일정을 확정하면 방장과 탈퇴한 멤버를 제외한 참여자에게 확정 알림이 저장된다`() {
+        val context = saveConfirmationContext()
+
+        meetingService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        val meetingId = requireNotNull(context.meeting.id)
+        val recipientUserId = requireNotNull(context.participant.user.id)
+        assertEquals(
+            listOf(
+                setOf(
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.owner.user.id,
+                        type = NotificationType.MEETING_DATE_CONFIRMED,
+                        message = "일정이 9월 22일~9월 23일로 확정됐어요",
+                        targetId = meetingId,
+                        deduplicationKey = "MEETING_DATE_CONFIRMED:$meetingId:$recipientUserId",
+                    ),
+                ),
+            ),
+            requestedNotificationCommands(),
+        )
+    }
+
+    @Test
+    fun `이미 확정된 일정으로 다시 확정하면 확정 알림이 다시 저장되지 않는다`() {
+        val context = saveConfirmationContext()
+        repeat(2) {
+            meetingService.confirmMeetingDate(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.owner.user.id),
+                candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+            )
+        }
+
+        assertEquals(1, requestedNotificationCommands().size)
     }
 
     @Test
@@ -674,6 +774,34 @@ class MeetingServiceTest {
         candidateDateRanges = candidateDateRanges,
     )
 
+    private fun saveConfirmationContext(): ConfirmationContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val owner = saveGroupMember(group, "owner-subject", "방장")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+        val withdrawnParticipant = saveGroupMember(group, "withdrawn-subject", "탈퇴자")
+        val meeting = meetingRepository.save(createPollMeeting(group, owner))
+        meetingParticipantRepository.saveAll(
+            listOf(owner, participant, withdrawnParticipant).map { member -> MeetingParticipant.create(meeting, member) },
+        )
+        withdrawnParticipant.withdraw(FIXED_INSTANT)
+        groupMemberRepository.flush()
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+        return ConfirmationContext(owner, participant, meeting, candidateDateRange)
+    }
+
+    private fun requestedNotificationCommands(): List<Set<Any?>> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .map { invocation -> (invocation.arguments.single() as List<*>).toSet() }
+
     private fun createGroup(inviteCode: String): Group =
         Group.create(
             name = "주말 여행 모임",
@@ -754,6 +882,13 @@ class MeetingServiceTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    data class ConfirmationContext(
+        val owner: GroupMember,
+        val participant: GroupMember,
+        val meeting: Meeting,
+        val candidateDateRange: MeetingCandidateDateRange,
+    )
 
     @TestConfiguration
     class FixedClockConfig {

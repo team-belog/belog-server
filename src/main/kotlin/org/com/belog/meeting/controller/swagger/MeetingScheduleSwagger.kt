@@ -253,6 +253,77 @@ interface MeetingScheduleSwagger {
     ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
+        summary = "미응답자 리마인드",
+        description =
+            "만남 방장이 후보 일정에 아직 응답하지 않은 참여자에게 리마인드 알림을 전송합니다. " +
+                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미하며, 재전송 횟수 제한은 없습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "204",
+                description = "미응답자 리마인드 전송 성공",
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "일정 조율 방식의 만남이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_DATE_POLL_MEETING_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 방장이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "일정 조율 중이 아니거나 미응답자가 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "일정 조율 종료", value = MEETING_DATE_NOT_SCHEDULING_EXAMPLE),
+                            ExampleObject(name = "미응답자 없음", value = DATE_POLL_REMINDER_TARGET_NOT_FOUND_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun remindUnrespondedParticipants(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<Void>
+
+    @Operation(
         summary = "후보 일정 확정",
         description =
             "만남 생성자가 조율 중인 만남에 등록된 후보 일정 하나를 최종 일정으로 확정합니다. " +
@@ -399,3 +470,6 @@ private const val DATE_POLL_ALREADY_RESPONDED_EXAMPLE =
 
 private const val DUPLICATE_AVAILABLE_DATE_EXAMPLE =
     """{"code":"MEETING-E016","message":"중복된 후보 일정이 선택되었습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val DATE_POLL_REMINDER_TARGET_NOT_FOUND_EXAMPLE =
+    """{"code":"MEETING-E024","message":"리마인드를 전송할 미응답자가 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

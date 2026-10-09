@@ -21,6 +21,7 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.com.belog.meeting.service.result.PastMeetingListResult
 import org.com.belog.meeting.service.result.PastMeetingResult
+import org.com.belog.notification.service.NotificationService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -36,6 +37,7 @@ class MeetingService(
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
     private val settlementRequestService: SettlementRequestService,
+    private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -159,9 +161,19 @@ class MeetingService(
                 )
             },
         )
+        val meetingId = requireNotNull(meeting.id)
+        notificationService.createAll(
+            participants.map { participant ->
+                MeetingNotificationCommands.datePollStarted(
+                    meetingId = meetingId,
+                    recipientUserId = requireNotNull(participant.user.id),
+                    creatorUserId = creatorUserId,
+                )
+            },
+        )
 
         return CreatedMeeting(
-            meetingId = requireNotNull(meeting.id),
+            meetingId = meetingId,
             groupId = groupId,
             name = meeting.name,
             location = meeting.location,
@@ -208,10 +220,44 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
         }
 
-        return meeting.confirmDate(
-            candidateDateRange = candidateDateRange,
-            confirmedAt = Instant.now(clock),
-            currentDate = currentDate,
+        val confirmed =
+            meeting.confirmDate(
+                candidateDateRange = candidateDateRange,
+                confirmedAt = Instant.now(clock),
+                currentDate = currentDate,
+            )
+        if (confirmed) {
+            notifyParticipantsOfConfirmedDate(
+                meetingId = meetingId,
+                ownerUserId = userId,
+                confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate),
+            )
+        }
+        return confirmed
+    }
+
+    private fun notifyParticipantsOfConfirmedDate(
+        meetingId: Long,
+        ownerUserId: Long,
+        confirmedDateRange: MeetingDateRange,
+    ) {
+        val recipientUserIds =
+            meetingParticipantRepository
+                .findAllWithMemberAndUserByMeetingId(meetingId)
+                .map { participant -> participant.groupMember }
+                .filter { groupMember -> groupMember.isActive }
+                .map { groupMember -> requireNotNull(groupMember.user.id) }
+                .filter { recipientUserId -> recipientUserId != ownerUserId }
+
+        notificationService.createAll(
+            recipientUserIds.map { recipientUserId ->
+                MeetingNotificationCommands.meetingDateConfirmed(
+                    meetingId = meetingId,
+                    recipientUserId = recipientUserId,
+                    ownerUserId = ownerUserId,
+                    confirmedDateRange = confirmedDateRange,
+                )
+            },
         )
     }
 

@@ -284,7 +284,7 @@ interface MeetingSwagger {
         @Parameter(description = "만남 ID", example = "7", required = true)
         @PathVariable
         meetingId: Long,
-    ): ResponseEntity<CommonResponse<Nothing>>
+    ): ResponseEntity<Void>
 
     @Operation(
         summary = "만남 상세 조회",
