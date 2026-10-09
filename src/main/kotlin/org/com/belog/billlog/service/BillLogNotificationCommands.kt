@@ -2,11 +2,13 @@ package org.com.belog.billlog.service
 
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.command.CreateNotificationCommand
+import java.time.Instant
 
 internal object BillLogNotificationCommands {
     private const val SETTLEMENT_REQUESTED_MESSAGE_SUFFIX = " 님이 정산을 요청했어요"
     private const val BILL_REGISTERED_MESSAGE_SUFFIX = " 님이 영수증을 등록했어요"
     private const val SETTLEMENT_COMPLETED_MESSAGE = "정산이 완료됐어요"
+    private const val SETTLEMENT_REMINDER_MESSAGE_SUFFIX = " 님이 정산을 다시 요청했어요"
 
     fun settlementRequested(
         meetingId: Long,
@@ -53,5 +55,22 @@ internal object BillLogNotificationCommands {
             message = SETTLEMENT_COMPLETED_MESSAGE,
             targetId = meetingId,
             deduplicationKey = "${NotificationType.SETTLEMENT_COMPLETED}:$settlementRequestId",
+        )
+
+    fun settlementReminder(
+        meetingId: Long,
+        settlementRequestId: Long,
+        recipientUserId: Long,
+        payerUserId: Long,
+        payerNickname: String,
+        remindedAt: Instant,
+    ): CreateNotificationCommand =
+        CreateNotificationCommand(
+            recipientUserId = recipientUserId,
+            actorUserId = payerUserId,
+            type = NotificationType.SETTLEMENT_REMINDER,
+            message = payerNickname + SETTLEMENT_REMINDER_MESSAGE_SUFFIX,
+            targetId = meetingId,
+            deduplicationKey = "${NotificationType.SETTLEMENT_REMINDER}:$settlementRequestId:${remindedAt.toEpochMilli()}",
         )
 }

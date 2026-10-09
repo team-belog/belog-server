@@ -32,16 +32,22 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
 import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.sql.Timestamp
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -90,8 +96,27 @@ class SettlementRequestServiceTest {
     @Autowired
     private lateinit var entityManager: EntityManager
 
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
     @MockitoBean
     private lateinit var notificationService: NotificationService
+
+    @MockitoBean
+    private lateinit var userService: UserService
+
+    @BeforeEach
+    fun stubUserService() {
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
+    }
 
     @Test
     fun `정산 요청 대상자가 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
@@ -184,11 +209,122 @@ class SettlementRequestServiceTest {
         assertEquals(1, requestedNotificationCommands().size)
     }
 
-    private fun requestedNotificationCommands(): List<Any?> =
+    @Test
+    fun `결제자가 정산 리마인드를 보내면 정산 대상자에게 리마인드 알림이 저장된다`() {
+        val context = saveSettlementContext()
+
+        settlementRequestService.remind(
+            settlementRequestId = context.settlementRequestId,
+            requesterUserId = context.payerUserId,
+        )
+        flushAndClear()
+
+        val expectedCommand =
+            CreateNotificationCommand(
+                recipientUserId = context.settlementTargetUserId,
+                actorUserId = context.payerUserId,
+                type = NotificationType.SETTLEMENT_REMINDER,
+                message = "결제자 님이 정산을 다시 요청했어요",
+                targetId = context.meetingId,
+                deduplicationKey = "SETTLEMENT_REMINDER:${context.settlementRequestId}:${FIXED_INSTANT.toEpochMilli()}",
+            )
+        assertEquals(listOf(expectedCommand), requestedNotificationCommands())
+        assertEquals(
+            FIXED_INSTANT,
+            settlementRequestRepository.findById(context.settlementRequestId).orElseThrow().lastRemindedAt,
+        )
+    }
+
+    @Test
+    fun `결제자가 아닌 사용자는 정산 리마인드를 보낼 수 없다`() {
+        val context = saveSettlementContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.remind(
+                    settlementRequestId = context.settlementRequestId,
+                    requesterUserId = context.settlementTargetUserId,
+                )
+            }
+
+        assertEquals(BillLogErrorCode.SETTLEMENT_REMINDER_ACCESS_DENIED, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationCommands())
+    }
+
+    @Test
+    fun `완료된 정산 요청에는 리마인드를 보낼 수 없다`() {
+        val context = saveSettlementContext()
+        settlementRequestService.complete(
+            settlementRequestId = context.settlementRequestId,
+            requesterUserId = context.settlementTargetUserId,
+        )
+        flushAndClear()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.remind(
+                    settlementRequestId = context.settlementRequestId,
+                    requesterUserId = context.payerUserId,
+                )
+            }
+
+        assertEquals(BillLogErrorCode.SETTLEMENT_REQUEST_ALREADY_COMPLETED, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationCommands(NotificationType.SETTLEMENT_REMINDER))
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나지 않으면 정산 리마인드를 다시 보낼 수 없다`() {
+        val context = saveSettlementContext()
+        updateLastRemindedAt(context.settlementRequestId, FIXED_INSTANT.minusSeconds(59))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                settlementRequestService.remind(
+                    settlementRequestId = context.settlementRequestId,
+                    requesterUserId = context.payerUserId,
+                )
+            }
+
+        assertEquals(BillLogErrorCode.SETTLEMENT_REMINDER_TOO_FREQUENT, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationCommands())
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나면 정산 리마인드를 다시 보낼 수 있다`() {
+        val context = saveSettlementContext()
+        updateLastRemindedAt(context.settlementRequestId, FIXED_INSTANT.minusSeconds(60))
+
+        settlementRequestService.remind(
+            settlementRequestId = context.settlementRequestId,
+            requesterUserId = context.payerUserId,
+        )
+        flushAndClear()
+
+        assertEquals(1, requestedNotificationCommands().size)
+        assertEquals(
+            FIXED_INSTANT,
+            settlementRequestRepository.findById(context.settlementRequestId).orElseThrow().lastRemindedAt,
+        )
+    }
+
+    private fun updateLastRemindedAt(
+        settlementRequestId: Long,
+        lastRemindedAt: Instant,
+    ) {
+        jdbcTemplate.update(
+            "UPDATE bill_log_settlement_requests SET last_reminded_at = ? WHERE id = ?",
+            Timestamp.from(lastRemindedAt),
+            settlementRequestId,
+        )
+        entityManager.clear()
+    }
+
+    private fun requestedNotificationCommands(type: NotificationType? = null): List<CreateNotificationCommand> =
         mockingDetails(notificationService)
             .invocations
             .filter { invocation -> invocation.method.name == "create" }
-            .map { invocation -> invocation.arguments.single() }
+            .map { invocation -> invocation.arguments.single() as CreateNotificationCommand }
+            .filter { command -> type == null || command.type == type }
 
     private fun saveSettlementContext(): SettlementContext {
         val group = groupRepository.save(createGroup())

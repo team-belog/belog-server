@@ -32,4 +32,7 @@ enum class BillLogErrorCode(
     RECEIPT_ANALYSIS_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "BILL_LOG-E022", "영수증 이미지 분석 시간이 초과되었습니다."),
     UNSETTLED_SETTLEMENT_REQUEST_EXISTS(HttpStatus.CONFLICT, "BILL_LOG-E023", "아직 정산이 완료되지 않았어요"),
     RECEIPT_IMAGE_VERIFICATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "BILL_LOG-E024", "업로드된 영수증 이미지를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요."),
+    SETTLEMENT_REMINDER_ACCESS_DENIED(HttpStatus.FORBIDDEN, "BILL_LOG-E025", "결제자만 정산 리마인드를 보낼 수 있습니다."),
+    SETTLEMENT_REQUEST_ALREADY_COMPLETED(HttpStatus.CONFLICT, "BILL_LOG-E026", "이미 완료된 정산 요청입니다."),
+    SETTLEMENT_REMINDER_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "BILL_LOG-E027", "정산 리마인드는 1분 후에 다시 보낼 수 있습니다."),
 }

@@ -29,6 +29,7 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
 import org.springframework.beans.factory.annotation.Autowired
@@ -81,6 +82,9 @@ class MeetingServiceTest {
 
     @MockitoBean
     private lateinit var notificationService: NotificationService
+
+    @MockitoBean
+    private lateinit var userService: UserService
 
     @Test
     fun `그룹 멤버가 확정 날짜 만남을 생성하면 생성자와 선택한 멤버가 참여자로 저장된다`() {

@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.meeting.domain.MeetingParticipant
+import java.time.Duration
 import java.time.Instant
 
 @Entity
@@ -73,6 +74,22 @@ class SettlementRequest protected constructor(
     var completedAt: Instant? = null
         protected set
 
+    @Column(name = "last_reminded_at")
+    var lastRemindedAt: Instant? = null
+        protected set
+
+    fun isReminderCooldownElapsed(now: Instant): Boolean {
+        val lastRemindedAt = lastRemindedAt ?: return true
+        return !now.isBefore(lastRemindedAt.plus(REMINDER_COOLDOWN))
+    }
+
+    fun remind(remindedAt: Instant) {
+        check(status == SettlementRequestStatus.PENDING) { "완료된 정산 요청은 리마인드할 수 없습니다." }
+        check(isReminderCooldownElapsed(remindedAt)) { "정산 리마인드 대기 시간이 지나지 않았습니다." }
+
+        lastRemindedAt = remindedAt
+    }
+
     fun complete(completedAt: Instant) {
         if (status == SettlementRequestStatus.COMPLETED) {
             return
@@ -83,6 +100,8 @@ class SettlementRequest protected constructor(
     }
 
     companion object {
+        private val REMINDER_COOLDOWN: Duration = Duration.ofMinutes(1)
+
         fun create(share: BillShare): SettlementRequest {
             require(!share.participant.isSameParticipantAs(share.bill.payer)) {
                 "결제자에게는 정산 요청을 생성할 수 없습니다."
