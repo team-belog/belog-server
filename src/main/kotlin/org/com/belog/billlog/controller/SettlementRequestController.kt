@@ -12,6 +12,7 @@ import org.com.belog.global.response.CommonResponse
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -57,5 +58,20 @@ class SettlementRequestController(
         )
 
         return ResponseEntity.noContent().build()
+    }
+
+    @PostMapping("/api/v1/settlement-requests/{settlementRequestId}/reminders")
+    override fun remind(
+        @LoginUserId userId: Long,
+        @PathVariable settlementRequestId: Long,
+    ): ResponseEntity<Void> {
+        settlementRequestService.remind(
+            settlementRequestId = settlementRequestId,
+            requesterUserId = userId,
+        )
+
+        return ResponseEntity
+            .status(BillLogSuccessCode.SETTLEMENT_REMINDER_SENT.status)
+            .build()
     }
 }
