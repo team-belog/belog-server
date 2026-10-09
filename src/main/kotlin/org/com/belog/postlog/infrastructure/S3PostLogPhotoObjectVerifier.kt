@@ -4,6 +4,7 @@ import jakarta.annotation.PreDestroy
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.config.PostLogPhotoVerificationProperties
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -87,6 +88,8 @@ class S3PostLogPhotoObjectVerifier(
                 s3ObjectMetadataProvider.get(objectKey.value)
             } catch (exception: S3ObjectNotFoundException) {
                 throw BusinessException(PostLogErrorCode.PHOTO_NOT_FOUND, exception)
+            } catch (exception: S3ObjectUnavailableException) {
+                throw BusinessException(PostLogErrorCode.PHOTO_VERIFICATION_UNAVAILABLE, exception)
             }
 
         val format =

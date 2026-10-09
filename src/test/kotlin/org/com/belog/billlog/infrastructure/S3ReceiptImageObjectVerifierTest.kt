@@ -7,6 +7,7 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadata
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.`when`
@@ -34,6 +35,16 @@ class S3ReceiptImageObjectVerifierTest {
         val exception = assertFailsWith<BusinessException> { verifier.verify(objectKey) }
 
         assertEquals(BillLogErrorCode.RECEIPT_IMAGE_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `S3 객체를 확인할 수 없으면 재시도 가능한 오류를 반환한다`() {
+        val cause = S3ObjectUnavailableException(objectKey.value, S3Exception.builder().statusCode(403).build())
+        `when`(metadataProvider.get(objectKey.value)).thenThrow(cause)
+
+        val exception = assertFailsWith<BusinessException> { verifier.verify(objectKey) }
+
+        assertEquals(BillLogErrorCode.RECEIPT_IMAGE_VERIFICATION_UNAVAILABLE, exception.errorCode)
     }
 
     @Test

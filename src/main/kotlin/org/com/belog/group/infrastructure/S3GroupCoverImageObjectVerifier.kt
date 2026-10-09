@@ -3,6 +3,7 @@ package org.com.belog.group.infrastructure
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupCoverImageFormat
 import org.com.belog.group.domain.GroupCoverImageObjectKey
@@ -18,6 +19,8 @@ class S3GroupCoverImageObjectVerifier(
                 s3ObjectMetadataProvider.get(objectKey.value)
             } catch (exception: S3ObjectNotFoundException) {
                 throw BusinessException(GroupErrorCode.COVER_IMAGE_NOT_FOUND, exception)
+            } catch (exception: S3ObjectUnavailableException) {
+                throw BusinessException(GroupErrorCode.COVER_IMAGE_VERIFICATION_UNAVAILABLE, exception)
             }
 
         val format =

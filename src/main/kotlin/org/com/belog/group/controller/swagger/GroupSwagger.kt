@@ -569,6 +569,17 @@ interface GroupSwagger {
                     ),
                 ],
             ),
+            ApiResponse(
+                responseCode = "503",
+                description = "업로드된 그룹 커버 이미지 확인 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = COVER_IMAGE_VERIFICATION_UNAVAILABLE_EXAMPLE)],
+                    ),
+                ],
+            ),
         ],
     )
     fun updateCoverImage(
@@ -653,12 +664,15 @@ interface GroupSwagger {
             ),
             ApiResponse(
                 responseCode = "503",
-                description = "초대 코드 발급 실패",
+                description = "초대 코드 발급 실패 또는 업로드된 그룹 커버 이미지 확인 실패",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = INVITE_CODE_ISSUANCE_FAILED_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "초대 코드 발급 실패", value = INVITE_CODE_ISSUANCE_FAILED_EXAMPLE),
+                            ExampleObject(name = "커버 이미지 확인 실패", value = COVER_IMAGE_VERIFICATION_UNAVAILABLE_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -707,6 +721,9 @@ private const val INVALID_COVER_IMAGE_OBJECT_KEY_EXAMPLE =
 
 private const val COVER_IMAGE_NOT_FOUND_EXAMPLE =
     """{"code":"GROUP-E006","message":"업로드된 그룹 커버 이미지를 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-17T00:00:00Z"}}"""
+
+private const val COVER_IMAGE_VERIFICATION_UNAVAILABLE_EXAMPLE =
+    """{"code":"GROUP-E016","message":"업로드된 그룹 커버 이미지를 확인할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-10-09T00:00:00Z"}}"""
 
 private const val INVALID_COVER_IMAGE_METADATA_EXAMPLE =
     """{"code":"GROUP-E007","message":"그룹 커버 이미지 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-17T00:00:00Z"}}"""

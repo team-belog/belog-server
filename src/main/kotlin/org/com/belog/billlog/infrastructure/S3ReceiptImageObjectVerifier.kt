@@ -6,6 +6,7 @@ import org.com.belog.billlog.domain.ReceiptImageObjectKey
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.springframework.stereotype.Component
 
 @Component
@@ -18,6 +19,8 @@ class S3ReceiptImageObjectVerifier(
                 s3ObjectMetadataProvider.get(objectKey.value)
             } catch (exception: S3ObjectNotFoundException) {
                 throw BusinessException(BillLogErrorCode.RECEIPT_IMAGE_NOT_FOUND, exception)
+            } catch (exception: S3ObjectUnavailableException) {
+                throw BusinessException(BillLogErrorCode.RECEIPT_IMAGE_VERIFICATION_UNAVAILABLE, exception)
             }
 
         val format =

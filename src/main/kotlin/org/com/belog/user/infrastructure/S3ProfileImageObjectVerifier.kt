@@ -3,6 +3,7 @@ package org.com.belog.user.infrastructure
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectMetadataProvider
 import org.com.belog.global.storage.S3ObjectNotFoundException
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.ProfileImageFormat
 import org.com.belog.user.domain.ProfileImageObjectKey
@@ -18,6 +19,8 @@ class S3ProfileImageObjectVerifier(
                 s3ObjectMetadataProvider.get(objectKey.value)
             } catch (exception: S3ObjectNotFoundException) {
                 throw BusinessException(UserErrorCode.PROFILE_IMAGE_NOT_FOUND, exception)
+            } catch (exception: S3ObjectUnavailableException) {
+                throw BusinessException(UserErrorCode.PROFILE_IMAGE_VERIFICATION_UNAVAILABLE, exception)
             }
 
         val format =
