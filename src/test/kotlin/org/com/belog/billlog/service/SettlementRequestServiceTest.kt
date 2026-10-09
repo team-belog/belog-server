@@ -22,6 +22,9 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -30,6 +33,7 @@ import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mockingDetails
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -37,6 +41,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -85,6 +90,9 @@ class SettlementRequestServiceTest {
     @Autowired
     private lateinit var entityManager: EntityManager
 
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
     @Test
     fun `정산 요청 대상자가 요청을 완료하면 완료 상태와 완료 시각이 저장된다`() {
         val context = saveSettlementContext()
@@ -98,6 +106,27 @@ class SettlementRequestServiceTest {
         val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
         assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
         assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+    }
+
+    @Test
+    fun `정산 요청 대상자가 요청을 완료하면 결제자에게 정산 완료 알림이 저장된다`() {
+        val context = saveSettlementContext()
+
+        settlementRequestService.complete(
+            settlementRequestId = context.settlementRequestId,
+            requesterUserId = context.settlementTargetUserId,
+        )
+
+        val expectedCommand =
+            CreateNotificationCommand(
+                recipientUserId = context.payerUserId,
+                actorUserId = context.settlementTargetUserId,
+                type = NotificationType.SETTLEMENT_COMPLETED,
+                message = "정산이 완료됐어요",
+                targetId = context.meetingId,
+                deduplicationKey = "SETTLEMENT_COMPLETED:${context.settlementRequestId}",
+            )
+        assertEquals(listOf(expectedCommand), requestedNotificationCommands())
     }
 
     @Test
@@ -152,7 +181,14 @@ class SettlementRequestServiceTest {
         val settlementRequest = settlementRequestRepository.findById(context.settlementRequestId).orElseThrow()
         assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
         assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+        assertEquals(1, requestedNotificationCommands().size)
     }
+
+    private fun requestedNotificationCommands(): List<Any?> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "create" }
+            .map { invocation -> invocation.arguments.single() }
 
     private fun saveSettlementContext(): SettlementContext {
         val group = groupRepository.save(createGroup())

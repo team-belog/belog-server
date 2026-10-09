@@ -6,6 +6,7 @@ import org.com.belog.notification.service.command.CreateNotificationCommand
 internal object BillLogNotificationCommands {
     private const val SETTLEMENT_REQUESTED_MESSAGE_SUFFIX = " 님이 정산을 요청했어요"
     private const val BILL_REGISTERED_MESSAGE_SUFFIX = " 님이 영수증을 등록했어요"
+    private const val SETTLEMENT_COMPLETED_MESSAGE = "정산이 완료됐어요"
 
     fun settlementRequested(
         meetingId: Long,
@@ -37,5 +38,20 @@ internal object BillLogNotificationCommands {
             message = creatorNickname + BILL_REGISTERED_MESSAGE_SUFFIX,
             targetId = meetingId,
             deduplicationKey = "${NotificationType.BILL_REGISTERED}:$billId:$recipientUserId",
+        )
+
+    fun settlementCompleted(
+        meetingId: Long,
+        settlementRequestId: Long,
+        recipientUserId: Long,
+        debtorUserId: Long,
+    ): CreateNotificationCommand =
+        CreateNotificationCommand(
+            recipientUserId = recipientUserId,
+            actorUserId = debtorUserId,
+            type = NotificationType.SETTLEMENT_COMPLETED,
+            message = SETTLEMENT_COMPLETED_MESSAGE,
+            targetId = meetingId,
+            deduplicationKey = "${NotificationType.SETTLEMENT_COMPLETED}:$settlementRequestId",
         )
 }
