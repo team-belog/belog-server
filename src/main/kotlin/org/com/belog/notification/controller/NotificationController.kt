@@ -7,14 +7,17 @@ import jakarta.validation.constraints.Positive
 import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.notification.code.NotificationSuccessCode
+import org.com.belog.notification.controller.dto.request.RegisterNotificationDeviceRequest
 import org.com.belog.notification.controller.dto.request.UpdatePushNotificationSettingRequest
 import org.com.belog.notification.controller.dto.response.NotificationListResponse
 import org.com.belog.notification.controller.dto.response.PushNotificationSettingResponse
 import org.com.belog.notification.controller.swagger.NotificationSwagger
+import org.com.belog.notification.service.NotificationDeviceService
 import org.com.belog.notification.service.NotificationQueryService
 import org.com.belog.notification.service.NotificationService
 import org.springframework.http.CacheControl
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PutMapping
@@ -28,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class NotificationController(
     private val notificationQueryService: NotificationQueryService,
     private val notificationService: NotificationService,
+    private val notificationDeviceService: NotificationDeviceService,
 ) : NotificationSwagger {
     @GetMapping("/settings")
     override fun getPushNotificationSetting(
@@ -88,6 +92,33 @@ class NotificationController(
         @PathVariable notificationId: Long,
     ): ResponseEntity<Void> {
         notificationService.markAsRead(notificationId = notificationId, userId = userId)
+
+        return ResponseEntity.noContent().build()
+    }
+
+    @PutMapping("/devices/{deviceId}")
+    override fun registerDevice(
+        @LoginUserId userId: Long,
+        @PathVariable deviceId: String,
+        @Valid @RequestBody request: RegisterNotificationDeviceRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        notificationDeviceService.registerDevice(
+            userId = userId,
+            deviceId = deviceId,
+            fcmToken = request.fcmToken,
+        )
+
+        return ResponseEntity
+            .status(NotificationSuccessCode.NOTIFICATION_DEVICE_REGISTERED.status)
+            .body(CommonResponse.success(NotificationSuccessCode.NOTIFICATION_DEVICE_REGISTERED))
+    }
+
+    @DeleteMapping("/devices/{deviceId}")
+    override fun unregisterDevice(
+        @LoginUserId userId: Long,
+        @PathVariable deviceId: String,
+    ): ResponseEntity<Void> {
+        notificationDeviceService.unregisterDevice(userId = userId, deviceId = deviceId)
 
         return ResponseEntity.noContent().build()
     }

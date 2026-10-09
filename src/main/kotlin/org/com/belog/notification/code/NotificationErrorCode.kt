@@ -9,4 +9,5 @@ enum class NotificationErrorCode(
     override val message: String,
 ) : ErrorCode {
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION-E001", "알림을 찾을 수 없습니다."),
+    NOTIFICATION_DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "NOTIFICATION-E002", "등록된 기기를 찾을 수 없습니다."),
 }

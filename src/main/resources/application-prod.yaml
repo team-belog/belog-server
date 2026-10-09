@@ -36,3 +36,7 @@ auth:
   jwt:
     refresh-cookie-secure: true
     refresh-cookie-same-site: Lax
+
+fcm:
+  project-id: "${FCM_PROJECT_ID}"
+  credentials-base64: "${FCM_CREDENTIALS_BASE64}"
