@@ -24,6 +24,9 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -35,6 +38,7 @@ import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -95,6 +99,9 @@ class BillServiceTest {
 
     @MockitoBean
     private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
 
     @BeforeEach
     fun stubUserService() {
@@ -239,6 +246,29 @@ class BillServiceTest {
     }
 
     @Test
+    fun `결제 내역을 등록하면 정산 대상자에게 결제자 이름으로 정산 요청 알림이 저장된다`() {
+        val context = saveMeetingContext()
+
+        val result = billService.registerBill(createCommand(context, payerMemberId = requireNotNull(context.member.id)))
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        val expectedCommands =
+            setOf(
+                CreateNotificationCommand(
+                    recipientUserId = requireNotNull(context.creator.user.id),
+                    actorUserId = context.member.user.id,
+                    type = NotificationType.SETTLEMENT_REQUESTED,
+                    message = "참여자 님이 정산을 요청했어요",
+                    targetId = context.meeting.id,
+                    deduplicationKey = "SETTLEMENT_REQUESTED:${settlementRequest.id}",
+                ),
+            )
+        assertEquals(listOf(expectedCommands), requestedNotificationCommands())
+        assertEquals(1L, billRepository.count())
+        assertEquals(result.billId, billRepository.findAll().single().id)
+    }
+
+    @Test
     fun `결제 항목 합계가 결제 총액과 다르면 등록할 수 없다`() {
         val context = saveMeetingContext()
         val command =
@@ -362,6 +392,12 @@ class BillServiceTest {
             items = items,
             shares = shares,
         )
+
+    private fun requestedNotificationCommands(): List<Set<Any?>> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .map { invocation -> (invocation.arguments.single() as List<*>).toSet() }
 
     private fun assertBillDataIsEmpty() {
         assertEquals(0L, billRepository.count())

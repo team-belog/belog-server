@@ -25,6 +25,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -39,6 +40,7 @@ class BillService(
     private val billShareRepository: BillShareRepository,
     private val settlementRequestRepository: SettlementRequestRepository,
     private val userService: UserService,
+    private val notificationService: NotificationService,
 ) {
     @Transactional
     fun registerBill(command: RegisterBillCommand): RegisteredBill {
@@ -59,7 +61,8 @@ class BillService(
         val bill = saveBill(command, meeting, creator, payer)
         saveItems(command, bill)
         val shares = saveShares(command, bill, shareParticipants)
-        saveSettlementRequests(shares, payer)
+        val settlementRequests = saveSettlementRequests(shares, payer)
+        notifySettlementRequested(meeting, payer, settlementRequests)
 
         return RegisteredBill(
             billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
@@ -245,14 +248,40 @@ class BillService(
     private fun saveSettlementRequests(
         shares: List<BillShare>,
         payer: MeetingParticipant,
-    ) {
+    ): List<SettlementRequest> {
         val payerId = checkNotNull(payer.id) { "결제자의 만남 참여자 ID가 없습니다." }
         val settlementRequests =
             shares
                 .filter { share -> share.participant.id != payerId }
                 .map(SettlementRequest::create)
 
-        settlementRequestRepository.saveAll(settlementRequests)
+        return settlementRequestRepository.saveAll(settlementRequests)
+    }
+
+    private fun notifySettlementRequested(
+        meeting: Meeting,
+        payer: MeetingParticipant,
+        settlementRequests: List<SettlementRequest>,
+    ) {
+        val meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val payerUser = payer.groupMember.user
+        val payerUserId = checkNotNull(payerUser.id) { "결제자의 사용자 ID가 없습니다." }
+        val payerNickname = userService.resolveDisplayNickname(payerUser)
+
+        notificationService.createAll(
+            settlementRequests.map { settlementRequest ->
+                BillLogNotificationCommands.settlementRequested(
+                    meetingId = meetingId,
+                    settlementRequestId = checkNotNull(settlementRequest.id) { "저장된 정산 요청의 ID가 없습니다." },
+                    recipientUserId =
+                        checkNotNull(settlementRequest.participant.groupMember.user.id) {
+                            "정산 대상자의 사용자 ID가 없습니다."
+                        },
+                    payerUserId = payerUserId,
+                    payerNickname = payerNickname,
+                )
+            },
+        )
     }
 
     private fun <T> saveDomainEntity(block: () -> T): T =
