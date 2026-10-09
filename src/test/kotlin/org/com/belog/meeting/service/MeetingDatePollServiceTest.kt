@@ -1,5 +1,6 @@
 package org.com.belog.meeting.service
 
+import jakarta.persistence.EntityManager
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.Group
@@ -39,8 +40,10 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.sql.Timestamp
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -85,6 +88,12 @@ class MeetingDatePollServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
 
     @MockitoBean
     private lateinit var userService: UserService
@@ -473,6 +482,51 @@ class MeetingDatePollServiceTest {
 
         assertEquals(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING, exception.errorCode)
         assertEquals(emptyList(), requestedReminderCommands())
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나지 않으면 리마인드를 다시 요청할 수 없다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val creatorUserId = requireNotNull(context.creator.user.id)
+        meetingDatePollService.remindUnrespondedParticipants(meetingId = meetingId, userId = creatorUserId)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(meetingId = meetingId, userId = creatorUserId)
+            }
+
+        assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TOO_FREQUENT, exception.errorCode)
+        assertEquals(1, requestedReminderCommands().size)
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나면 리마인드를 다시 요청할 수 있다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        updateLastDatePollRemindedAt(meetingId, FIXED_INSTANT.minusSeconds(60))
+
+        meetingDatePollService.remindUnrespondedParticipants(
+            meetingId = meetingId,
+            userId = requireNotNull(context.creator.user.id),
+        )
+        meetingRepository.flush()
+
+        assertEquals(1, requestedReminderCommands().size)
+        assertEquals(FIXED_INSTANT, meetingRepository.findById(meetingId).orElseThrow().lastDatePollRemindedAt)
+    }
+
+    private fun updateLastDatePollRemindedAt(
+        meetingId: Long,
+        lastDatePollRemindedAt: Instant,
+    ) {
+        meetingRepository.flush()
+        jdbcTemplate.update(
+            "UPDATE meetings SET last_date_poll_reminded_at = ? WHERE id = ?",
+            Timestamp.from(lastDatePollRemindedAt),
+            meetingId,
+        )
+        entityManager.clear()
     }
 
     private fun requestedReminderCommands(): List<List<*>> =

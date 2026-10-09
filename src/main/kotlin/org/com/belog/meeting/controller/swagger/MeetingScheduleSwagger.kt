@@ -256,7 +256,8 @@ interface MeetingScheduleSwagger {
         summary = "미응답자 리마인드",
         description =
             "만남 방장이 후보 일정에 아직 응답하지 않은 참여자에게 리마인드 알림을 전송합니다. " +
-                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미하며, 재전송 횟수 제한은 없습니다.",
+                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미하며, " +
+                "같은 만남에는 마지막 전송 후 1분이 지나야 다시 전송할 수 있습니다.",
     )
     @ApiResponses(
         value = [
@@ -309,6 +310,17 @@ interface MeetingScheduleSwagger {
                             ExampleObject(name = "일정 조율 종료", value = MEETING_DATE_NOT_SCHEDULING_EXAMPLE),
                             ExampleObject(name = "미응답자 없음", value = DATE_POLL_REMINDER_TARGET_NOT_FOUND_EXAMPLE),
                         ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "429",
+                description = "마지막 리마인드 후 1분이 지나지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = DATE_POLL_REMINDER_TOO_FREQUENT_EXAMPLE)],
                     ),
                 ],
             ),
@@ -473,3 +485,6 @@ private const val DUPLICATE_AVAILABLE_DATE_EXAMPLE =
 
 private const val DATE_POLL_REMINDER_TARGET_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E024","message":"리마인드를 전송할 미응답자가 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val DATE_POLL_REMINDER_TOO_FREQUENT_EXAMPLE =
+    """{"code":"MEETING-E025","message":"일정 조율 리마인드는 1분 후에 다시 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

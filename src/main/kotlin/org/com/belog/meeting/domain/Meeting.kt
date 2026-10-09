@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 
@@ -122,6 +123,10 @@ class Meeting protected constructor(
     var confirmedAt: Instant? = confirmedAt
         protected set
 
+    @Column(name = "last_date_poll_reminded_at")
+    var lastDatePollRemindedAt: Instant? = null
+        protected set
+
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null
         protected set
@@ -169,6 +174,18 @@ class Meeting protected constructor(
         this.name = normalizedName
         this.location = normalizedLocation
         return true
+    }
+
+    fun isDatePollReminderCooldownElapsed(now: Instant): Boolean {
+        val lastDatePollRemindedAt = lastDatePollRemindedAt ?: return true
+        return !now.isBefore(lastDatePollRemindedAt.plus(DATE_POLL_REMINDER_COOLDOWN))
+    }
+
+    fun remindDatePoll(remindedAt: Instant) {
+        check(status == MeetingStatus.SCHEDULING) { "일정 조율 중인 만남에만 리마인드할 수 있습니다." }
+        check(isDatePollReminderCooldownElapsed(remindedAt)) { "일정 조율 리마인드 대기 시간이 지나지 않았습니다." }
+
+        lastDatePollRemindedAt = remindedAt
     }
 
     fun delete(deletedAt: Instant) {
@@ -238,6 +255,7 @@ class Meeting protected constructor(
         const val NAME_MIN_LENGTH = MEETING_NAME_MIN_LENGTH
         const val NAME_MAX_LENGTH = MEETING_NAME_MAX_LENGTH
         const val LOCATION_MAX_LENGTH = MEETING_LOCATION_MAX_LENGTH
+        private val DATE_POLL_REMINDER_COOLDOWN: Duration = Duration.ofMinutes(1)
 
         fun createFixed(
             group: Group,
