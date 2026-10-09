@@ -154,6 +154,29 @@ class MeetingRepositoryTest {
     }
 
     @Test
+    fun `미응답 참여자 조회는 생성자와 응답한 참여자와 탈퇴한 멤버를 제외한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val unrespondedMember = saveGroupMember(group, "unresponded-subject", "미응답자")
+        val respondedMember = saveGroupMember(group, "responded-subject", "응답자")
+        val withdrawnMember = saveGroupMember(group, "withdrawn-subject", "탈퇴자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val participants =
+            meetingParticipantRepository.saveAllAndFlush(
+                listOf(creator, unrespondedMember, respondedMember, withdrawnMember).map { member ->
+                    MeetingParticipant.create(meeting, member)
+                },
+            )
+        saveScheduleResponse(PollResponseContext(meeting, participants[2]))
+        withdrawnMember.withdraw(Instant.parse("2026-09-20T02:00:00Z"))
+        groupMemberRepository.flush()
+
+        val result = meetingParticipantRepository.findAllUnrespondedActiveWithUserByMeetingId(requireNotNull(meeting.id))
+
+        assertEquals(listOf(unrespondedMember.id), result.map { participant -> participant.groupMember.id })
+    }
+
+    @Test
     fun `삭제된 만남은 모든 활성 만남 조회에서 제외된다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")

@@ -80,6 +80,28 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         @Param("meetingId") meetingId: Long,
     ): List<MeetingParticipant>
 
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id <> participant.meeting.createdBy.id
+          AND groupMember.withdrawnAt IS NULL
+          AND NOT EXISTS (
+              SELECT response.id
+              FROM MeetingScheduleResponse response
+              WHERE response.meeting.id = :meetingId
+                AND response.participant = participant
+          )
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllUnrespondedActiveWithUserByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
