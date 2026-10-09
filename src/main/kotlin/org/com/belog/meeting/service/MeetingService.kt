@@ -21,6 +21,7 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.com.belog.meeting.service.result.PastMeetingListResult
 import org.com.belog.meeting.service.result.PastMeetingResult
+import org.com.belog.notification.service.NotificationService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -36,6 +37,7 @@ class MeetingService(
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
     private val settlementRequestService: SettlementRequestService,
+    private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -159,9 +161,19 @@ class MeetingService(
                 )
             },
         )
+        val meetingId = requireNotNull(meeting.id)
+        notificationService.createAll(
+            participants.map { participant ->
+                MeetingNotificationCommands.datePollStarted(
+                    meetingId = meetingId,
+                    recipientUserId = requireNotNull(participant.user.id),
+                    creatorUserId = creatorUserId,
+                )
+            },
+        )
 
         return CreatedMeeting(
-            meetingId = requireNotNull(meeting.id),
+            meetingId = meetingId,
             groupId = groupId,
             name = meeting.name,
             location = meeting.location,
