@@ -220,10 +220,44 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
         }
 
-        return meeting.confirmDate(
-            candidateDateRange = candidateDateRange,
-            confirmedAt = Instant.now(clock),
-            currentDate = currentDate,
+        val confirmed =
+            meeting.confirmDate(
+                candidateDateRange = candidateDateRange,
+                confirmedAt = Instant.now(clock),
+                currentDate = currentDate,
+            )
+        if (confirmed) {
+            notifyParticipantsOfConfirmedDate(
+                meetingId = meetingId,
+                ownerUserId = userId,
+                confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate),
+            )
+        }
+        return confirmed
+    }
+
+    private fun notifyParticipantsOfConfirmedDate(
+        meetingId: Long,
+        ownerUserId: Long,
+        confirmedDateRange: MeetingDateRange,
+    ) {
+        val recipientUserIds =
+            meetingParticipantRepository
+                .findAllWithMemberAndUserByMeetingId(meetingId)
+                .map { participant -> participant.groupMember }
+                .filter { groupMember -> groupMember.isActive }
+                .map { groupMember -> requireNotNull(groupMember.user.id) }
+                .filter { recipientUserId -> recipientUserId != ownerUserId }
+
+        notificationService.createAll(
+            recipientUserIds.map { recipientUserId ->
+                MeetingNotificationCommands.meetingDateConfirmed(
+                    meetingId = meetingId,
+                    recipientUserId = recipientUserId,
+                    ownerUserId = ownerUserId,
+                    confirmedDateRange = confirmedDateRange,
+                )
+            },
         )
     }
 

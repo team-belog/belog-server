@@ -13,6 +13,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
@@ -445,6 +446,49 @@ class MeetingServiceTest {
     }
 
     @Test
+    fun `후보 일정을 확정하면 방장과 탈퇴한 멤버를 제외한 참여자에게 확정 알림이 저장된다`() {
+        val context = saveConfirmationContext()
+
+        meetingService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        val meetingId = requireNotNull(context.meeting.id)
+        val recipientUserId = requireNotNull(context.participant.user.id)
+        assertEquals(
+            listOf(
+                setOf(
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.owner.user.id,
+                        type = NotificationType.MEETING_DATE_CONFIRMED,
+                        message = "일정이 9월 22일~9월 23일로 확정됐어요",
+                        targetId = meetingId,
+                        deduplicationKey = "MEETING_DATE_CONFIRMED:$meetingId:$recipientUserId",
+                    ),
+                ),
+            ),
+            requestedNotificationCommands(),
+        )
+    }
+
+    @Test
+    fun `이미 확정된 일정으로 다시 확정하면 확정 알림이 다시 저장되지 않는다`() {
+        val context = saveConfirmationContext()
+        repeat(2) {
+            meetingService.confirmMeetingDate(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.owner.user.id),
+                candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+            )
+        }
+
+        assertEquals(1, requestedNotificationCommands().size)
+    }
+
+    @Test
     fun `만남 생성자가 확정된 일정을 수정한다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")
@@ -730,6 +774,28 @@ class MeetingServiceTest {
         candidateDateRanges = candidateDateRanges,
     )
 
+    private fun saveConfirmationContext(): ConfirmationContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val owner = saveGroupMember(group, "owner-subject", "방장")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+        val withdrawnParticipant = saveGroupMember(group, "withdrawn-subject", "탈퇴자")
+        val meeting = meetingRepository.save(createPollMeeting(group, owner))
+        meetingParticipantRepository.saveAll(
+            listOf(owner, participant, withdrawnParticipant).map { member -> MeetingParticipant.create(meeting, member) },
+        )
+        withdrawnParticipant.withdraw(FIXED_INSTANT)
+        groupMemberRepository.flush()
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+        return ConfirmationContext(owner, participant, meeting, candidateDateRange)
+    }
+
     private fun requestedNotificationCommands(): List<Set<Any?>> =
         mockingDetails(notificationService)
             .invocations
@@ -816,6 +882,13 @@ class MeetingServiceTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    data class ConfirmationContext(
+        val owner: GroupMember,
+        val participant: GroupMember,
+        val meeting: Meeting,
+        val candidateDateRange: MeetingCandidateDateRange,
+    )
 
     @TestConfiguration
     class FixedClockConfig {
