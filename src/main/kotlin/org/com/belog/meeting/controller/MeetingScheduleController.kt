@@ -14,6 +14,7 @@ import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -74,6 +75,18 @@ class MeetingScheduleController(
         return ResponseEntity
             .status(MeetingSuccessCode.DATE_POLL_RESPONSE_SUBMITTED.status)
             .body(CommonResponse.success(MeetingSuccessCode.DATE_POLL_RESPONSE_SUBMITTED))
+    }
+
+    @PostMapping("/date-poll/reminders")
+    override fun remindUnrespondedParticipants(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<Void> {
+        meetingDatePollService.remindUnrespondedParticipants(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.DATE_POLL_REMINDER_SENT.status)
+            .build()
     }
 
     @PutMapping("/confirmed-date")
