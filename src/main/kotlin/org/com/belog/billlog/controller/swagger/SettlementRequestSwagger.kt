@@ -136,6 +136,72 @@ interface SettlementRequestSwagger {
         @PathVariable
         settlementRequestId: Long,
     ): ResponseEntity<Void>
+
+    @Operation(
+        summary = "정산 리마인드 전송",
+        description =
+            "결제자가 아직 완료되지 않은 정산 요청의 대상자에게 리마인드 알림을 전송합니다. " +
+                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미하며, " +
+                "같은 정산 요청에는 마지막 전송 후 1분이 지나야 다시 전송할 수 있습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "정산 리마인드 전송 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 정산 요청의 결제자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = REMINDER_ACCESS_DENIED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "정산 요청을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 완료된 정산 요청",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ALREADY_COMPLETED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "429",
+                description = "마지막 리마인드 후 1분이 지나지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = REMINDER_TOO_FREQUENT_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun remind(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "정산 요청 ID", example = "12", required = true)
+        @PathVariable
+        settlementRequestId: Long,
+    ): ResponseEntity<Void>
 }
 
 private const val GET_SETTLEMENT_REQUESTS_SUCCESS_EXAMPLE =
@@ -155,3 +221,12 @@ private const val ACCESS_DENIED_EXAMPLE =
 
 private const val NOT_FOUND_EXAMPLE =
     """{"code":"BILL_LOG-E013","message":"정산 요청을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val REMINDER_ACCESS_DENIED_EXAMPLE =
+    """{"code":"BILL_LOG-E025","message":"결제자만 정산 리마인드를 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val ALREADY_COMPLETED_EXAMPLE =
+    """{"code":"BILL_LOG-E026","message":"이미 완료된 정산 요청입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val REMINDER_TOO_FREQUENT_EXAMPLE =
+    """{"code":"BILL_LOG-E027","message":"정산 리마인드는 1분 후에 다시 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""

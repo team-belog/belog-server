@@ -32,4 +32,5 @@ enum class MeetingErrorCode(
     PAST_MEETING_DATE_SELECTION(HttpStatus.BAD_REQUEST, "MEETING-E022", "과거 날짜를 만남 일정으로 지정할 수 없습니다."),
     MEETING_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "MEETING-E023", "확정된 만남의 시작일과 종료일은 필수입니다."),
     DATE_POLL_REMINDER_TARGET_NOT_FOUND(HttpStatus.CONFLICT, "MEETING-E024", "리마인드를 전송할 미응답자가 없습니다."),
+    DATE_POLL_REMINDER_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "MEETING-E025", "일정 조율 리마인드는 1분 후에 다시 보낼 수 있습니다."),
 }

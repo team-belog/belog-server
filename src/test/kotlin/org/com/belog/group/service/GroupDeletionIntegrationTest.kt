@@ -26,6 +26,8 @@ import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.MeetingServiceTest
+import org.com.belog.notification.repository.NotificationOutboxRepository
+import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -97,8 +99,16 @@ class GroupDeletionIntegrationTest {
     @Autowired
     private lateinit var userRepository: UserRepository
 
+    @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
+
+    @Autowired
+    private lateinit var notificationRepository: NotificationRepository
+
     @AfterEach
     fun cleanUp() {
+        notificationOutboxRepository.deleteAllInBatch()
+        notificationRepository.deleteAllInBatch()
         settlementRequestRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
         billItemRepository.deleteAllInBatch()

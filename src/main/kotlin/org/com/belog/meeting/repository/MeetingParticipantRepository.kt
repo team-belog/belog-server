@@ -87,6 +87,21 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         JOIN FETCH participant.groupMember groupMember
         JOIN FETCH groupMember.user
         WHERE participant.meeting.id = :meetingId
+          AND groupMember.withdrawnAt IS NULL
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllActiveWithUserByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE participant.meeting.id = :meetingId
           AND groupMember.id <> participant.meeting.createdBy.id
           AND groupMember.withdrawnAt IS NULL
           AND NOT EXISTS (

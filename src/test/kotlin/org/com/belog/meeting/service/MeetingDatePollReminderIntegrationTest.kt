@@ -96,13 +96,13 @@ class MeetingDatePollReminderIntegrationTest {
     }
 
     @Test
-    fun `같은 시각에 리마인드를 다시 요청해도 새 알림이 저장된다`() {
+    fun `1분 후 리마인드를 다시 요청하면 새 알림이 저장된다`() {
         val context = saveReminderContext()
         `when`(clock.instant()).thenReturn(REMINDED_AT)
+        meetingDatePollService.remindUnrespondedParticipants(context.meetingId, context.ownerUserId)
 
-        repeat(2) {
-            meetingDatePollService.remindUnrespondedParticipants(context.meetingId, context.ownerUserId)
-        }
+        `when`(clock.instant()).thenReturn(REMINDED_AT.plusSeconds(60))
+        meetingDatePollService.remindUnrespondedParticipants(context.meetingId, context.ownerUserId)
 
         assertEquals(2L, notificationRepository.count())
         assertEquals(2L, notificationOutboxRepository.count())

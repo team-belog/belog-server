@@ -198,13 +198,17 @@ class MeetingDatePollService(
         if (meeting.status != MeetingStatus.SCHEDULING) {
             throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
         }
+        val remindedAt = Instant.now(clock)
+        if (!meeting.isDatePollReminderCooldownElapsed(remindedAt)) {
+            throw BusinessException(MeetingErrorCode.DATE_POLL_REMINDER_TOO_FREQUENT)
+        }
 
         val unrespondedParticipants = meetingParticipantRepository.findAllUnrespondedActiveWithUserByMeetingId(meetingId)
         if (unrespondedParticipants.isEmpty()) {
             throw BusinessException(MeetingErrorCode.DATE_POLL_REMINDER_TARGET_NOT_FOUND)
         }
 
-        val remindedAt = Instant.now(clock)
+        meeting.remindDatePoll(remindedAt)
         val reminderId = UUID.randomUUID()
         notificationService.createAll(
             unrespondedParticipants.map { participant ->
