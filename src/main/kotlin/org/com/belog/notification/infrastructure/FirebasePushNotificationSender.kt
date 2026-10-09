@@ -66,7 +66,10 @@ class FirebasePushNotificationSender(
     private fun classify(exception: FirebaseMessagingException?): PushSendOutcome =
         when (exception?.messagingErrorCode) {
             MessagingErrorCode.UNREGISTERED, MessagingErrorCode.INVALID_ARGUMENT -> PushSendOutcome.INVALID_TOKEN
-            MessagingErrorCode.UNAVAILABLE, MessagingErrorCode.INTERNAL -> PushSendOutcome.RETRYABLE_FAILURE
+            MessagingErrorCode.UNAVAILABLE,
+            MessagingErrorCode.INTERNAL,
+            MessagingErrorCode.QUOTA_EXCEEDED,
+            -> PushSendOutcome.RETRYABLE_FAILURE
             else -> PushSendOutcome.PERMANENT_FAILURE
         }
 

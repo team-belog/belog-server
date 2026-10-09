@@ -24,22 +24,23 @@ class NotificationDeviceService(
         deviceId: String,
         fcmToken: String,
     ) {
+        val normalizedDeviceId = normalizeAndValidateDeviceId(deviceId)
         val normalizedFcmToken = fcmToken.trim()
         val user =
             userRepository.findById(userId).orElseThrow {
                 BusinessException(UserErrorCode.USER_NOT_FOUND)
             }
 
-        deactivateConflictingDevice(user = user, deviceId = deviceId, fcmToken = normalizedFcmToken)
+        deactivateConflictingDevice(user = user, deviceId = normalizedDeviceId, fcmToken = normalizedFcmToken)
 
-        val existingDevice = notificationDeviceRepository.findByUserIdAndDeviceId(userId, deviceId)
+        val existingDevice = notificationDeviceRepository.findByUserIdAndDeviceId(userId, normalizedDeviceId)
         if (existingDevice != null) {
             existingDevice.updateToken(normalizedFcmToken)
             return
         }
 
         notificationDeviceRepository.save(
-            NotificationDevice.register(user = user, deviceId = deviceId, fcmToken = normalizedFcmToken),
+            NotificationDevice.register(user = user, deviceId = normalizedDeviceId, fcmToken = normalizedFcmToken),
         )
     }
 
@@ -48,11 +49,20 @@ class NotificationDeviceService(
         userId: Long,
         deviceId: String,
     ) {
+        val normalizedDeviceId = normalizeAndValidateDeviceId(deviceId)
         val device =
-            notificationDeviceRepository.findByUserIdAndDeviceId(userId, deviceId)
+            notificationDeviceRepository.findByUserIdAndDeviceId(userId, normalizedDeviceId)
                 ?: throw BusinessException(NotificationErrorCode.NOTIFICATION_DEVICE_NOT_FOUND)
 
         device.deactivate(Instant.now(clock))
+    }
+
+    private fun normalizeAndValidateDeviceId(deviceId: String): String {
+        val normalized = deviceId.trim()
+        require(normalized.isNotEmpty() && normalized.length <= NotificationDevice.DEVICE_ID_MAX_LENGTH) {
+            "기기 식별자는 비어 있을 수 없으며 ${NotificationDevice.DEVICE_ID_MAX_LENGTH}자를 초과할 수 없습니다."
+        }
+        return normalized
     }
 
     private fun deactivateConflictingDevice(
