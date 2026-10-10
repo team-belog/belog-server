@@ -215,6 +215,63 @@ class MeetingRepositoryTest {
         )
     }
 
+    @Test
+    fun `시작일로 만남 ID를 조회하면 삭제된 만남과 시작일이 다른 만남은 제외된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val target = meetingRepository.save(createMeetingStartingOn(group, creator, REMINDER_START_DATE))
+        val deleted = createMeetingStartingOn(group, creator, REMINDER_START_DATE)
+        deleted.delete(Instant.parse("2026-09-20T00:00:00Z"))
+        meetingRepository.save(deleted)
+        meetingRepository.save(createMeetingStartingOn(group, creator, REMINDER_START_DATE.plusDays(1)))
+        meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+
+        val meetingIds =
+            meetingRepository.findIdsByStartDate(
+                startDate = REMINDER_START_DATE,
+                cursor = null,
+                status = MeetingStatus.CONFIRMED,
+                pageable = PageRequest.of(0, 10),
+            )
+
+        assertEquals(listOf(target.id), meetingIds)
+    }
+
+    @Test
+    fun `시작일로 만남 ID를 조회하면 커서 이후 ID를 요청 개수만큼 오름차순으로 반환한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meetings =
+            meetingRepository.saveAllAndFlush(
+                List(4) { createMeetingStartingOn(group, creator, REMINDER_START_DATE) },
+            )
+
+        val meetingIds =
+            meetingRepository.findIdsByStartDate(
+                startDate = REMINDER_START_DATE,
+                cursor = meetings[0].id,
+                status = MeetingStatus.CONFIRMED,
+                pageable = PageRequest.of(0, 2),
+            )
+
+        assertEquals(listOf(meetings[1].id, meetings[2].id), meetingIds)
+    }
+
+    private fun createMeetingStartingOn(
+        group: Group,
+        creator: GroupMember,
+        startDate: LocalDate,
+    ): Meeting =
+        Meeting.createFixed(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = null,
+            dateRange = MeetingDateRange(startDate, startDate.plusDays(1)),
+            confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
+            currentDate = LocalDate.of(2026, 9, 20),
+        )
+
     private fun createMeeting(
         group: Group,
         creator: GroupMember,
@@ -318,4 +375,8 @@ class MeetingRepositoryTest {
         val meeting: Meeting,
         val participant: MeetingParticipant,
     )
+
+    companion object {
+        private val REMINDER_START_DATE: LocalDate = LocalDate.of(2026, 9, 28)
+    }
 }

@@ -106,6 +106,24 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
 
     @Query(
         """
+        SELECT meeting.id
+        FROM Meeting meeting
+        WHERE meeting.startDate = :startDate
+          AND meeting.status = :status
+          AND (:cursor IS NULL OR meeting.id > :cursor)
+          AND meeting.deletedAt IS NULL
+        ORDER BY meeting.id ASC
+        """,
+    )
+    fun findIdsByStartDate(
+        @Param("startDate") startDate: LocalDate,
+        @Param("cursor") cursor: Long?,
+        @Param("status") status: MeetingStatus,
+        pageable: Pageable,
+    ): List<Long>
+
+    @Query(
+        """
         SELECT meeting
         FROM Meeting meeting
         JOIN FETCH meeting.group

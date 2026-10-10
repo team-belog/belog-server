@@ -175,6 +175,8 @@ class Meeting protected constructor(
 
     fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
 
+    fun startsOn(date: LocalDate): Boolean = startDate == date
+
     fun updateDetails(
         name: String,
         location: String?,
