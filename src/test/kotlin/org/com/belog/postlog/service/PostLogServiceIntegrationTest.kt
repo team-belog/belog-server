@@ -21,6 +21,9 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.repository.NotificationOutboxRepository
+import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
@@ -113,11 +116,19 @@ class PostLogServiceIntegrationTest {
     @Autowired
     private lateinit var settlementRequestRepository: SettlementRequestRepository
 
+    @Autowired
+    private lateinit var notificationRepository: NotificationRepository
+
+    @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
+
     @MockitoBean
     private lateinit var objectReadUrlProvider: S3ObjectReadUrlProvider
 
     @AfterEach
     fun cleanUp() {
+        notificationOutboxRepository.deleteAllInBatch()
+        notificationRepository.deleteAllInBatch()
         settlementRequestRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
         billRepository.deleteAllInBatch()
@@ -258,6 +269,41 @@ class PostLogServiceIntegrationTest {
         assertEquals(LocalDate.of(2026, 9, 29), result.endDate)
         assertEquals("광주", result.location)
         assertEquals(1L, postLogTicketRepository.count())
+    }
+
+    @Test
+    fun `티켓을 생성하면 작성자를 제외한 만남 참여자에게 후기 등록 알림을 저장한다`() {
+        val context = saveMeetingContext()
+        val participant = saveGroupMember(context.group, "member2")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, participant))
+        val participantUserId = checkNotNull(participant.user.id)
+
+        val result = postLogService.createTicket(context.meetingId, context.creatorUserId, "함께한 광주 여행")
+
+        val notification = notificationRepository.findAll().single()
+        assertEquals(participantUserId, notification.recipient.id)
+        assertEquals(context.creatorUserId, notification.actor?.id)
+        assertEquals(NotificationType.POST_LOG_REVIEW_CREATED, notification.type)
+        assertEquals("creator 님이 후기를 남겼어요", notification.message)
+        assertEquals(context.meetingId, notification.targetId)
+        assertEquals("POST_LOG_REVIEW_CREATED:${result.ticketId}:$participantUserId", notification.deduplicationKey)
+        assertEquals(1L, notificationOutboxRepository.count())
+    }
+
+    @Test
+    fun `임시저장하거나 티켓을 중복 생성하면 후기 등록 알림을 저장하지 않는다`() {
+        val context = saveMeetingContext()
+        val participant = saveGroupMember(context.group, "member2")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, participant))
+        postLogService.saveDraft(context.meetingId, context.creatorUserId, "임시저장 문구")
+        assertEquals(0L, notificationRepository.count())
+        postLogService.createTicket(context.meetingId, context.creatorUserId, "첫 번째 추억")
+
+        assertFailsWith<BusinessException> {
+            postLogService.createTicket(context.meetingId, context.creatorUserId, "변경하려는 추억")
+        }
+
+        assertEquals(1L, notificationRepository.count())
     }
 
     @Test

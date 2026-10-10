@@ -6,10 +6,12 @@ import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.POST_LOG_TICKET_MEETING_CREATOR_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.postlog.domain.PostLogDraft
@@ -42,6 +44,7 @@ class PostLogService(
     private val settlementRequestRepository: SettlementRequestRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
+    private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
     @Transactional
@@ -108,6 +111,7 @@ class PostLogService(
                 throw exception
             }
         postLogDraftRepository.findByMeetingIdAndCreatedById(meetingId, creatorId)?.let(postLogDraftRepository::delete)
+        notifyReviewCreated(meetingId, savedTicket, creator)
         return toTicketResult(savedTicket)
     }
 
@@ -177,6 +181,34 @@ class PostLogService(
 
     companion object {
         private const val REPRESENTATIVE_PHOTO_COUNT = 1
+    }
+
+    private fun notifyReviewCreated(
+        meetingId: Long,
+        ticket: PostLogTicket,
+        creator: GroupMember,
+    ) {
+        val ticketId = checkNotNull(ticket.id) { "저장된 티켓의 ID가 없습니다." }
+        val creatorUser = creator.user
+        val creatorUserId = checkNotNull(creatorUser.id) { "티켓 생성자의 사용자 ID가 없습니다." }
+        val creatorNickname = userService.resolveDisplayNickname(creatorUser)
+        val recipientUserIds =
+            meetingParticipantRepository
+                .findAllActiveWithUserByMeetingId(meetingId)
+                .map { participant -> checkNotNull(participant.groupMember.user.id) { "만남 참여자의 사용자 ID가 없습니다." } }
+                .filter { recipientUserId -> recipientUserId != creatorUserId }
+
+        notificationService.createAll(
+            recipientUserIds.map { recipientUserId ->
+                PostLogNotificationCommands.reviewCreated(
+                    meetingId = meetingId,
+                    ticketId = ticketId,
+                    recipientUserId = recipientUserId,
+                    creatorUserId = creatorUserId,
+                    creatorNickname = creatorNickname,
+                )
+            },
+        )
     }
 
     private fun findRepresentativeObjectKey(meetingId: Long): String? =
