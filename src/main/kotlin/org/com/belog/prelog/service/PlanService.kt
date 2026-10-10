@@ -7,7 +7,9 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.Plan
@@ -20,6 +22,7 @@ import org.com.belog.prelog.service.result.MapPlanListItemResult
 import org.com.belog.prelog.service.result.MapPlanListResult
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
+import org.com.belog.user.service.UserService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -32,6 +35,9 @@ class PlanService(
     private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
     private val planLikeRepository: PlanLikeRepository,
+    private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val notificationService: NotificationService,
+    private val userService: UserService,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -159,7 +165,7 @@ class PlanService(
                     url = url,
                     currentDate = currentDate,
                 ).apply { applyLocationResolution(locationResolution) }
-        }
+        }.also { plan -> notifyPlanCreated(meetingId, plan, creator) }
     }
 
     @Transactional
@@ -184,7 +190,7 @@ class PlanService(
                 content = content,
                 currentDate = currentDate,
             )
-        }
+        }.also { plan -> notifyPlanCreated(meetingId, plan, creator) }
     }
 
     @Transactional
@@ -331,6 +337,34 @@ class PlanService(
             }
 
         return planRepository.save(plan)
+    }
+
+    private fun notifyPlanCreated(
+        meetingId: Long,
+        plan: Plan,
+        creator: GroupMember,
+    ) {
+        val planId = checkNotNull(plan.id) { "저장된 계획의 ID가 없습니다." }
+        val creatorUser = creator.user
+        val creatorUserId = checkNotNull(creatorUser.id) { "계획 작성자의 사용자 ID가 없습니다." }
+        val creatorNickname = userService.resolveDisplayNickname(creatorUser)
+        val recipientUserIds =
+            meetingParticipantRepository
+                .findAllActiveWithUserByMeetingId(meetingId)
+                .map { participant -> checkNotNull(participant.groupMember.user.id) { "만남 참여자의 사용자 ID가 없습니다." } }
+                .filter { recipientUserId -> recipientUserId != creatorUserId }
+
+        notificationService.createAll(
+            recipientUserIds.map { recipientUserId ->
+                PreLogNotificationCommands.planCreated(
+                    meetingId = meetingId,
+                    planId = planId,
+                    recipientUserId = recipientUserId,
+                    creatorUserId = creatorUserId,
+                    creatorNickname = creatorNickname,
+                )
+            },
+        )
     }
 
     private fun Plan.toListItemResult(
