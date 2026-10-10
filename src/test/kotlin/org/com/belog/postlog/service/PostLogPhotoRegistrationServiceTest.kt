@@ -1,5 +1,6 @@
 package org.com.belog.postlog.service
 
+import org.com.belog.global.config.ClockConfig
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.Group
@@ -10,6 +11,7 @@ import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
@@ -19,13 +21,16 @@ import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
+import org.com.belog.user.infrastructure.ProfileImageStorage
 import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -38,6 +43,9 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     PostLogPhotoRegistrationService::class,
+    NotificationService::class,
+    UserService::class,
+    ClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
@@ -61,6 +69,9 @@ class PostLogPhotoRegistrationServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @MockitoBean
+    private lateinit var profileImageStorage: ProfileImageStorage
 
     @AfterEach
     fun cleanUp() {
