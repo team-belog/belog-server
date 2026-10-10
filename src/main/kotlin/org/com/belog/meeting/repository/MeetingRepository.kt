@@ -106,6 +106,87 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
 
     @Query(
         """
+        SELECT meeting.id
+        FROM Meeting meeting
+        WHERE meeting.startDate = :startDate
+          AND meeting.status = :status
+          AND (:cursor IS NULL OR meeting.id > :cursor)
+          AND meeting.deletedAt IS NULL
+        ORDER BY meeting.id ASC
+        """,
+    )
+    fun findIdsByStartDate(
+        @Param("startDate") startDate: LocalDate,
+        @Param("cursor") cursor: Long?,
+        @Param("status") status: MeetingStatus,
+        pageable: Pageable,
+    ): List<Long>
+
+    @Query(
+        """
+        SELECT meeting.id
+        FROM Meeting meeting
+        WHERE meeting.endDate = :endDate
+          AND meeting.status = :status
+          AND (:cursor IS NULL OR meeting.id > :cursor)
+          AND meeting.deletedAt IS NULL
+        ORDER BY meeting.id ASC
+        """,
+    )
+    fun findIdsByEndDate(
+        @Param("endDate") endDate: LocalDate,
+        @Param("cursor") cursor: Long?,
+        @Param("status") status: MeetingStatus,
+        pageable: Pageable,
+    ): List<Long>
+
+    @Query(
+        """
+        SELECT meeting.group.id
+        FROM Meeting meeting
+        WHERE meeting.status = :confirmedStatus
+          AND (:cursor IS NULL OR meeting.group.id > :cursor)
+          AND meeting.deletedAt IS NULL
+          AND NOT EXISTS (
+              SELECT schedulingMeeting.id
+              FROM Meeting schedulingMeeting
+              WHERE schedulingMeeting.group = meeting.group
+                AND schedulingMeeting.status = :schedulingStatus
+                AND schedulingMeeting.deletedAt IS NULL
+          )
+        GROUP BY meeting.group.id
+        HAVING MAX(meeting.endDate) <= :lastEndDate
+        ORDER BY meeting.group.id ASC
+        """,
+    )
+    fun findInactiveGroupIds(
+        @Param("lastEndDate") lastEndDate: LocalDate,
+        @Param("cursor") cursor: Long?,
+        @Param("confirmedStatus") confirmedStatus: MeetingStatus,
+        @Param("schedulingStatus") schedulingStatus: MeetingStatus,
+        pageable: Pageable,
+    ): List<Long>
+
+    @Query(
+        """
+        SELECT meeting
+        FROM Meeting meeting
+        WHERE meeting.group.id = :groupId
+          AND meeting.status = :status
+          AND meeting.endDate < :currentDate
+          AND meeting.deletedAt IS NULL
+        ORDER BY meeting.endDate DESC, meeting.id DESC
+        """,
+    )
+    fun findLatestEndedMeetings(
+        @Param("groupId") groupId: Long,
+        @Param("currentDate") currentDate: LocalDate,
+        @Param("status") status: MeetingStatus,
+        pageable: Pageable,
+    ): List<Meeting>
+
+    @Query(
+        """
         SELECT meeting
         FROM Meeting meeting
         JOIN FETCH meeting.group
