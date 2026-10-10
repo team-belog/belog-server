@@ -8,7 +8,12 @@ import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.MapProvider
@@ -18,9 +23,12 @@ import org.com.belog.prelog.domain.PlanLocation
 import org.com.belog.prelog.domain.PlanType
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.user.domain.User
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
@@ -43,8 +51,21 @@ class PlanServiceTest {
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
     private val planRepository = mock(PlanRepository::class.java)
     private val planLikeRepository = mock(PlanLikeRepository::class.java)
+    private val meetingParticipantRepository = mock(MeetingParticipantRepository::class.java)
+    private val notificationService = mock(NotificationService::class.java)
+    private val userService = mock(UserService::class.java)
     private val clock = Clock.fixed(Instant.parse("2026-09-22T00:00:00Z"), ZoneOffset.UTC)
-    private val planService = PlanService(meetingRepository, groupMemberRepository, planRepository, planLikeRepository, clock)
+    private val planService =
+        PlanService(
+            meetingRepository,
+            groupMemberRepository,
+            planRepository,
+            planLikeRepository,
+            meetingParticipantRepository,
+            notificationService,
+            userService,
+            clock,
+        )
 
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
@@ -321,12 +342,7 @@ class PlanServiceTest {
     @Test
     fun `약속에 참여하지 않은 그룹 멤버도 계획을 생성할 수 있다`() {
         val context = meetingContext()
-        val groupMember = mock(GroupMember::class.java)
-        `when`(groupMember.group).thenReturn(context.group)
-        `when`(groupMember.belongsTo(context.group)).thenCallRealMethod()
-        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
-        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
-        `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation -> invocation.getArgument(0) }
+        val groupMember = stubPlanCreator(context)
 
         val plan =
             planService.createMemoPlan(
@@ -339,6 +355,36 @@ class PlanServiceTest {
 
         assertSame(context.meeting, plan.meeting)
         assertSame(groupMember, plan.createdBy)
+    }
+
+    @Test
+    fun `계획을 등록하면 등록자를 제외한 만남 참여자에게 등록 알림을 저장한다`() {
+        val context = meetingContext()
+        stubPlanCreator(context)
+        val participants = listOf(15L, 16L, 17L).map { userId -> meetingParticipant(userId) }
+        `when`(meetingParticipantRepository.findAllActiveWithUserByMeetingId(1L)).thenReturn(participants)
+
+        planService.createLocationPlan(
+            meetingId = 1L,
+            creatorUserId = 15L,
+            category = PlanCategory.CAFE,
+            title = "카페",
+            url = "https://example.com/cafe",
+        )
+
+        assertEquals(
+            listOf(16L, 17L).map { recipientUserId ->
+                CreateNotificationCommand(
+                    recipientUserId = recipientUserId,
+                    actorUserId = 15L,
+                    type = NotificationType.PRE_LOG_PLAN_CREATED,
+                    message = "등록자 님이 새로운 계획을 등록했어요",
+                    targetId = 1L,
+                    deduplicationKey = "PRE_LOG_PLAN_CREATED:20:$recipientUserId",
+                )
+            },
+            requestedNotificationCommands(),
+        )
     }
 
     @Test
@@ -362,6 +408,7 @@ class PlanServiceTest {
         assertEquals(PreLogErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
         verify(context.meeting).isEnded(LocalDate.of(2026, 9, 22))
         verifyNoInteractions(planRepository)
+        verifyNoInteractions(notificationService)
     }
 
     private fun meetingContext(endDate: LocalDate = LocalDate.of(2026, 9, 23)): MeetingContext {
@@ -374,6 +421,39 @@ class PlanServiceTest {
         `when`(meeting.isEnded(currentDate)).thenReturn(endDate.isBefore(currentDate))
         return MeetingContext(group, meeting)
     }
+
+    private fun stubPlanCreator(context: MeetingContext): GroupMember {
+        val creatorUser = mock(User::class.java)
+        val creator = mock(GroupMember::class.java)
+        `when`(creatorUser.id).thenReturn(15L)
+        `when`(creator.user).thenReturn(creatorUser)
+        `when`(creator.group).thenReturn(context.group)
+        `when`(creator.belongsTo(context.group)).thenCallRealMethod()
+        `when`(userService.resolveDisplayNickname(creatorUser)).thenReturn("등록자")
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(creator)
+        `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation ->
+            invocation.getArgument<Plan>(0).also { plan -> ReflectionTestUtils.setField(plan, "id", 20L) }
+        }
+        return creator
+    }
+
+    private fun meetingParticipant(userId: Long): MeetingParticipant {
+        val user = mock(User::class.java)
+        val groupMember = mock(GroupMember::class.java)
+        val participant = mock(MeetingParticipant::class.java)
+        `when`(user.id).thenReturn(userId)
+        `when`(groupMember.user).thenReturn(user)
+        `when`(participant.groupMember).thenReturn(groupMember)
+        return participant
+    }
+
+    private fun requestedNotificationCommands(): List<CreateNotificationCommand> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
 
     private fun stubPlanList(
         loginGroupMemberId: Long,
