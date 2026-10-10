@@ -257,6 +257,29 @@ class MeetingRepositoryTest {
         assertEquals(listOf(meetings[1].id, meetings[2].id), meetingIds)
     }
 
+    @Test
+    fun `종료일로 만남 ID를 조회하면 삭제된 만남과 종료일이 다른 만남은 제외된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val endDate = REMINDER_START_DATE.plusDays(1)
+        val target = meetingRepository.save(createMeetingStartingOn(group, creator, REMINDER_START_DATE))
+        val deleted = createMeetingStartingOn(group, creator, REMINDER_START_DATE)
+        deleted.delete(Instant.parse("2026-09-20T00:00:00Z"))
+        meetingRepository.save(deleted)
+        meetingRepository.save(createMeetingStartingOn(group, creator, endDate))
+        meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+
+        val meetingIds =
+            meetingRepository.findIdsByEndDate(
+                endDate = endDate,
+                cursor = null,
+                status = MeetingStatus.CONFIRMED,
+                pageable = PageRequest.of(0, 10),
+            )
+
+        assertEquals(listOf(target.id), meetingIds)
+    }
+
     private fun createMeetingStartingOn(
         group: Group,
         creator: GroupMember,
