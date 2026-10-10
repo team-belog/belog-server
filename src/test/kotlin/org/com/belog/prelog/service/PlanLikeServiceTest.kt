@@ -6,10 +6,15 @@ import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanLike
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.user.domain.User
+import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
@@ -25,12 +30,44 @@ class PlanLikeServiceTest {
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
     private val planRepository = mock(PlanRepository::class.java)
     private val planLikeRepository = mock(PlanLikeRepository::class.java)
+    private val notificationService = mock(NotificationService::class.java)
+    private val userService = mock(UserService::class.java)
     private val planLikeService =
         PlanLikeService(
             groupMemberRepository = groupMemberRepository,
             planRepository = planRepository,
             planLikeRepository = planLikeRepository,
+            notificationService = notificationService,
+            userService = userService,
         )
+
+    @Test
+    fun `다른 멤버가 계획에 좋아요하면 작성자에게 좋아요 알림을 저장한다`() {
+        val planAuthor = groupMember(groupMemberId = AUTHOR_GROUP_MEMBER_ID, userId = AUTHOR_USER_ID)
+        stubLikeTarget(planAuthor = planAuthor)
+
+        planLikeService.likePlan(PLAN_ID, USER_ID)
+
+        verify(notificationService).create(
+            CreateNotificationCommand(
+                recipientUserId = AUTHOR_USER_ID,
+                actorUserId = USER_ID,
+                type = NotificationType.PRE_LOG_PLAN_LIKED,
+                message = "좋아요한 멤버 님이 좋아요를 눌렀어요",
+                targetId = MEETING_ID,
+                deduplicationKey = "PRE_LOG_PLAN_LIKED:$PLAN_ID:$GROUP_MEMBER_ID",
+            ),
+        )
+    }
+
+    @Test
+    fun `작성자가 자신의 계획에 좋아요하면 알림을 저장하지 않는다`() {
+        stubLikeTarget()
+
+        planLikeService.likePlan(PLAN_ID, USER_ID)
+
+        verifyNoInteractions(notificationService)
+    }
 
     @Test
     fun `이미 좋아요한 계획에 다시 등록해도 현재 상태와 개수를 반환한다`() {
@@ -102,24 +139,42 @@ class PlanLikeServiceTest {
         verifyNoInteractions(planLikeRepository)
     }
 
-    private fun stubLikeTarget() {
+    private fun stubLikeTarget(planAuthor: GroupMember? = null) {
         val meeting = mock(Meeting::class.java)
         val group = mock(Group::class.java)
-        val groupMember = mock(GroupMember::class.java)
+        val groupMember = groupMember(groupMemberId = GROUP_MEMBER_ID, userId = USER_ID)
         val plan = mock(Plan::class.java)
+        `when`(meeting.id).thenReturn(MEETING_ID)
         `when`(meeting.group).thenReturn(group)
         `when`(group.id).thenReturn(GROUP_ID)
-        `when`(groupMember.id).thenReturn(GROUP_MEMBER_ID)
+        `when`(userService.resolveDisplayNickname(groupMember.user)).thenReturn("좋아요한 멤버")
         `when`(plan.id).thenReturn(PLAN_ID)
         `when`(plan.meeting).thenReturn(meeting)
+        `when`(plan.createdBy).thenReturn(planAuthor ?: groupMember)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(groupMember)
         `when`(planRepository.findByIdWithMeetingAndCreator(PLAN_ID)).thenReturn(plan)
     }
 
+    private fun groupMember(
+        groupMemberId: Long,
+        userId: Long,
+    ): GroupMember {
+        val user = mock(User::class.java)
+        val groupMember = mock(GroupMember::class.java)
+        `when`(user.id).thenReturn(userId)
+        `when`(groupMember.id).thenReturn(groupMemberId)
+        `when`(groupMember.user).thenReturn(user)
+        `when`(groupMember.isActive).thenReturn(true)
+        return groupMember
+    }
+
     companion object {
         private const val PLAN_ID = 12L
+        private const val MEETING_ID = 1L
         private const val GROUP_ID = 3L
         private const val GROUP_MEMBER_ID = 10L
         private const val USER_ID = 15L
+        private const val AUTHOR_GROUP_MEMBER_ID = 11L
+        private const val AUTHOR_USER_ID = 16L
     }
 }
