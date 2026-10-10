@@ -96,3 +96,7 @@ notification:
     max-attempts: "${NOTIFICATION_OUTBOX_MAX_ATTEMPTS:5}"
     processing-timeout: "${NOTIFICATION_OUTBOX_PROCESSING_TIMEOUT:5m}"
     retry-base-delay: "${NOTIFICATION_OUTBOX_RETRY_BASE_DELAY:30s}"
+  reminder:
+    morning-cron: "${NOTIFICATION_REMINDER_MORNING_CRON:0 0 9 * * *}"
+    evening-cron: "${NOTIFICATION_REMINDER_EVENING_CRON:0 0 21 * * *}"
+    batch-size: "${NOTIFICATION_REMINDER_BATCH_SIZE:100}"
