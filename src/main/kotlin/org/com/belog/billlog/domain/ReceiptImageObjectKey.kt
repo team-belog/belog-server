@@ -38,10 +38,12 @@ value class ReceiptImageObjectKey private constructor(
 
             val imageIdValue = fileName.substring(0, extensionSeparatorIndex)
             val extension = fileName.substring(extensionSeparatorIndex + 1)
-            require(ReceiptImageFormat.fromExtension(extension) != null) { "지원하지 않는 영수증 이미지 확장자입니다." }
+            require(ReceiptImageFormat.fromExtension(extension)?.extension == extension) {
+                "지원하지 않는 영수증 이미지 확장자입니다."
+            }
 
             val imageId = runCatching { UUID.fromString(imageIdValue) }.getOrNull()
-            require(imageId != null && imageId.toString().equals(imageIdValue, ignoreCase = true)) {
+            require(imageId != null && imageId.toString() == imageIdValue) {
                 "영수증 이미지 파일 식별자가 올바르지 않습니다."
             }
 

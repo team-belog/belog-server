@@ -25,6 +25,11 @@ class S3ObjectMetadataProvider(
                 )
             } catch (exception: S3Exception) {
                 if (exception.statusCode() == NOT_FOUND_STATUS_CODE) {
+                    log.warn(
+                        "S3 object not found: objectKey={}, requestId={}",
+                        objectKey,
+                        exception.requestId(),
+                    )
                     throw S3ObjectNotFoundException(objectKey, exception)
                 }
                 log.error(
