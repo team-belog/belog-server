@@ -179,6 +179,8 @@ class Meeting protected constructor(
 
     fun endsOn(date: LocalDate): Boolean = endDate == date
 
+    fun isEndedOnOrBefore(date: LocalDate): Boolean = endDate?.isAfter(date) == false
+
     fun updateDetails(
         name: String,
         location: String?,

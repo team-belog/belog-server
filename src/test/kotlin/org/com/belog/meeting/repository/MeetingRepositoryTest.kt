@@ -280,6 +280,38 @@ class MeetingRepositoryTest {
         assertEquals(listOf(target.id), meetingIds)
     }
 
+    @Test
+    fun `마지막 종료 여정이 기준일 이전이고 일정 조율 중인 만남이 없는 그룹 ID만 조회된다`() {
+        val lastEndDate = LocalDate.of(2026, 10, 1)
+        val inactiveGroup = saveGroupWithMeetingStartingOn("AB12CD", "inactive", lastEndDate.minusDays(1))
+        val recentGroup = saveGroupWithMeetingStartingOn("BC23DE", "recent", lastEndDate.minusDays(1))
+        meetingRepository.save(createMeetingStartingOn(recentGroup.group, recentGroup.creator, lastEndDate))
+        val schedulingGroup = saveGroupWithMeetingStartingOn("CD34EF", "poll", lastEndDate.minusDays(1))
+        meetingRepository.saveAndFlush(createPollMeeting(schedulingGroup.group, schedulingGroup.creator))
+
+        val groupIds =
+            meetingRepository.findInactiveGroupIds(
+                lastEndDate = lastEndDate,
+                cursor = null,
+                confirmedStatus = MeetingStatus.CONFIRMED,
+                schedulingStatus = MeetingStatus.SCHEDULING,
+                pageable = PageRequest.of(0, 10),
+            )
+
+        assertEquals(listOf(inactiveGroup.group.id), groupIds)
+    }
+
+    private fun saveGroupWithMeetingStartingOn(
+        inviteCode: String,
+        providerUserId: String,
+        startDate: LocalDate,
+    ): GroupContext {
+        val group = groupRepository.save(createGroup(inviteCode))
+        val creator = saveGroupMember(group, "$providerUserId-subject", providerUserId)
+        meetingRepository.saveAndFlush(createMeetingStartingOn(group, creator, startDate))
+        return GroupContext(group, creator)
+    }
+
     private fun createMeetingStartingOn(
         group: Group,
         creator: GroupMember,
@@ -393,6 +425,11 @@ class MeetingRepositoryTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    private data class GroupContext(
+        val group: Group,
+        val creator: GroupMember,
+    )
 
     private data class PollResponseContext(
         val meeting: Meeting,
