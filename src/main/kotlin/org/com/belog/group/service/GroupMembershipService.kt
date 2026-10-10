@@ -10,6 +10,7 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.group.service.result.JoinedGroup
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.UserService
@@ -24,6 +25,7 @@ class GroupMembershipService(
     private val userRepository: UserRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val userService: UserService,
+    private val notificationService: NotificationService,
 ) {
     @Transactional(readOnly = true)
     fun getGroupMembers(
@@ -79,19 +81,47 @@ class GroupMembershipService(
             throw BusinessException(GroupErrorCode.GROUP_MEMBER_LIMIT_EXCEEDED)
         }
 
-        try {
-            groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
-        } catch (exception: DataIntegrityViolationException) {
-            if (exception.isGroupMemberUniqueConstraintViolation()) {
-                throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER, exception)
+        val joinedMember =
+            try {
+                groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+            } catch (exception: DataIntegrityViolationException) {
+                if (exception.isGroupMemberUniqueConstraintViolation()) {
+                    throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER, exception)
+                }
+                throw exception
             }
-            throw exception
-        }
+        notifyGroupMemberJoined(groupId, joinedMember)
 
         return JoinedGroup(
             groupId = groupId,
             name = group.name,
             currentMemberCount = currentMemberCount.toInt() + 1,
+        )
+    }
+
+    private fun notifyGroupMemberJoined(
+        groupId: Long,
+        joinedMember: GroupMember,
+    ) {
+        val joinedMemberId = checkNotNull(joinedMember.id) { "저장된 그룹 멤버의 ID가 없습니다." }
+        val joinedUser = joinedMember.user
+        val joinedUserId = checkNotNull(joinedUser.id) { "그룹 참여자의 사용자 ID가 없습니다." }
+        val joinedUserNickname = userService.resolveDisplayNickname(joinedUser)
+        val recipients =
+            groupMemberRepository
+                .findAllWithUserByGroupId(groupId)
+                .filter { member -> member.id != joinedMemberId }
+
+        notificationService.createAll(
+            recipients.map { member ->
+                GroupNotificationCommands.groupMemberJoined(
+                    groupId = groupId,
+                    joinedMemberId = joinedMemberId,
+                    recipientUserId = checkNotNull(member.user.id) { "그룹 멤버의 사용자 ID가 없습니다." },
+                    joinedUserId = joinedUserId,
+                    joinedUserNickname = joinedUserNickname,
+                )
+            },
         )
     }
 

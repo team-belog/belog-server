@@ -27,6 +27,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
 import org.springframework.dao.DataIntegrityViolationException
@@ -49,6 +50,7 @@ class GroupService(
     private val settlementRequestService: SettlementRequestService,
     private val s3ObjectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
+    private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
     fun createGroup(
@@ -156,12 +158,14 @@ class GroupService(
         val group =
             groupRepository.findActiveByIdForUpdate(groupId)
                 ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        if (findCurrentMember(groupId, userId).role != GroupRole.OWNER) {
+        val owner = findCurrentMember(groupId, userId)
+        if (owner.role != GroupRole.OWNER) {
             throw BusinessException(GroupErrorCode.GROUP_DELETE_OWNER_REQUIRED)
         }
         val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
         settlementRequestService.validateGroupSettled(groupId)
 
+        notifyGroupDeleted(group, owner)
         deleteGroupAndMeetings(group, meetings, Instant.now(clock))
     }
 
@@ -197,6 +201,29 @@ class GroupService(
         }
 
         departingOwner.delegateOwnerTo(successor)
+    }
+
+    private fun notifyGroupDeleted(
+        group: Group,
+        owner: GroupMember,
+    ) {
+        val groupId = checkNotNull(group.id) { "삭제할 그룹의 ID가 없습니다." }
+        val ownerUserId = checkNotNull(owner.user.id) { "방장의 사용자 ID가 없습니다." }
+        val recipients =
+            groupMemberRepository
+                .findAllWithUserByGroupId(groupId)
+                .filter { member -> member.id != owner.id }
+
+        notificationService.createAll(
+            recipients.map { member ->
+                GroupNotificationCommands.groupDeleted(
+                    groupId = groupId,
+                    groupName = group.name,
+                    recipientUserId = checkNotNull(member.user.id) { "그룹 멤버의 사용자 ID가 없습니다." },
+                    ownerUserId = ownerUserId,
+                )
+            },
+        )
     }
 
     private fun deleteGroupAndMeetings(

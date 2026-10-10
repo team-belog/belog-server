@@ -26,6 +26,7 @@ import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.MeetingServiceTest
+import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.repository.NotificationOutboxRepository
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.user.domain.Bank
@@ -134,6 +135,19 @@ class GroupDeletionIntegrationTest {
     }
 
     @Test
+    fun `OWNER가 그룹을 삭제하면 방장을 제외한 멤버에게 그룹 삭제 알림이 저장된다`() {
+        val context = saveGroupContext()
+
+        groupService.deleteGroup(context.groupId, context.ownerUserId)
+
+        val notification = groupDeletedNotifications().single()
+        assertEquals("GROUP_DELETED:${context.groupId}:${context.memberUserId}", notification.deduplicationKey)
+        assertEquals("주말 여행 모임 그룹이 삭제됐어요", notification.message)
+        assertNull(notification.targetId)
+        assertEquals(1L, notificationOutboxRepository.count())
+    }
+
+    @Test
     fun `OWNER가 아닌 그룹 멤버는 그룹을 삭제할 수 없다`() {
         val context = saveGroupContext()
 
@@ -159,6 +173,7 @@ class GroupDeletionIntegrationTest {
         assertEquals(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS, exception.errorCode)
         assertNull(groupRepository.findById(context.groupId).orElseThrow().deletedAt)
         assertNull(meetingRepository.findById(context.meetingId).orElseThrow().deletedAt)
+        assertTrue(groupDeletedNotifications().isEmpty())
     }
 
     @Test
@@ -230,6 +245,9 @@ class GroupDeletionIntegrationTest {
             executor.shutdownNow()
         }
     }
+
+    private fun groupDeletedNotifications() =
+        notificationRepository.findAll().filter { notification -> notification.type == NotificationType.GROUP_DELETED }
 
     private fun saveGroupContext(): GroupContext {
         val group = groupRepository.save(Group.create("주말 여행 모임", null, InviteCode.create("AB12CD")))

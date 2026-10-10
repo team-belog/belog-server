@@ -8,6 +8,9 @@ import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -19,6 +22,7 @@ import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -55,6 +59,9 @@ class GroupMembershipServiceTest {
     @MockitoBean
     private lateinit var userService: UserService
 
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
     @AfterEach
     fun cleanUp() {
         groupMemberRepository.deleteAll()
@@ -76,6 +83,44 @@ class GroupMembershipServiceTest {
         assertEquals(GroupRole.MEMBER, savedMember.role)
         assertEquals(group.id, savedMember.group.id)
         assertEquals(user.id, savedMember.user.id)
+    }
+
+    @Test
+    fun `그룹에 참여하면 참여자를 제외한 기존 멤버에게 참여 알림이 저장된다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "방장")
+        val member = saveCompletedUser("member", "멤버")
+        val withdrawnUser = saveCompletedUser("withdrawn", "탈퇴자")
+        groupMemberRepository.save(GroupMember.createOwner(group, owner))
+        groupMemberRepository.save(GroupMember.createMember(group, member))
+        val withdrawnMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, withdrawnUser))
+        withdrawnMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        groupMemberRepository.saveAndFlush(withdrawnMember)
+        val joiner = saveCompletedUser("joiner", "참여자")
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        groupMembershipService.joinGroup(requireNotNull(joiner.id), "AB12CD")
+
+        val joinedMemberId =
+            requireNotNull(
+                groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(requireNotNull(group.id), requireNotNull(joiner.id))?.id,
+            )
+        val expectedCommands =
+            listOf(owner, member)
+                .map { recipient ->
+                    val recipientUserId = requireNotNull(recipient.id)
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = joiner.id,
+                        type = NotificationType.GROUP_MEMBER_JOINED,
+                        message = "참여자 님이 그룹에 참여했어요",
+                        targetId = group.id,
+                        deduplicationKey = "GROUP_MEMBER_JOINED:$joinedMemberId:$recipientUserId",
+                    )
+                }.toSet()
+        assertEquals(expectedCommands, requestedNotificationCommands())
     }
 
     @Test
@@ -137,6 +182,7 @@ class GroupMembershipServiceTest {
 
         assertEquals(GroupErrorCode.ALREADY_GROUP_MEMBER, exception.errorCode)
         assertEquals(1L, groupMemberRepository.count())
+        assertEquals(emptySet(), requestedNotificationCommands())
     }
 
     @Test
@@ -282,6 +328,14 @@ class GroupMembershipServiceTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    private fun requestedNotificationCommands(): Set<CreateNotificationCommand> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
+            .toSet()
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyValue(): T {
