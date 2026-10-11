@@ -10,6 +10,7 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
@@ -55,6 +56,20 @@ private const val MEETING_LOCATION_MAX_LENGTH = 20
         CheckConstraint(
             name = "chk_meetings_date_range",
             constraint = "start_date IS NULL OR end_date >= start_date",
+        ),
+    ],
+    indexes = [
+        Index(
+            name = "idx_meetings_start_date_id",
+            columnList = "start_date, id",
+        ),
+        Index(
+            name = "idx_meetings_end_date_id",
+            columnList = "end_date, id",
+        ),
+        Index(
+            name = "idx_meetings_group_end_date",
+            columnList = "group_id, end_date",
         ),
     ],
 )
@@ -159,6 +174,12 @@ class Meeting protected constructor(
     }
 
     fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
+
+    fun startsOn(date: LocalDate): Boolean = startDate == date
+
+    fun endsOn(date: LocalDate): Boolean = endDate == date
+
+    fun isEndedOnOrBefore(date: LocalDate): Boolean = endDate?.isAfter(date) == false
 
     fun updateDetails(
         name: String,

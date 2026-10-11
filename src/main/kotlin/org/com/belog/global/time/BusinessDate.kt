@@ -5,7 +5,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
-private val BUSINESS_ZONE_ID: ZoneId = ZoneId.of("Asia/Seoul")
+const val BUSINESS_TIME_ZONE = "Asia/Seoul"
+
+private val BUSINESS_ZONE_ID: ZoneId = ZoneId.of(BUSINESS_TIME_ZONE)
 
 fun Clock.currentBusinessDate(): LocalDate = LocalDate.ofInstant(instant(), BUSINESS_ZONE_ID)
 
