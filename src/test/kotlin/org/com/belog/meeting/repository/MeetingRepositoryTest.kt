@@ -73,6 +73,32 @@ class MeetingRepositoryTest {
     private lateinit var userRepository: UserRepository
 
     @Test
+    fun `그룹의 두 만남 목록은 위임된 만남장과 사용자를 함께 조회한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator", "생성자")
+        val successor = saveGroupMember(group, "successor", "새 만남장")
+        val scheduling = createPollMeeting(group, creator)
+        val active = createMeeting(group, creator)
+        scheduling.delegateOwnerTo(successor)
+        active.delegateOwnerTo(successor)
+        meetingRepository.saveAllAndFlush(listOf(scheduling, active))
+        entityManager.clear()
+
+        val schedulingMeetings = meetingRepository.findSchedulingMeetings(requireNotNull(group.id), MeetingStatus.SCHEDULING)
+        val activeMeetings =
+            meetingRepository.findActiveMeetings(requireNotNull(group.id), LocalDate.of(2026, 9, 21), MeetingStatus.CONFIRMED)
+
+        assertEquals(listOf(scheduling.id), schedulingMeetings.map { it.id })
+        assertEquals(listOf(active.id), activeMeetings.map { it.id })
+        (schedulingMeetings + activeMeetings).forEach { meeting ->
+            assertTrue(Hibernate.isInitialized(meeting.owner))
+            assertTrue(Hibernate.isInitialized(meeting.owner.user))
+            assertEquals(successor.id, meeting.owner.id)
+            assertEquals("새 만남장", meeting.owner.user.nickname)
+        }
+    }
+
+    @Test
     fun `동일한 멤버를 같은 만남에 중복 저장할 수 없다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator-subject", "생성자")
