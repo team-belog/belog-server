@@ -23,8 +23,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mockingDetails
-import org.mockito.Mockito.times
-import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -205,44 +203,60 @@ class GroupMembershipServiceTest {
     }
 
     @Test
-    fun `그룹 멤버를 OWNER 우선으로 조회하고 프로필 이미지 URL을 반환한다`() {
+    fun `일반 멤버 요청자를 먼저 조회하고 나머지는 방장 우선과 멤버 ID 순서를 유지한다`() {
         val group = groupRepository.saveAndFlush(createGroup())
+        val earlierUser = saveCompletedUser("earlier", "첫멤버")
+        val requester = saveCompletedUser("requester", "요청자")
+        val laterUser = saveCompletedUser("later", "둘째멤버")
         val owner = saveCompletedUser("owner", "방장")
-        val member =
-            saveCompletedUser(
-                providerUserId = "member",
-                nickname = "멤버",
-                hasUploadedProfileImage = false,
-                socialProfileImageUrl = "https://example.com/social-profile",
-            )
-        val savedOwner = groupMemberRepository.save(GroupMember.createOwner(group, owner))
-        val savedMember = groupMemberRepository.save(GroupMember.createMember(group, member))
-        groupMemberRepository.flush()
-        val ownerId = requireNotNull(owner.id)
-        `when`(userService.resolveProfileImageUrl(anyValue())).thenAnswer { invocation ->
-            val user = invocation.arguments[0] as User
-            if (user.profileImageObjectKey == null) {
-                "https://example.com/social-profile"
-            } else {
-                "https://example.com/s3-profile"
-            }
-        }
+        val earlierMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, earlierUser))
+        val requesterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        val laterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, laterUser))
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
         `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
             requireNotNull((invocation.arguments[0] as User).nickname)
         }
 
-        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), ownerId, null)
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), null)
 
-        assertEquals(2, results.size)
-        assertEquals(requireNotNull(savedOwner.id), results[0].groupMemberId)
-        assertEquals("방장", results[0].nickname)
-        assertEquals("https://example.com/s3-profile", results[0].profileImageUrl)
-        assertEquals(GroupRole.OWNER, results[0].role)
-        assertEquals(requireNotNull(savedMember.id), results[1].groupMemberId)
-        assertEquals("멤버", results[1].nickname)
-        assertEquals("https://example.com/social-profile", results[1].profileImageUrl)
-        assertEquals(GroupRole.MEMBER, results[1].role)
-        verify(userService, times(2)).resolveProfileImageUrl(anyValue())
+        assertEquals(
+            listOf(requesterMember.id, ownerMember.id, earlierMember.id, laterMember.id),
+            results.map { it.groupMemberId },
+        )
+    }
+
+    @Test
+    fun `검색 결과에 포함된 일반 멤버 요청자를 먼저 반환한다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "검색 방장")
+        val requester = saveCompletedUser("requester", "검색 요청자")
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        val requesterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), " 검색 ")
+
+        assertEquals(listOf(requesterMember.id, ownerMember.id), results.map { it.groupMemberId })
+    }
+
+    @Test
+    fun `검색 조건에 맞지 않는 요청자는 목록에 추가하지 않는다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "검색 방장")
+        val matchedUser = saveCompletedUser("matched", "검색 멤버")
+        val requester = saveCompletedUser("requester", "요청자")
+        val matchedMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, matchedUser))
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), "검색")
+
+        assertEquals(listOf(ownerMember.id, matchedMember.id), results.map { it.groupMemberId })
     }
 
     @Test
