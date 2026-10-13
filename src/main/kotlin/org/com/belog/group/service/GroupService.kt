@@ -16,17 +16,19 @@ import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.group.service.query.GroupListCursor
+import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup
 import org.com.belog.group.service.result.GroupDetailResult
 import org.com.belog.group.service.result.GroupMeetingParticipantResult
-import org.com.belog.group.service.result.GroupMeetingResult
 import org.com.belog.group.service.result.GroupPreviewMemberResult
 import org.com.belog.group.service.result.MyGroupListResult
 import org.com.belog.group.service.result.MyGroupSummaryResult
+import org.com.belog.group.service.result.SchedulingMeetingResult
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
@@ -47,6 +49,7 @@ class GroupService(
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
     private val settlementRequestService: SettlementRequestService,
     private val s3ObjectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
@@ -246,6 +249,14 @@ class GroupService(
         val schedulingMeetings = meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING)
         val activeMeetings = meetingRepository.findActiveMeetings(groupId, currentDate, MeetingStatus.CONFIRMED)
         val participantsByMeetingId = createMeetingParticipantResults(schedulingMeetings + activeMeetings)
+        val respondedMeetingIds =
+            if (schedulingMeetings.isEmpty()) {
+                emptySet()
+            } else {
+                meetingScheduleResponseRepository
+                    .findRespondedMeetingIds(schedulingMeetings.map { requireNotNull(it.id) }, userId)
+                    .toSet()
+            }
         val canManageGroup = currentMember.role == GroupRole.OWNER
 
         return GroupDetailResult(
@@ -258,11 +269,20 @@ class GroupService(
             canDeleteGroup = canManageGroup,
             schedulingMeetings =
                 schedulingMeetings.map { meeting ->
-                    createGroupMeetingResult(meeting, currentMember, participantsByMeetingId.getValue(requireNotNull(meeting.id)))
+                    val meetingId = requireNotNull(meeting.id)
+                    val participants = participantsByMeetingId.getValue(meetingId)
+                    SchedulingMeetingResult(
+                        meetingId = meetingId,
+                        name = meeting.name,
+                        isMeetingOwner = meeting.isOwnedBy(currentMember),
+                        hasResponded = meeting.isCreatedBy(currentMember) || meetingId in respondedMeetingIds,
+                        participants = participants,
+                        participantCount = participants.size,
+                    )
                 },
             activeMeetings =
                 activeMeetings.map { meeting ->
-                    createGroupMeetingResult(meeting, currentMember, participantsByMeetingId.getValue(requireNotNull(meeting.id)))
+                    createActiveMeetingResult(meeting, currentMember, participantsByMeetingId.getValue(requireNotNull(meeting.id)))
                 },
         )
     }
@@ -342,12 +362,12 @@ class GroupService(
         }
     }
 
-    private fun createGroupMeetingResult(
+    private fun createActiveMeetingResult(
         meeting: Meeting,
         currentMember: GroupMember,
         participants: List<GroupMeetingParticipantResult>,
-    ): GroupMeetingResult =
-        GroupMeetingResult(
+    ): ActiveMeetingResult =
+        ActiveMeetingResult(
             meetingId = requireNotNull(meeting.id),
             name = meeting.name,
             isMeetingOwner = meeting.isOwnedBy(currentMember),

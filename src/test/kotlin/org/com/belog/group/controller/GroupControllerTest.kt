@@ -8,11 +8,12 @@ import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.service.GroupCoverImageService
 import org.com.belog.group.service.GroupMembershipService
 import org.com.belog.group.service.GroupService
+import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup
 import org.com.belog.group.service.result.GroupDetailResult
 import org.com.belog.group.service.result.GroupMeetingParticipantResult
-import org.com.belog.group.service.result.GroupMeetingResult
 import org.com.belog.group.service.result.GroupMemberResult
+import org.com.belog.group.service.result.SchedulingMeetingResult
 import org.com.belog.meeting.service.MeetingService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
@@ -68,10 +69,11 @@ class GroupControllerTest {
                 canDeleteGroup = true,
                 schedulingMeetings =
                     listOf(
-                        GroupMeetingResult(
+                        SchedulingMeetingResult(
                             meetingId = 10L,
                             name = "일정 조율",
                             isMeetingOwner = true,
+                            hasResponded = true,
                             participants =
                                 listOf(
                                     GroupMeetingParticipantResult("요청자", true),
@@ -82,7 +84,7 @@ class GroupControllerTest {
                     ),
                 activeMeetings =
                     listOf(
-                        GroupMeetingResult(
+                        ActiveMeetingResult(
                             meetingId = 11L,
                             name = "확정 만남",
                             isMeetingOwner = false,
@@ -101,6 +103,7 @@ class GroupControllerTest {
             .perform(get("/api/v1/groups/1").principal(authenticatedUser()))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.schedulingMeetings[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].hasResponded").value(true))
             .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].nickname").value("요청자"))
             .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].isMeetingOwner").value(true))
             .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[1].nickname").value("다른 참여자"))
@@ -109,6 +112,7 @@ class GroupControllerTest {
             .andExpect(jsonPath("$.data.schedulingMeetings[0].participantNicknames").doesNotExist())
             .andExpect(jsonPath("$.data.schedulingMeetings[0].participantCount").value(2))
             .andExpect(jsonPath("$.data.activeMeetings[0].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.activeMeetings[0].hasResponded").doesNotExist())
             .andExpect(jsonPath("$.data.activeMeetings[0].participants[0].nickname").value("다른 참여자"))
             .andExpect(jsonPath("$.data.activeMeetings[0].participants[0].isMeetingOwner").value(true))
             .andExpect(jsonPath("$.data.activeMeetings[0].participants[1].nickname").value("요청자"))

@@ -56,6 +56,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         """
         SELECT meeting
         FROM Meeting meeting
+        JOIN FETCH meeting.createdBy
         JOIN FETCH meeting.owner owner
         JOIN FETCH owner.user
         WHERE meeting.group.id = :groupId
