@@ -8,11 +8,20 @@ data class GroupDetailResult(
     val memberCount: Int,
     val canEditCoverImage: Boolean,
     val canDeleteGroup: Boolean,
-    val schedulingMeetings: List<GroupMeetingResult>,
-    val activeMeetings: List<GroupMeetingResult>,
+    val schedulingMeetings: List<SchedulingMeetingResult>,
+    val activeMeetings: List<ActiveMeetingResult>,
 )
 
-data class GroupMeetingResult(
+data class SchedulingMeetingResult(
+    val meetingId: Long,
+    val name: String,
+    val isMeetingOwner: Boolean,
+    val hasResponded: Boolean,
+    val participants: List<GroupMeetingParticipantResult>,
+    val participantCount: Int,
+)
+
+data class ActiveMeetingResult(
     val meetingId: Long,
     val name: String,
     val isMeetingOwner: Boolean,

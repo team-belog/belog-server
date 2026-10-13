@@ -89,6 +89,7 @@ class MeetingRepositoryTest {
             meetingRepository.findActiveMeetings(requireNotNull(group.id), LocalDate.of(2026, 9, 21), MeetingStatus.CONFIRMED)
 
         assertEquals(listOf(scheduling.id), schedulingMeetings.map { it.id })
+        assertTrue(Hibernate.isInitialized(schedulingMeetings.single().createdBy))
         assertEquals(listOf(active.id), activeMeetings.map { it.id })
         (schedulingMeetings + activeMeetings).forEach { meeting ->
             assertTrue(Hibernate.isInitialized(meeting.owner))
@@ -182,6 +183,31 @@ class MeetingRepositoryTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun `응답한 만남 ID 조회는 요청한 만남과 사용자로 제한하고 가능 날짜가 없는 응답도 포함한다`() {
+        val context = savePollResponseContext()
+        saveScheduleResponse(context)
+        val group = context.meeting.group
+        val creator = context.meeting.createdBy
+        val requester = context.participant.groupMember
+        val otherMember = saveGroupMember(group, "other-subject", "다른 응답자")
+        val secondPoll = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val otherParticipant = meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(secondPoll, otherMember))
+        saveScheduleResponse(PollResponseContext(secondPoll, otherParticipant))
+        val excludedPoll = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val excludedParticipant = meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(excludedPoll, requester))
+        saveScheduleResponse(PollResponseContext(excludedPoll, excludedParticipant))
+        entityManager.clear()
+
+        val respondedMeetingIds =
+            meetingScheduleResponseRepository.findRespondedMeetingIds(
+                meetingIds = listOf(requireNotNull(context.meeting.id), requireNotNull(secondPoll.id)),
+                userId = requireNotNull(requester.user.id),
+            )
+
+        assertEquals(listOf(context.meeting.id), respondedMeetingIds)
     }
 
     @Test

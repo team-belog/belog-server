@@ -12,6 +12,7 @@ import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
 import org.com.belog.user.domain.User
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
@@ -31,6 +32,7 @@ class GroupDetailServiceTest {
     private val groupMemberRepository = dependency<GroupMemberRepository>()
     private val meetingRepository = dependency<MeetingRepository>()
     private val participantRepository = dependency<MeetingParticipantRepository>()
+    private val responseRepository = dependency<MeetingScheduleResponseRepository>()
     private val userService = dependency<UserService>()
     private val clock = Clock.fixed(Instant.parse("2026-10-13T00:00:00Z"), ZoneOffset.UTC)
     private val service =
@@ -43,6 +45,7 @@ class GroupDetailServiceTest {
             groupMemberRepository = groupMemberRepository,
             meetingRepository = meetingRepository,
             meetingParticipantRepository = participantRepository,
+            meetingScheduleResponseRepository = responseRepository,
             settlementRequestService = dependency(),
             s3ObjectReadUrlProvider = dependency(),
             userService = userService,
@@ -75,6 +78,8 @@ class GroupDetailServiceTest {
         )
         assertEquals(1, ownerResult.schedulingMeetings.single().participantCount)
         assertEquals(2, ownerResult.activeMeetings.single().participantCount)
+        assertTrue(ownerResult.schedulingMeetings.single().hasResponded)
+        assertFalse(groupOwnerResult.schedulingMeetings.single().hasResponded)
         assertTrue(ownerResult.schedulingMeetings.single().isMeetingOwner)
         assertTrue(ownerResult.activeMeetings.single().isMeetingOwner)
         assertFalse(groupOwnerResult.schedulingMeetings.single().isMeetingOwner)
@@ -107,6 +112,8 @@ class GroupDetailServiceTest {
         val afterDelegation = successorResult.schedulingMeetings.single()
         assertEquals(afterDelegation.participants, successorResult.activeMeetings.single().participants)
         assertEquals(afterDelegation.participantCount, successorResult.activeMeetings.single().participantCount)
+        assertFalse(successorResult.schedulingMeetings.single().hasResponded)
+        assertTrue(previousOwnerResult.schedulingMeetings.single().hasResponded)
         assertTrue(successorResult.schedulingMeetings.single().isMeetingOwner)
         assertTrue(successorResult.activeMeetings.single().isMeetingOwner)
         assertFalse(previousOwnerResult.schedulingMeetings.single().isMeetingOwner)

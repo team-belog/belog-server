@@ -21,6 +21,19 @@ interface MeetingScheduleResponseRepository : JpaRepository<MeetingScheduleRespo
         @Param("meetingId") meetingId: Long,
     ): List<MeetingScheduleResponse>
 
+    @Query(
+        """
+        SELECT response.meeting.id
+        FROM MeetingScheduleResponse response
+        WHERE response.meeting.id IN :meetingIds
+          AND response.participant.groupMember.user.id = :userId
+        """,
+    )
+    fun findRespondedMeetingIds(
+        @Param("meetingIds") meetingIds: Collection<Long>,
+        @Param("userId") userId: Long,
+    ): List<Long>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """
