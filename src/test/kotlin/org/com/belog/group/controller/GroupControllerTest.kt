@@ -62,12 +62,14 @@ class GroupControllerTest {
                         nickname = "방장",
                         profileImageUrl = "https://example.com/owner-profile",
                         role = GroupRole.OWNER,
+                        isMe = true,
                     ),
                     GroupMemberResult(
                         groupMemberId = 22L,
                         nickname = "멤버",
                         profileImageUrl = null,
                         role = GroupRole.MEMBER,
+                        isMe = false,
                     ),
                 ),
             )
@@ -84,9 +86,11 @@ class GroupControllerTest {
             .andExpect(jsonPath("$.data.items[0].nickname").value("방장"))
             .andExpect(jsonPath("$.data.items[0].profileImageUrl").value("https://example.com/owner-profile"))
             .andExpect(jsonPath("$.data.items[0].role").value("OWNER"))
+            .andExpect(jsonPath("$.data.items[0].isMe").value(true))
             .andExpect(jsonPath("$.data.items[1].groupMemberId").value(22))
             .andExpect(jsonPath("$.data.items[1].profileImageUrl").isEmpty)
             .andExpect(jsonPath("$.data.items[1].role").value("MEMBER"))
+            .andExpect(jsonPath("$.data.items[1].isMe").value(false))
     }
 
     @Test

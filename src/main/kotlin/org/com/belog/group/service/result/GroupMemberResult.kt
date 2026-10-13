@@ -7,4 +7,5 @@ data class GroupMemberResult(
     val nickname: String,
     val profileImageUrl: String?,
     val role: GroupRole,
+    val isMe: Boolean,
 )

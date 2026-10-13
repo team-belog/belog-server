@@ -43,13 +43,14 @@ class GroupMembershipService(
                 groupMemberRepository.searchAllWithUserByGroupId(groupId, normalizedQuery)
             }
 
-        return members.map { member ->
+        return members.sortedBy { member -> member.user.id != userId }.map { member ->
             val memberUser = member.user
             GroupMemberResult(
                 groupMemberId = requireNotNull(member.id),
                 nickname = userService.resolveDisplayNickname(memberUser),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
+                isMe = memberUser.id == userId,
             )
         }
     }

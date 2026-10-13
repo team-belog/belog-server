@@ -17,6 +17,7 @@ import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
+import org.com.belog.meeting.controller.dto.response.MeetingMembersResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.PathVariable
@@ -339,7 +340,66 @@ interface MeetingSwagger {
         @PathVariable
         meetingId: Long,
     ): ResponseEntity<CommonResponse<MeetingDetailResponse>>
+
+    @Operation(
+        summary = "만남 멤버 목록 조회",
+        description =
+            "해당 만남의 참여자 중 탈퇴하지 않은 그룹 멤버를 조회합니다. " +
+                "요청자가 참여자이면 첫 번째로 반환하고 나머지는 그룹 멤버 ID 오름차순으로 정렬합니다. " +
+                "isMe는 요청자 본인 여부이며, groupMemberId는 결제 등록의 payerMemberId 및 participantMemberId에 사용하는 ID입니다. " +
+                "해당 그룹의 활성 멤버만 조회할 수 있으며, 만남에 참여하지 않은 요청자는 목록에 추가하지 않습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 멤버 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = MEETING_MEMBERS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 그룹의 활성 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun getMeetingMembers(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingMembersResponse>>
 }
+
+private const val MEETING_MEMBERS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S011","message":"만남 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":22,"nickname":"요청자","profileImageUrl":null,"isMe":true},{"groupMemberId":21,"nickname":"참여자","profileImageUrl":"https://example.com/profile","isMe":false}]}}"""
 
 private const val CREATE_FIXED_MEETING_REQUEST_EXAMPLE =
     """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}"""

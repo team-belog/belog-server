@@ -1,5 +1,6 @@
 package org.com.belog.meeting.repository
 
+import jakarta.persistence.EntityManager
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
@@ -20,6 +21,7 @@ import org.com.belog.user.domain.SocialProvider
 import org.com.belog.user.domain.User
 import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
 import org.com.belog.user.repository.UserRepository
+import org.hibernate.Hibernate
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -43,6 +45,9 @@ import kotlin.test.assertTrue
     AccountNumberAttributeConverter::class,
 )
 class MeetingRepositoryTest {
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
     @Autowired
     private lateinit var meetingRepository: MeetingRepository
 
@@ -299,6 +304,29 @@ class MeetingRepositoryTest {
             )
 
         assertEquals(listOf(inactiveGroup.group.id), groupIds)
+    }
+
+    @Test
+    fun `활성 참여자 조회는 다른 만남 참여자와 탈퇴 멤버를 제외하고 사용자 정보를 함께 가져온다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator", "생성자")
+        val activeMember = saveGroupMember(group, "active", "참여자")
+        val withdrawnMember = saveGroupMember(group, "withdrawn", "탈퇴자")
+        val otherMember = saveGroupMember(group, "other", "다른참여자")
+        val meeting = meetingRepository.saveAndFlush(createMeeting(group, creator))
+        val otherMeeting = meetingRepository.saveAndFlush(createMeeting(group, creator, "다른 만남"))
+        meetingParticipantRepository.saveAllAndFlush(
+            listOf(creator, activeMember, withdrawnMember).map { MeetingParticipant.create(meeting, it) } +
+                MeetingParticipant.create(otherMeeting, otherMember),
+        )
+        withdrawnMember.withdraw(Instant.parse("2026-09-21T00:00:00Z"))
+        groupMemberRepository.flush()
+        entityManager.clear()
+
+        val participants = meetingParticipantRepository.findAllActiveWithUserByMeetingId(requireNotNull(meeting.id))
+
+        assertEquals(listOf(creator.id, activeMember.id), participants.map { it.groupMember.id })
+        assertTrue(participants.all { Hibernate.isInitialized(it.groupMember) && Hibernate.isInitialized(it.groupMember.user) })
     }
 
     private fun saveGroupWithMeetingStartingOn(
