@@ -19,6 +19,7 @@ import org.com.belog.group.service.query.GroupListCursor
 import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup
 import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupMeetingParticipantResult
 import org.com.belog.group.service.result.GroupPreviewMemberResult
 import org.com.belog.group.service.result.MyGroupListResult
 import org.com.belog.group.service.result.MyGroupSummaryResult
@@ -255,8 +256,8 @@ class GroupService(
             memberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId).toInt(),
             canEditCoverImage = canManageGroup,
             canDeleteGroup = canManageGroup,
-            schedulingMeetings = createSchedulingMeetingResults(schedulingMeetings),
-            activeMeetings = activeMeetings.map(::createActiveMeetingResult),
+            schedulingMeetings = createSchedulingMeetingResults(schedulingMeetings, currentMember),
+            activeMeetings = activeMeetings.map { meeting -> createActiveMeetingResult(meeting, currentMember) },
         )
     }
 
@@ -308,7 +309,10 @@ class GroupService(
         )
     }
 
-    private fun createSchedulingMeetingResults(meetings: List<Meeting>): List<SchedulingMeetingResult> {
+    private fun createSchedulingMeetingResults(
+        meetings: List<Meeting>,
+        currentMember: GroupMember,
+    ): List<SchedulingMeetingResult> {
         if (meetings.isEmpty()) {
             return emptyList()
         }
@@ -321,23 +325,34 @@ class GroupService(
 
         return meetings.map { meeting ->
             val meetingId = requireNotNull(meeting.id)
-            val participants = participantsByMeetingId[meetingId].orEmpty()
+            val participants =
+                participantsByMeetingId[meetingId]
+                    .orEmpty()
+                    .sortedBy { participant -> !meeting.isOwnedBy(participant.groupMember) }
             SchedulingMeetingResult(
                 meetingId = meetingId,
                 name = meeting.name,
-                participantNicknames =
+                isMeetingOwner = meeting.isOwnedBy(currentMember),
+                participants =
                     participants.map { participant ->
-                        userService.resolveDisplayNickname(participant.groupMember.user)
+                        GroupMeetingParticipantResult(
+                            nickname = userService.resolveDisplayNickname(participant.groupMember.user),
+                            isMeetingOwner = meeting.isOwnedBy(participant.groupMember),
+                        )
                     },
                 participantCount = participants.size,
             )
         }
     }
 
-    private fun createActiveMeetingResult(meeting: Meeting): ActiveMeetingResult =
+    private fun createActiveMeetingResult(
+        meeting: Meeting,
+        currentMember: GroupMember,
+    ): ActiveMeetingResult =
         ActiveMeetingResult(
             meetingId = requireNotNull(meeting.id),
             name = meeting.name,
+            isMeetingOwner = meeting.isOwnedBy(currentMember),
             startDate = requireNotNull(meeting.startDate),
             endDate = requireNotNull(meeting.endDate),
         )

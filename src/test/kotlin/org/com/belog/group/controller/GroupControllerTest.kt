@@ -8,8 +8,12 @@ import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.service.GroupCoverImageService
 import org.com.belog.group.service.GroupMembershipService
 import org.com.belog.group.service.GroupService
+import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup
+import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupMeetingParticipantResult
 import org.com.belog.group.service.result.GroupMemberResult
+import org.com.belog.group.service.result.SchedulingMeetingResult
 import org.com.belog.meeting.service.MeetingService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
@@ -31,6 +35,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.test.assertEquals
 
 @WebMvcTest(GroupController::class)
@@ -51,6 +56,54 @@ class GroupControllerTest {
 
     @MockitoBean
     private lateinit var meetingService: MeetingService
+
+    @Test
+    fun `그룹 상세 조회의 두 만남 목록에 만남장 정보를 반환한다`() {
+        `when`(groupService.getGroup(1L, 15L)).thenReturn(
+            GroupDetailResult(
+                groupId = 1L,
+                name = "여행 모임",
+                coverImageUrl = null,
+                inviteCode = "AB12CD",
+                memberCount = 2,
+                canEditCoverImage = true,
+                canDeleteGroup = true,
+                schedulingMeetings =
+                    listOf(
+                        SchedulingMeetingResult(
+                            meetingId = 10L,
+                            name = "일정 조율",
+                            isMeetingOwner = true,
+                            participants =
+                                listOf(
+                                    GroupMeetingParticipantResult("요청자", true),
+                                    GroupMeetingParticipantResult("다른 참여자", false),
+                                ),
+                            participantCount = 2,
+                        ),
+                    ),
+                activeMeetings =
+                    listOf(
+                        ActiveMeetingResult(11L, "확정 만남", false, LocalDate.of(2026, 10, 20), LocalDate.of(2026, 10, 21)),
+                    ),
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/groups/1").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].nickname").value("요청자"))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[1].nickname").value("다른 참여자"))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[1].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].meetingOwnerNickname").doesNotExist())
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participantNicknames").doesNotExist())
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participantCount").value(2))
+            .andExpect(jsonPath("$.data.activeMeetings[0].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.activeMeetings[0].meetingOwnerNickname").doesNotExist())
+            .andExpect(jsonPath("$.data.activeMeetings[0].startDate").value("2026-10-20"))
+    }
 
     @Test
     fun `그룹 멤버 목록을 조회한다`() {

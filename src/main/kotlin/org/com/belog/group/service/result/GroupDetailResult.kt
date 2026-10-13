@@ -17,13 +17,20 @@ data class GroupDetailResult(
 data class SchedulingMeetingResult(
     val meetingId: Long,
     val name: String,
-    val participantNicknames: List<String>,
+    val isMeetingOwner: Boolean,
+    val participants: List<GroupMeetingParticipantResult>,
     val participantCount: Int,
 )
 
 data class ActiveMeetingResult(
     val meetingId: Long,
     val name: String,
+    val isMeetingOwner: Boolean,
     val startDate: LocalDate,
     val endDate: LocalDate,
+)
+
+data class GroupMeetingParticipantResult(
+    val nickname: String,
+    val isMeetingOwner: Boolean,
 )

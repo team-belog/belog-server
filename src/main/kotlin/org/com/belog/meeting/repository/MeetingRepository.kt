@@ -56,6 +56,8 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         """
         SELECT meeting
         FROM Meeting meeting
+        JOIN FETCH meeting.owner owner
+        JOIN FETCH owner.user
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
           AND meeting.deletedAt IS NULL
@@ -71,6 +73,8 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         """
         SELECT meeting
         FROM Meeting meeting
+        JOIN FETCH meeting.owner owner
+        JOIN FETCH owner.user
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
           AND meeting.endDate >= :currentDate

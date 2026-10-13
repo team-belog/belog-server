@@ -3,6 +3,7 @@ package org.com.belog.group.controller.dto.response
 import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupMeetingParticipantResult
 import org.com.belog.group.service.result.SchedulingMeetingResult
 import java.time.LocalDate
 
@@ -49,8 +50,10 @@ data class SchedulingMeetingResponse(
     val meetingId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
     val name: String,
-    @field:Schema(description = "참여자 닉네임 목록", example = "[\"이정원\", \"정다빈\", \"김성연\"]")
-    val participantNicknames: List<String>,
+    @field:Schema(description = "로그인 사용자의 만남장 여부", example = "true")
+    val isMeetingOwner: Boolean,
+    @field:Schema(description = "참여자 목록. 현재 만남장 우선, 나머지는 참여자 ID 오름차순")
+    val participants: List<GroupMeetingParticipantResponse>,
     @field:Schema(description = "만남 참여자 수", example = "3")
     val participantCount: Int,
 ) {
@@ -59,7 +62,8 @@ data class SchedulingMeetingResponse(
             SchedulingMeetingResponse(
                 meetingId = result.meetingId,
                 name = result.name,
-                participantNicknames = result.participantNicknames,
+                isMeetingOwner = result.isMeetingOwner,
+                participants = result.participants.map(GroupMeetingParticipantResponse::from),
                 participantCount = result.participantCount,
             )
     }
@@ -71,6 +75,8 @@ data class ActiveMeetingResponse(
     val meetingId: Long,
     @field:Schema(description = "만남명", example = "여름 부산 여행")
     val name: String,
+    @field:Schema(description = "로그인 사용자의 만남장 여부", example = "false")
+    val isMeetingOwner: Boolean,
     @field:Schema(description = "시작일", example = "2026-09-25")
     val startDate: LocalDate,
     @field:Schema(description = "종료일", example = "2026-09-26")
@@ -81,8 +87,25 @@ data class ActiveMeetingResponse(
             ActiveMeetingResponse(
                 meetingId = result.meetingId,
                 name = result.name,
+                isMeetingOwner = result.isMeetingOwner,
                 startDate = result.startDate,
                 endDate = result.endDate,
+            )
+    }
+}
+
+@Schema(description = "그룹 조회의 만남 참여자")
+data class GroupMeetingParticipantResponse(
+    @field:Schema(description = "참여자 표시 닉네임", example = "이정원")
+    val nickname: String,
+    @field:Schema(description = "해당 참여자의 현재 만남장 여부", example = "true")
+    val isMeetingOwner: Boolean,
+) {
+    companion object {
+        fun from(result: GroupMeetingParticipantResult): GroupMeetingParticipantResponse =
+            GroupMeetingParticipantResponse(
+                nickname = result.nickname,
+                isMeetingOwner = result.isMeetingOwner,
             )
     }
 }
