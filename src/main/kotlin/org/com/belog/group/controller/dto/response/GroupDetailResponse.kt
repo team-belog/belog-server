@@ -1,11 +1,9 @@
 package org.com.belog.group.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
-import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.GroupDetailResult
 import org.com.belog.group.service.result.GroupMeetingParticipantResult
-import org.com.belog.group.service.result.SchedulingMeetingResult
-import java.time.LocalDate
+import org.com.belog.group.service.result.GroupMeetingResult
 
 @Schema(description = "그룹 상세 조회 결과")
 data class GroupDetailResponse(
@@ -24,9 +22,9 @@ data class GroupDetailResponse(
     @field:Schema(description = "로그인 사용자의 그룹 삭제 권한", example = "true")
     val canDeleteGroup: Boolean,
     @field:Schema(description = "일정 조율 중인 만남 목록")
-    val schedulingMeetings: List<SchedulingMeetingResponse>,
+    val schedulingMeetings: List<GroupMeetingResponse>,
     @field:Schema(description = "종료되지 않은 확정 만남 목록")
-    val activeMeetings: List<ActiveMeetingResponse>,
+    val activeMeetings: List<GroupMeetingResponse>,
 ) {
     companion object {
         fun from(result: GroupDetailResult): GroupDetailResponse =
@@ -38,14 +36,14 @@ data class GroupDetailResponse(
                 memberCount = result.memberCount,
                 canEditCoverImage = result.canEditCoverImage,
                 canDeleteGroup = result.canDeleteGroup,
-                schedulingMeetings = result.schedulingMeetings.map(SchedulingMeetingResponse::from),
-                activeMeetings = result.activeMeetings.map(ActiveMeetingResponse::from),
+                schedulingMeetings = result.schedulingMeetings.map(GroupMeetingResponse::from),
+                activeMeetings = result.activeMeetings.map(GroupMeetingResponse::from),
             )
     }
 }
 
-@Schema(description = "일정 조율 중인 만남")
-data class SchedulingMeetingResponse(
+@Schema(description = "그룹 조회의 만남")
+data class GroupMeetingResponse(
     @field:Schema(description = "만남 ID", example = "10")
     val meetingId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
@@ -58,38 +56,13 @@ data class SchedulingMeetingResponse(
     val participantCount: Int,
 ) {
     companion object {
-        fun from(result: SchedulingMeetingResult): SchedulingMeetingResponse =
-            SchedulingMeetingResponse(
+        fun from(result: GroupMeetingResult): GroupMeetingResponse =
+            GroupMeetingResponse(
                 meetingId = result.meetingId,
                 name = result.name,
                 isMeetingOwner = result.isMeetingOwner,
                 participants = result.participants.map(GroupMeetingParticipantResponse::from),
                 participantCount = result.participantCount,
-            )
-    }
-}
-
-@Schema(description = "종료되지 않은 확정 만남")
-data class ActiveMeetingResponse(
-    @field:Schema(description = "만남 ID", example = "11")
-    val meetingId: Long,
-    @field:Schema(description = "만남명", example = "여름 부산 여행")
-    val name: String,
-    @field:Schema(description = "로그인 사용자의 만남장 여부", example = "false")
-    val isMeetingOwner: Boolean,
-    @field:Schema(description = "시작일", example = "2026-09-25")
-    val startDate: LocalDate,
-    @field:Schema(description = "종료일", example = "2026-09-26")
-    val endDate: LocalDate,
-) {
-    companion object {
-        fun from(result: ActiveMeetingResult): ActiveMeetingResponse =
-            ActiveMeetingResponse(
-                meetingId = result.meetingId,
-                name = result.name,
-                isMeetingOwner = result.isMeetingOwner,
-                startDate = result.startDate,
-                endDate = result.endDate,
             )
     }
 }

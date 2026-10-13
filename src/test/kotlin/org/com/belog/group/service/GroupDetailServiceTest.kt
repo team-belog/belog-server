@@ -69,6 +69,12 @@ class GroupDetailServiceTest {
 
         assertEquals(listOf(GroupMeetingParticipantResult("만남장", true)), ownerResult.schedulingMeetings.single().participants)
         assertEquals(ownerResult.schedulingMeetings.single().participants, groupOwnerResult.schedulingMeetings.single().participants)
+        assertEquals(
+            listOf(GroupMeetingParticipantResult("만남장", true), GroupMeetingParticipantResult("그룹 방장", false)),
+            ownerResult.activeMeetings.single().participants,
+        )
+        assertEquals(1, ownerResult.schedulingMeetings.single().participantCount)
+        assertEquals(2, ownerResult.activeMeetings.single().participantCount)
         assertTrue(ownerResult.schedulingMeetings.single().isMeetingOwner)
         assertTrue(ownerResult.activeMeetings.single().isMeetingOwner)
         assertFalse(groupOwnerResult.schedulingMeetings.single().isMeetingOwner)
@@ -78,14 +84,18 @@ class GroupDetailServiceTest {
     @Test
     fun `현재 만남장을 참여자 목록 맨 앞에 두고 위임 후에도 나머지 순서를 유지한다`() {
         val meetings = stubMeetings()
-        val scheduling = meetings.first()
         val lastMember = member(3L, "마지막 참여자")
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(1L, 3L)).thenReturn(lastMember)
         val participants =
-            listOf(groupOwner, meetingOwner, lastMember).map { MeetingParticipant.create(scheduling, it) }
-        `when`(participantRepository.findAllWithUserByMeetingIdIn(listOf(10L))).thenReturn(participants)
+            meetings.flatMap { meeting ->
+                listOf(groupOwner, meetingOwner, lastMember).map { MeetingParticipant.create(meeting, it) }
+            }
+        `when`(participantRepository.findAllWithUserByMeetingIdIn(listOf(10L, 11L))).thenReturn(participants)
 
-        val beforeDelegation = service.getGroup(1L, 1L).schedulingMeetings.single()
+        val initialResult = service.getGroup(1L, 1L)
+        val beforeDelegation = initialResult.schedulingMeetings.single()
+        assertEquals(beforeDelegation.participants, initialResult.activeMeetings.single().participants)
+        assertEquals(beforeDelegation.participantCount, initialResult.activeMeetings.single().participantCount)
         assertEquals(listOf("만남장", "그룹 방장", "마지막 참여자"), beforeDelegation.participants.map { it.nickname })
         assertEquals(listOf(true, false, false), beforeDelegation.participants.map { it.isMeetingOwner })
         assertEquals(3, beforeDelegation.participantCount)
@@ -95,6 +105,8 @@ class GroupDetailServiceTest {
         val successorResult = service.getGroup(1L, 3L)
         val previousOwnerResult = service.getGroup(1L, 2L)
         val afterDelegation = successorResult.schedulingMeetings.single()
+        assertEquals(afterDelegation.participants, successorResult.activeMeetings.single().participants)
+        assertEquals(afterDelegation.participantCount, successorResult.activeMeetings.single().participantCount)
         assertTrue(successorResult.schedulingMeetings.single().isMeetingOwner)
         assertTrue(successorResult.activeMeetings.single().isMeetingOwner)
         assertFalse(previousOwnerResult.schedulingMeetings.single().isMeetingOwner)
@@ -112,6 +124,12 @@ class GroupDetailServiceTest {
         val result = service.getGroup(1L, 1L)
 
         assertEquals(listOf(GroupMeetingParticipantResult("탈퇴한 사용자", true)), result.schedulingMeetings.single().participants)
+        val activeParticipant =
+            result.activeMeetings
+                .single()
+                .participants
+                .first()
+        assertEquals(GroupMeetingParticipantResult("탈퇴한 사용자", true), activeParticipant)
     }
 
     private fun stubMeetings(): List<Meeting> {
@@ -128,8 +146,14 @@ class GroupDetailServiceTest {
             )
         ReflectionTestUtils.setField(scheduling, "id", 10L)
         ReflectionTestUtils.setField(active, "id", 11L)
-        `when`(participantRepository.findAllWithUserByMeetingIdIn(listOf(10L)))
-            .thenReturn(listOf(MeetingParticipant.create(scheduling, meetingOwner)))
+        `when`(participantRepository.findAllWithUserByMeetingIdIn(listOf(10L, 11L)))
+            .thenReturn(
+                listOf(
+                    MeetingParticipant.create(scheduling, meetingOwner),
+                    MeetingParticipant.create(active, meetingOwner),
+                    MeetingParticipant.create(active, groupOwner),
+                ),
+            )
         `when`(meetingRepository.findSchedulingMeetings(1L, MeetingStatus.SCHEDULING)).thenReturn(listOf(scheduling))
         `when`(meetingRepository.findActiveMeetings(1L, LocalDate.of(2026, 10, 13), MeetingStatus.CONFIRMED))
             .thenReturn(listOf(active))

@@ -1,7 +1,5 @@
 package org.com.belog.group.service.result
 
-import java.time.LocalDate
-
 data class GroupDetailResult(
     val groupId: Long,
     val name: String,
@@ -10,24 +8,16 @@ data class GroupDetailResult(
     val memberCount: Int,
     val canEditCoverImage: Boolean,
     val canDeleteGroup: Boolean,
-    val schedulingMeetings: List<SchedulingMeetingResult>,
-    val activeMeetings: List<ActiveMeetingResult>,
+    val schedulingMeetings: List<GroupMeetingResult>,
+    val activeMeetings: List<GroupMeetingResult>,
 )
 
-data class SchedulingMeetingResult(
+data class GroupMeetingResult(
     val meetingId: Long,
     val name: String,
     val isMeetingOwner: Boolean,
     val participants: List<GroupMeetingParticipantResult>,
     val participantCount: Int,
-)
-
-data class ActiveMeetingResult(
-    val meetingId: Long,
-    val name: String,
-    val isMeetingOwner: Boolean,
-    val startDate: LocalDate,
-    val endDate: LocalDate,
 )
 
 data class GroupMeetingParticipantResult(
