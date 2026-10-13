@@ -7,8 +7,10 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDetailService
+import org.com.belog.meeting.service.MeetingMemberService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CreatedMeeting
+import org.com.belog.meeting.service.result.MeetingMemberResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
@@ -20,6 +22,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -38,6 +41,64 @@ class MeetingControllerTest {
 
     @MockitoBean
     private lateinit var meetingDetailService: MeetingDetailService
+
+    @MockitoBean
+    private lateinit var meetingMemberService: MeetingMemberService
+
+    @Test
+    fun `만남 멤버 목록은 서비스의 순서와 그룹 멤버 ID 및 본인 여부를 반환한다`() {
+        `when`(meetingMemberService.getMeetingMembers(7L, 15L)).thenReturn(
+            listOf(
+                MeetingMemberResult(22L, "요청자", null, true),
+                MeetingMemberResult(21L, "참여자", "https://example.com/profile", false),
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/meetings/7/members").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S011"))
+            .andExpect(jsonPath("$.message").value("만남 멤버 목록을 조회했습니다."))
+            .andExpect(jsonPath("$.data.items.length()").value(2))
+            .andExpect(jsonPath("$.data.items[0].groupMemberId").value(22))
+            .andExpect(jsonPath("$.data.items[0].nickname").value("요청자"))
+            .andExpect(jsonPath("$.data.items[0].profileImageUrl").isEmpty)
+            .andExpect(jsonPath("$.data.items[0].isMe").value(true))
+            .andExpect(jsonPath("$.data.items[1].groupMemberId").value(21))
+            .andExpect(jsonPath("$.data.items[1].nickname").value("참여자"))
+            .andExpect(jsonPath("$.data.items[1].profileImageUrl").value("https://example.com/profile"))
+            .andExpect(jsonPath("$.data.items[1].isMe").value(false))
+    }
+
+    @Test
+    fun `만남 멤버 조회는 인증 정보가 없으면 거부한다`() {
+        mockMvc
+            .perform(get("/api/v1/meetings/7/members"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("CMN-E005"))
+    }
+
+    @Test
+    fun `만남 멤버 조회는 그룹 멤버가 아니면 403을 반환한다`() {
+        `when`(meetingMemberService.getMeetingMembers(7L, 15L))
+            .thenThrow(BusinessException(GroupErrorCode.NOT_GROUP_MEMBER))
+
+        mockMvc
+            .perform(get("/api/v1/meetings/7/members").principal(authenticatedUser()))
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("GROUP-E013"))
+    }
+
+    @Test
+    fun `만남 멤버 조회는 조회할 만남이 없으면 404를 반환한다`() {
+        `when`(meetingMemberService.getMeetingMembers(7L, 15L))
+            .thenThrow(BusinessException(MeetingErrorCode.MEETING_NOT_FOUND))
+
+        mockMvc
+            .perform(get("/api/v1/meetings/7/members").principal(authenticatedUser()))
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("MEETING-E010"))
+    }
 
     @Test
     fun `확정 날짜 만남을 생성한다`() {

@@ -11,10 +11,12 @@ import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
+import org.com.belog.meeting.controller.dto.response.MeetingMembersResponse
 import org.com.belog.meeting.controller.swagger.MeetingSwagger
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.service.MeetingDetailService
+import org.com.belog.meeting.service.MeetingMemberService
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController
 class MeetingController(
     private val meetingService: MeetingService,
     private val meetingDetailService: MeetingDetailService,
+    private val meetingMemberService: MeetingMemberService,
 ) : MeetingSwagger {
     @PostMapping("/api/v1/groups/{groupId}/meetings")
     override fun createMeeting(
@@ -116,6 +119,23 @@ class MeetingController(
                 CommonResponse.success(
                     MeetingSuccessCode.MEETING_DETAIL_RETRIEVED,
                     MeetingDetailResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/api/v1/meetings/{meetingId}/members")
+    override fun getMeetingMembers(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingMembersResponse>> {
+        val members = meetingMemberService.getMeetingMembers(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_MEMBERS_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    MeetingSuccessCode.MEETING_MEMBERS_RETRIEVED,
+                    MeetingMembersResponse.from(members),
                 ),
             )
     }
