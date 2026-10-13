@@ -50,6 +50,7 @@ class GroupMembershipService(
                 nickname = userService.resolveDisplayNickname(memberUser),
                 profileImageUrl = userService.resolveProfileImageUrl(memberUser),
                 role = member.role,
+                isMe = memberUser.id == userId,
             )
         }
     }

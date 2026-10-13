@@ -223,6 +223,7 @@ class GroupMembershipServiceTest {
             listOf(requesterMember.id, ownerMember.id, earlierMember.id, laterMember.id),
             results.map { it.groupMemberId },
         )
+        assertEquals(listOf(true, false, false, false), results.map { it.isMe })
     }
 
     @Test
@@ -239,6 +240,7 @@ class GroupMembershipServiceTest {
         val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), " 검색 ")
 
         assertEquals(listOf(requesterMember.id, ownerMember.id), results.map { it.groupMemberId })
+        assertEquals(listOf(true, false), results.map { it.isMe })
     }
 
     @Test
@@ -257,6 +259,7 @@ class GroupMembershipServiceTest {
         val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), "검색")
 
         assertEquals(listOf(ownerMember.id, matchedMember.id), results.map { it.groupMemberId })
+        assertEquals(listOf(false, false), results.map { it.isMe })
     }
 
     @Test

@@ -17,6 +17,8 @@ data class GroupMemberResponse(
     val profileImageUrl: String?,
     @field:Schema(description = "그룹 역할", example = "MEMBER")
     val role: GroupRole,
+    @field:Schema(description = "요청자 본인 여부", example = "true")
+    val isMe: Boolean,
 ) {
     companion object {
         fun from(result: GroupMemberResult): GroupMemberResponse =
@@ -25,6 +27,7 @@ data class GroupMemberResponse(
                 nickname = result.nickname,
                 profileImageUrl = result.profileImageUrl,
                 role = result.role,
+                isMe = result.isMe,
             )
     }
 }

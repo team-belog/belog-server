@@ -379,6 +379,7 @@ interface GroupSwagger {
         summary = "그룹 멤버 목록 조회",
         description =
             "그룹 멤버를 요청자 우선으로 조회하며, 나머지는 OWNER 우선 및 그룹 멤버 ID 오름차순으로 정렬합니다. " +
+                "각 멤버의 isMe 필드는 요청자 본인 여부를 나타냅니다. " +
                 "query를 전달하면 이름 또는 닉네임이 검색어를 포함하는 멤버를 영문 대소문자 구분 없이 조회합니다. " +
                 "검색 결과에 요청자가 포함된 경우에만 요청자를 첫 번째로 반환합니다. " +
                 "query가 없거나 공백이면 전체 멤버를 조회하며, 해당 그룹에 참여한 사용자만 이용할 수 있습니다.",
@@ -745,7 +746,7 @@ private const val INVITE_CODE_ISSUANCE_FAILED_EXAMPLE =
     """{"code":"GROUP-E002","message":"초대 코드를 발급할 수 없습니다. 잠시 후 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-09-15T00:00:00Z"}}"""
 
 private const val GET_GROUP_MEMBERS_SUCCESS_EXAMPLE =
-    """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER"},{"groupMemberId":22,"nickname":"멤버","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER"}]}}"""
+    """{"code":"GROUP-S004","message":"그룹 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":21,"nickname":"방장","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","role":"OWNER","isMe":true},{"groupMemberId":22,"nickname":"멤버","profileImageUrl":"https://lh3.googleusercontent.com/profile","role":"MEMBER","isMe":false}]}}"""
 
 private const val GET_MY_GROUPS_SUCCESS_EXAMPLE =
     """{"code":"GROUP-S007","message":"내 그룹 목록을 조회했습니다.","data":{"items":[{"groupId":1,"name":"피놀리와 기니휘기","coverImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/group-covers/15/image.webp?...","memberCount":3,"previewMembers":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?..."},{"groupMemberId":22,"nickname":"정다빈","profileImageUrl":null},{"groupMemberId":23,"nickname":"김성연","profileImageUrl":"https://lh3.googleusercontent.com/profile"}],"pinned":true,"canDeleteGroup":true}],"nextCursor":"MTo0Mg","hasNext":true}}"""
