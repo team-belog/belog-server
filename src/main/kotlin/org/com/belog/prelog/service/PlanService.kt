@@ -390,6 +390,7 @@ class PlanService(
             likeCount = 0,
             likedByMe = false,
             pinned = pinned,
+            canEdit = isPlanCreator,
             canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )
