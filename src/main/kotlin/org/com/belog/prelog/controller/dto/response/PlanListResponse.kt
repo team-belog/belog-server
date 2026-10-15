@@ -49,6 +49,8 @@ data class PlanListItemResponse(
     val likedByMe: Boolean,
     @field:Schema(description = "고정 여부", example = "true")
     val pinned: Boolean,
+    @field:Schema(description = "로그인 사용자가 계획 작성자인 경우에만 true인 수정 권한 여부", example = "true")
+    val canEdit: Boolean,
     @field:Schema(description = "로그인 사용자의 삭제 권한 여부", example = "true")
     val canDelete: Boolean,
     @field:Schema(description = "계획 생성 시각", example = "2026-09-22T10:30:00Z")
@@ -67,6 +69,7 @@ data class PlanListItemResponse(
                 likeCount = result.likeCount,
                 likedByMe = result.likedByMe,
                 pinned = result.pinned,
+                canEdit = result.canEdit,
                 canDelete = result.canDelete,
                 createdAt = result.createdAt,
             )
