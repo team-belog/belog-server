@@ -21,6 +21,7 @@ import org.com.belog.prelog.service.command.PreLogNotificationCommands
 import org.com.belog.prelog.service.query.PlanListCursor
 import org.com.belog.prelog.service.result.MapPlanListItemResult
 import org.com.belog.prelog.service.result.MapPlanListResult
+import org.com.belog.prelog.service.result.PlanDetailResult
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
 import org.com.belog.prelog.service.result.PlanLocationResolution
@@ -42,6 +43,26 @@ class PlanService(
     private val userService: UserService,
     private val clock: Clock,
 ) {
+    @Transactional(readOnly = true)
+    fun getPlanDetail(
+        planId: Long,
+        userId: Long,
+    ): PlanDetailResult {
+        val plan = findPlan(planId)
+        val groupMember = findGroupMember(plan.meeting, userId)
+        if (plan.type != PlanType.MEMO) {
+            throw BusinessException(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED)
+        }
+
+        return PlanDetailResult(
+            planId = checkNotNull(plan.id) { "조회된 계획의 ID가 없습니다." },
+            category = plan.category,
+            title = plan.title,
+            content = checkNotNull(plan.content) { "메모 계획의 본문이 없습니다." },
+            canEdit = plan.isCreatedBy(groupMember),
+        )
+    }
+
     @Transactional(readOnly = true)
     fun getPlans(
         meetingId: Long,

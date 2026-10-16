@@ -26,6 +26,8 @@ import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.user.domain.User
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
@@ -66,6 +68,55 @@ class PlanServiceTest {
             userService,
             clock,
         )
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `그룹 멤버가 메모 상세를 조회하면 작성자 여부에 따른 수정 권한을 반환한다`(isCreator: Boolean) {
+        val target = stubPlanActionTarget(loginIsPlanCreator = isCreator, type = PlanType.MEMO)
+
+        val result = planService.getPlanDetail(planId = 20L, userId = 15L)
+
+        assertEquals(20L, result.planId)
+        assertEquals(target.plan.category, result.category)
+        assertEquals(target.plan.title, result.title)
+        assertEquals(target.plan.content, result.content)
+        assertEquals(isCreator, result.canEdit)
+    }
+
+    @Test
+    fun `존재하지 않는 계획은 상세 조회할 수 없다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `활성 그룹 멤버가 아니면 메모 상세를 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `위치 계획은 상세 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED, exception.errorCode)
+    }
 
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
@@ -531,6 +582,7 @@ class PlanServiceTest {
     private fun stubPlanActionTarget(
         loginIsPlanCreator: Boolean,
         loginIsMeetingCreator: Boolean = false,
+        type: PlanType = PlanType.LOCATION,
     ): PlanActionTarget {
         val context = meetingContext()
         val planCreator = mock(GroupMember::class.java)
@@ -543,14 +595,27 @@ class PlanServiceTest {
         }
 
         val plan =
-            Plan.createLocation(
-                meeting = context.meeting,
-                creator = planCreator,
-                category = PlanCategory.RESTAURANT,
-                title = "맛집",
-                url = "https://example.com/place",
-                currentDate = LocalDate.of(2026, 9, 22),
-            )
+            when (type) {
+                PlanType.LOCATION ->
+                    Plan.createLocation(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.RESTAURANT,
+                        title = "맛집",
+                        url = "https://example.com/place",
+                        currentDate = LocalDate.of(2026, 9, 22),
+                    )
+
+                PlanType.MEMO ->
+                    Plan.createMemo(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.OTHER,
+                        title = "준비물",
+                        content = "가".repeat(Plan.CONTENT_MAX_LENGTH),
+                        currentDate = LocalDate.of(2026, 9, 22),
+                    )
+            }
         ReflectionTestUtils.setField(plan, "id", 20L)
 
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)

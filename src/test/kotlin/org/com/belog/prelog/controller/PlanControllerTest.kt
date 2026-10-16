@@ -1,7 +1,9 @@
 package org.com.belog.prelog.controller
 
+import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
 import org.com.belog.prelog.domain.PlanType
@@ -9,6 +11,7 @@ import org.com.belog.prelog.service.PlanLikeService
 import org.com.belog.prelog.service.PlanLocationService
 import org.com.belog.prelog.service.PlanService
 import org.com.belog.prelog.service.PreLogService
+import org.com.belog.prelog.service.result.PlanDetailResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -23,6 +26,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -46,6 +50,40 @@ class PlanControllerTest {
 
     @MockitoBean
     private lateinit var planLikeService: PlanLikeService
+
+    @Test
+    fun `메모 상세 조회 응답에 본문 전체와 수정 권한을 반환한다`() {
+        val content = "가".repeat(Plan.CONTENT_MAX_LENGTH)
+        `when`(planService.getPlanDetail(planId = 12L, userId = 15L)).thenReturn(
+            PlanDetailResult(
+                planId = 12L,
+                category = PlanCategory.OTHER,
+                title = "준비물",
+                content = content,
+                canEdit = true,
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/plans/12").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S011"))
+            .andExpect(jsonPath("$.data.planId").value(12))
+            .andExpect(jsonPath("$.data.category").value("OTHER"))
+            .andExpect(jsonPath("$.data.title").value("준비물"))
+            .andExpect(jsonPath("$.data.content").value(content))
+            .andExpect(jsonPath("$.data.canEdit").value(true))
+    }
+
+    @Test
+    fun `위치 계획 상세 조회 요청은 400을 반환한다`() {
+        `when`(planService.getPlanDetail(12L, 15L)).thenThrow(BusinessException(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED))
+
+        mockMvc
+            .perform(get("/api/v1/plans/12").principal(authenticatedUser()))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-E008"))
+    }
 
     @Test
     fun `LOCATION 계획을 생성한다`() {

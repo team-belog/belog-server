@@ -11,6 +11,7 @@ import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
 import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
 import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
 import org.com.belog.prelog.controller.dto.response.MapPlanListResponse
+import org.com.belog.prelog.controller.dto.response.PlanDetailResponse
 import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
 import org.com.belog.prelog.controller.dto.response.PlanListResponse
 import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
@@ -79,6 +80,23 @@ class PreLogController(
                 CommonResponse.success(
                     PreLogSuccessCode.MAP_PLAN_LIST_RETRIEVED,
                     MapPlanListResponse.from(result),
+                ),
+            )
+    }
+
+    @GetMapping("/api/v1/plans/{planId}")
+    override fun getPlanDetail(
+        @LoginUserId userId: Long,
+        @PathVariable planId: Long,
+    ): ResponseEntity<CommonResponse<PlanDetailResponse>> {
+        val result = planService.getPlanDetail(planId = planId, userId = userId)
+
+        return ResponseEntity
+            .status(PreLogSuccessCode.PLAN_DETAIL_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    PreLogSuccessCode.PLAN_DETAIL_RETRIEVED,
+                    PlanDetailResponse.from(result),
                 ),
             )
     }
