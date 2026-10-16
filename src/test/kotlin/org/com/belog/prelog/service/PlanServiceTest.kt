@@ -139,6 +139,28 @@ class PlanServiceTest {
     }
 
     @Test
+    fun `계획 목록이 비어 있으면 좋아요를 조회하지 않는다`() {
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 11L, isMeetingCreator = false)
+        `when`(
+            planRepository.findPageWithCreator(
+                meetingId = 1L,
+                category = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
+                pageable = PageRequest.of(0, 21),
+            ),
+        ).thenReturn(emptyList())
+
+        val result = getPlans()
+
+        assertTrue(result.items.isEmpty())
+        assertFalse(result.hasNext)
+        assertNull(result.nextCursor)
+        verifyNoInteractions(planLikeRepository)
+    }
+
+    @Test
     fun `계획 작성자는 종료된 만남에서도 자신의 계획을 삭제할 수 있다`() {
         stubPlanList(
             loginGroupMemberId = 10L,

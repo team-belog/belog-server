@@ -90,13 +90,29 @@ class PlanService(
         val pagePlans = if (hasNext) plans.take(size) else plans
         val loginGroupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
         val isMeetingCreator = meeting.isCreatedBy(groupMember)
+        val planIds = pagePlans.map { plan -> checkNotNull(plan.id) { "조회된 계획의 ID가 없습니다." } }
+        val likeCounts =
+            if (planIds.isEmpty()) {
+                emptyMap()
+            } else {
+                planLikeRepository.countByPlanIds(planIds).associate { count -> count.planId to count.likeCount }
+            }
+        val likedPlanIds =
+            if (planIds.isEmpty()) {
+                emptySet()
+            } else {
+                planLikeRepository.findLikedPlanIds(planIds, loginGroupMemberId).toSet()
+            }
 
         return PlanListResult(
             items =
-                pagePlans.map { plan ->
+                pagePlans.mapIndexed { index, plan ->
+                    val planId = planIds[index]
                     plan.toListItemResult(
                         loginGroupMemberId = loginGroupMemberId,
                         isMeetingCreator = isMeetingCreator,
+                        likeCount = likeCounts[planId] ?: 0L,
+                        likedByMe = planId in likedPlanIds,
                     )
                 },
             nextCursor =
@@ -354,6 +370,8 @@ class PlanService(
     private fun Plan.toListItemResult(
         loginGroupMemberId: Long,
         isMeetingCreator: Boolean,
+        likeCount: Long,
+        likedByMe: Boolean,
     ): PlanListItemResult {
         val planId = checkNotNull(id) { "조회된 계획의 ID가 없습니다." }
         val creatorId = checkNotNull(createdBy.id) { "계획 작성자의 그룹 멤버 ID가 없습니다." }
@@ -371,8 +389,8 @@ class PlanService(
                     PlanType.MEMO -> content
                 },
             thumbnailUrl = null,
-            likeCount = 0,
-            likedByMe = false,
+            likeCount = likeCount,
+            likedByMe = likedByMe,
             pinned = pinned,
             canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
