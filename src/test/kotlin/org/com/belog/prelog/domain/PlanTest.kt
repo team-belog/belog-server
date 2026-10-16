@@ -42,6 +42,30 @@ class PlanTest {
     }
 
     @Test
+    fun `위치 계획에 메모 수정을 요청하면 기존 상태를 보존하고 거절한다`() {
+        val context = createMeetingContext()
+        val plan =
+            Plan.createLocation(
+                meeting = context.meeting,
+                creator = context.groupMember,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = "https://example.com/place",
+                currentDate = CURRENT_DATE,
+            )
+
+        assertFailsWith<IllegalArgumentException> {
+            plan.updateMemo(PlanCategory.OTHER, "메모", "변경 시도")
+        }
+
+        assertEquals(PlanType.LOCATION, plan.type)
+        assertEquals(PlanCategory.RESTAURANT, plan.category)
+        assertEquals("맛집", plan.title)
+        assertEquals("https://example.com/place", plan.url)
+        assertNull(plan.content)
+    }
+
+    @Test
     fun `MEMO 계획을 생성하면 내용만 저장한다`() {
         val context = createMeetingContext()
 

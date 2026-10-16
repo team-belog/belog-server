@@ -86,6 +86,54 @@ class PlanControllerTest {
     }
 
     @Test
+    fun `유형과 URL 없이 메모를 수정한다`() {
+        val plan = mockLocationPlan()
+        `when`(plan.type).thenReturn(PlanType.MEMO)
+        `when`(plan.category).thenReturn(PlanCategory.OTHER)
+        `when`(plan.title).thenReturn("준비물")
+        `when`(plan.url).thenReturn(null)
+        `when`(plan.content).thenReturn("우산 챙기기")
+        `when`(
+            planService.updateMemoPlan(
+                planId = 7L,
+                userId = 15L,
+                category = PlanCategory.OTHER,
+                title = "준비물",
+                content = "우산 챙기기",
+            ),
+        ).thenReturn(plan)
+
+        mockMvc
+            .perform(
+                put("/api/v1/plans/7")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"category":"OTHER","title":"준비물","content":"우산 챙기기"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S004"))
+            .andExpect(jsonPath("$.data.planId").value(7))
+            .andExpect(jsonPath("$.data.type").value("MEMO"))
+            .andExpect(jsonPath("$.data.category").value("OTHER"))
+            .andExpect(jsonPath("$.data.title").value("준비물"))
+            .andExpect(jsonPath("$.data.content").value("우산 챙기기"))
+            .andExpect(jsonPath("$.data.url").isEmpty)
+    }
+
+    @Test
+    fun `메모 수정 본문이 공백이면 거절한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/plans/7")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"category":"OTHER","title":"준비물","content":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(planService)
+    }
+
+    @Test
     fun `LOCATION 계획을 생성한다`() {
         val plan = mockLocationPlan()
         `when`(

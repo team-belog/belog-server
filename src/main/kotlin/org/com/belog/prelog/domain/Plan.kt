@@ -81,8 +81,7 @@ class Plan protected constructor(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    var type: PlanType = type
-        protected set
+    val type: PlanType = type
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -122,39 +121,18 @@ class Plan protected constructor(
         pinned = false
     }
 
-    fun updateLocation(
-        category: PlanCategory,
-        title: String,
-        url: String,
-    ) {
-        val normalizedTitle = normalizeTitle(title)
-        val normalizedUrl = normalizeUrl(url)
-
-        if (this.url != normalizedUrl) {
-            clearLocation()
-        }
-
-        this.type = PlanType.LOCATION
-        this.category = category
-        this.title = normalizedTitle
-        this.url = normalizedUrl
-        this.content = null
-    }
-
     fun updateMemo(
         category: PlanCategory,
         title: String,
         content: String,
     ) {
+        require(type == PlanType.MEMO) { "메모 계획만 수정할 수 있습니다." }
         val normalizedTitle = normalizeTitle(title)
         val normalizedContent = normalizeContent(content)
 
-        this.type = PlanType.MEMO
         this.category = category
         this.title = normalizedTitle
-        this.url = null
         this.content = normalizedContent
-        clearLocation()
     }
 
     fun resolveLocation(location: PlanLocation) {
@@ -184,11 +162,6 @@ class Plan protected constructor(
 
         this.location = provider?.let { PlanLocation.unresolved(it, externalPlaceId, placeName, address) }
         this.locationStatus = LocationResolutionStatus.FAILED
-    }
-
-    private fun clearLocation() {
-        location = null
-        locationStatus = LocationResolutionStatus.NOT_APPLICABLE
     }
 
     fun isCreatedBy(groupMember: GroupMember): Boolean {

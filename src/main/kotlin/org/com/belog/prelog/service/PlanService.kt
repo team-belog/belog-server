@@ -217,47 +217,30 @@ class PlanService(
     }
 
     @Transactional
-    fun updateLocationPlan(
-        planId: Long,
-        userId: Long,
-        category: PlanCategory,
-        title: String,
-        url: String,
-        locationResolution: PlanLocationResolution? = null,
-        expectedUrlWhenResolutionSkipped: String? = null,
-    ): Plan =
-        updatePlan(planId, userId) { plan ->
-            if (expectedUrlWhenResolutionSkipped != null && plan.url != expectedUrlWhenResolutionSkipped) {
-                throw BusinessException(PreLogErrorCode.PLAN_UPDATE_CONFLICT)
-            }
-            plan.updateLocation(category = category, title = title, url = url)
-            locationResolution?.let { resolution -> plan.applyLocationResolution(resolution) }
-        }
-
-    @Transactional(readOnly = true)
-    fun getLocationUrlForUpdate(
-        planId: Long,
-        userId: Long,
-    ): String? {
-        val plan = findPlan(planId)
-        val groupMember = findGroupMember(plan.meeting, userId)
-        if (!plan.isCreatedBy(groupMember)) {
-            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
-        }
-        return plan.url
-    }
-
-    @Transactional
     fun updateMemoPlan(
         planId: Long,
         userId: Long,
         category: PlanCategory,
         title: String,
         content: String,
-    ): Plan =
-        updatePlan(planId, userId) { plan ->
-            plan.updateMemo(category = category, title = title, content = content)
+    ): Plan {
+        val plan = findPlan(planId)
+        val groupMember = findGroupMember(plan.meeting, userId)
+        if (!plan.isCreatedBy(groupMember)) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
         }
+        if (plan.type != PlanType.MEMO) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_NOT_SUPPORTED)
+        }
+
+        try {
+            plan.updateMemo(category = category, title = title, content = content)
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(PreLogErrorCode.INVALID_PLAN, exception)
+        }
+
+        return plan
+    }
 
     @Transactional
     fun deletePlan(
@@ -312,28 +295,6 @@ class PlanService(
         val plan = findPlan(planId)
         val meeting = plan.meeting
         findGroupMember(meeting, userId)
-
-        return plan
-    }
-
-    private fun updatePlan(
-        planId: Long,
-        userId: Long,
-        update: (Plan) -> Unit,
-    ): Plan {
-        val plan = findPlan(planId)
-        val meeting = plan.meeting
-        val groupMember = findGroupMember(meeting, userId)
-
-        if (!plan.isCreatedBy(groupMember)) {
-            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
-        }
-
-        try {
-            update(plan)
-        } catch (exception: IllegalArgumentException) {
-            throw BusinessException(PreLogErrorCode.INVALID_PLAN, exception)
-        }
 
         return plan
     }

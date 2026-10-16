@@ -51,28 +51,6 @@ class PlanLocationServiceTest {
     }
 
     @Test
-    fun `일반 URL로 위치 계획을 수정할 수 없다`() {
-        val service = PlanLocationService(planService, mapUrlDetector, emptyList())
-        `when`(planService.getLocationUrlForUpdate(planId = 7L, userId = 15L))
-            .thenReturn("https://example.com/restaurant")
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                service.updateLocationPlan(
-                    planId = 7L,
-                    userId = 15L,
-                    category = PlanCategory.RESTAURANT,
-                    title = "맛집",
-                    url = "https://example.com/restaurant",
-                )
-            }
-
-        assertEquals(PreLogErrorCode.INVALID_MAP_URL, exception.errorCode)
-        verify(planService).getLocationUrlForUpdate(planId = 7L, userId = 15L)
-        verifyNoMoreInteractions(planService)
-    }
-
-    @Test
     fun `지원하는 지도 URL의 위치 추출 실패는 실패 상태로 저장한다`() {
         val url = "https://www.google.com/maps/place/Test"
         val resolution = PlanLocationResolution.ProviderFailed(MapProvider.GOOGLE)

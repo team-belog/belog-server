@@ -15,7 +15,6 @@ import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.prelog.code.PreLogErrorCode
-import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
@@ -191,53 +190,51 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `계획 작성자는 자신의 계획을 수정할 수 있다`() {
-        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+    fun `메모 작성자는 자신의 메모를 수정할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
 
         val result =
-            planService.updateLocationPlan(
+            planService.updateMemoPlan(
                 planId = 20L,
                 userId = 15L,
                 category = PlanCategory.CAFE,
-                title = "수정한 카페",
-                url = "https://example.com/updated-cafe",
+                title = "수정한 메모",
+                content = "변경한 내용",
             )
 
         assertSame(target.plan, result)
-        assertEquals(PlanType.LOCATION, result.type)
+        assertEquals(PlanType.MEMO, result.type)
         assertEquals(PlanCategory.CAFE, result.category)
-        assertEquals("수정한 카페", result.title)
-        assertEquals("https://example.com/updated-cafe", result.url)
+        assertEquals("수정한 메모", result.title)
+        assertEquals("변경한 내용", result.content)
     }
 
     @Test
-    fun `위치 해석을 생략한 사이 URL이 변경되면 위치 정보를 보존하고 충돌을 반환한다`() {
+    fun `위치 계획 작성자도 위치를 메모로 수정할 수 없다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
-        target.plan.updateLocation(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
-        target.plan.failLocationResolution(MapProvider.GOOGLE, externalPlaceId = "new-place-id")
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.updateLocationPlan(
+                planService.updateMemoPlan(
                     planId = 20L,
                     userId = 15L,
-                    category = PlanCategory.CAFE,
-                    title = "수정한 카페",
-                    url = "https://example.com/place",
-                    expectedUrlWhenResolutionSkipped = "https://example.com/place",
+                    category = PlanCategory.OTHER,
+                    title = "수정 시도",
+                    content = "변경 시도",
                 )
             }
 
-        assertEquals(PreLogErrorCode.PLAN_UPDATE_CONFLICT, exception.errorCode)
-        assertEquals("https://maps.google.com/new-place", target.plan.url)
-        assertEquals(LocationResolutionStatus.FAILED, target.plan.locationStatus)
-        assertEquals(MapProvider.GOOGLE, target.plan.location?.provider)
-        assertEquals("new-place-id", target.plan.location?.externalPlaceId)
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_NOT_SUPPORTED, exception.errorCode)
+        assertEquals(PlanType.LOCATION, target.plan.type)
+        assertEquals(PlanCategory.RESTAURANT, target.plan.category)
+        assertEquals("맛집", target.plan.title)
+        assertEquals("https://example.com/place", target.plan.url)
+        assertNull(target.plan.content)
     }
 
     @Test
     fun `계획 작성자가 아니면 계획을 수정할 수 없다`() {
-        val target = stubPlanActionTarget(loginIsPlanCreator = false)
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, type = PlanType.MEMO)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -251,9 +248,9 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
-        assertEquals(PlanType.LOCATION, target.plan.type)
-        assertEquals("맛집", target.plan.title)
-        assertEquals("https://example.com/place", target.plan.url)
+        assertEquals(PlanType.MEMO, target.plan.type)
+        assertEquals("준비물", target.plan.title)
+        assertEquals("가".repeat(Plan.CONTENT_MAX_LENGTH), target.plan.content)
     }
 
     @Test
@@ -296,12 +293,12 @@ class PlanServiceTest {
 
         val updateException =
             assertFailsWith<BusinessException> {
-                planService.updateLocationPlan(
+                planService.updateMemoPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
                     title = "카페",
-                    url = "https://example.com/cafe",
+                    content = "내용",
                 )
             }
         val deleteException =

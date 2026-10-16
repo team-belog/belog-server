@@ -174,25 +174,13 @@ class PreLogController(
         @Valid @RequestBody request: UpdatePlanRequest,
     ): ResponseEntity<CommonResponse<UpdatePlanResponse>> {
         val plan =
-            when (request.type) {
-                PlanType.LOCATION ->
-                    planLocationService.updateLocationPlan(
-                        planId = planId,
-                        userId = userId,
-                        category = request.category,
-                        title = request.title,
-                        url = checkNotNull(request.url),
-                    )
-
-                PlanType.MEMO ->
-                    planService.updateMemoPlan(
-                        planId = planId,
-                        userId = userId,
-                        category = request.category,
-                        title = request.title,
-                        content = checkNotNull(request.content),
-                    )
-            }
+            planService.updateMemoPlan(
+                planId = planId,
+                userId = userId,
+                category = request.category,
+                title = request.title,
+                content = request.content,
+            )
 
         return ResponseEntity
             .status(PreLogSuccessCode.PLAN_UPDATED.status)

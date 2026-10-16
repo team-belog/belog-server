@@ -386,10 +386,10 @@ interface PreLogSwagger {
     ): ResponseEntity<CommonResponse<CreatePlanResponse>>
 
     @Operation(
-        summary = "Pre-log 계획 수정",
+        summary = "Pre-log 메모 계획 수정",
         description =
-            "계획 작성자가 위치 또는 메모 계획의 전체 내용을 수정합니다. " +
-                "LOCATION은 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남의 계획도 수정할 수 있습니다.",
+            "메모 작성자가 카테고리, 제목과 본문을 수정합니다. 종료된 만남의 메모도 수정할 수 있습니다. " +
+                "위치 계획은 수정할 수 없으며 계획 유형 변경은 지원하지 않습니다.",
     )
     @ApiResponses(
         value = [
@@ -401,7 +401,6 @@ interface PreLogSwagger {
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         examples = [
-                            ExampleObject(name = "위치 계획 수정", value = UPDATE_LOCATION_PLAN_SUCCESS_EXAMPLE),
                             ExampleObject(name = "메모 계획 수정", value = UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE),
                         ],
                     ),
@@ -417,7 +416,7 @@ interface PreLogSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
-                            ExampleObject(name = "지원하지 않는 지도 링크", value = INVALID_MAP_URL_EXAMPLE),
+                            ExampleObject(name = "위치 계획 수정 불가", value = PLAN_UPDATE_NOT_SUPPORTED_EXAMPLE),
                         ],
                     ),
                 ],
@@ -448,17 +447,6 @@ interface PreLogSwagger {
                     ),
                 ],
             ),
-            ApiResponse(
-                responseCode = "409",
-                description = "위치 계획의 URL이 다른 요청에서 변경됨",
-                content = [
-                    Content(
-                        mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = PLAN_UPDATE_CONFLICT_EXAMPLE)],
-                    ),
-                ],
-            ),
         ],
     )
     fun updatePlan(
@@ -475,7 +463,6 @@ interface PreLogSwagger {
                     mediaType = MediaType.APPLICATION_JSON_VALUE,
                     schema = Schema(implementation = UpdatePlanRequest::class),
                     examples = [
-                        ExampleObject(name = "위치 계획", value = UPDATE_LOCATION_PLAN_REQUEST_EXAMPLE),
                         ExampleObject(name = "메모 계획", value = UPDATE_MEMO_PLAN_REQUEST_EXAMPLE),
                     ],
                 ),
@@ -751,20 +738,14 @@ private const val CREATE_LOCATION_PLAN_REQUEST_EXAMPLE =
 private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
     """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
 
-private const val UPDATE_LOCATION_PLAN_REQUEST_EXAMPLE =
-    """{"type":"LOCATION","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456"}"""
-
 private const val UPDATE_MEMO_PLAN_REQUEST_EXAMPLE =
-    """{"type":"MEMO","category":"OTHER","title":"준비물","content":"우산 챙기기"}"""
+    """{"category":"OTHER","title":"준비물","content":"우산 챙기기"}"""
 
 private const val CREATE_LOCATION_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456","content":null}}"""
 
 private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
-
-private const val UPDATE_LOCATION_PLAN_SUCCESS_EXAMPLE =
-    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"LOCATION","category":"CAFE","title":"광주 카페","url":"https://map.naver.com/p/entry/place/123456","content":null}}"""
 
 private const val UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE =
     """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"OTHER","title":"준비물","url":null,"content":"우산 챙기기"}}"""
@@ -789,9 +770,6 @@ private const val PLAN_NOT_FOUND_EXAMPLE =
 
 private const val PLAN_UPDATE_FORBIDDEN_EXAMPLE =
     """{"code":"PRE_LOG-E004","message":"계획 작성자만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
-
-private const val PLAN_UPDATE_CONFLICT_EXAMPLE =
-    """{"code":"PRE_LOG-E006","message":"계획이 다른 요청에서 수정되었습니다. 다시 시도해 주세요.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val PLAN_DELETE_FORBIDDEN_EXAMPLE =
     """{"code":"PRE_LOG-E005","message":"계획을 삭제할 권한이 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
@@ -819,3 +797,6 @@ private const val GET_PLAN_DETAIL_SUCCESS_EXAMPLE =
 
 private const val PLAN_DETAIL_NOT_SUPPORTED_EXAMPLE =
     """{"code":"PRE_LOG-E008","message":"메모 계획만 상세 조회할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_UPDATE_NOT_SUPPORTED_EXAMPLE =
+    """{"code":"PRE_LOG-E006","message":"메모 계획만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
