@@ -37,35 +37,6 @@ class PlanLocationService(
         )
     }
 
-    fun updateLocationPlan(
-        planId: Long,
-        userId: Long,
-        category: PlanCategory,
-        title: String,
-        url: String,
-    ): Plan {
-        val currentUrl = planService.getLocationUrlForUpdate(planId = planId, userId = userId)
-        val normalizedUrl = url.trim()
-        val provider = detectMapProvider(normalizedUrl)
-        val unchangedUrl = currentUrl.takeIf { it == normalizedUrl }
-        val resolution =
-            if (unchangedUrl != null) {
-                null
-            } else {
-                resolveLocation(normalizedUrl, provider)
-            }
-
-        return planService.updateLocationPlan(
-            planId = planId,
-            userId = userId,
-            category = category,
-            title = title,
-            url = url,
-            locationResolution = resolution,
-            expectedUrlWhenResolutionSkipped = unchangedUrl,
-        )
-    }
-
     private fun detectMapProvider(url: String): MapProvider =
         planMapUrlDetector.detect(url) ?: throw BusinessException(PreLogErrorCode.INVALID_MAP_URL)
 

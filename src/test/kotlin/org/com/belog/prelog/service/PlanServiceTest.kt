@@ -15,7 +15,6 @@ import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
 import org.com.belog.prelog.code.PreLogErrorCode
-import org.com.belog.prelog.domain.LocationResolutionStatus
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
@@ -26,6 +25,8 @@ import org.com.belog.prelog.repository.PlanRepository
 import org.com.belog.user.domain.User
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import org.mockito.Mockito.any
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.mockingDetails
@@ -67,6 +68,55 @@ class PlanServiceTest {
             clock,
         )
 
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `그룹 멤버가 메모 상세를 조회하면 작성자 여부에 따른 수정 권한을 반환한다`(isCreator: Boolean) {
+        val target = stubPlanActionTarget(loginIsPlanCreator = isCreator, type = PlanType.MEMO)
+
+        val result = planService.getPlanDetail(planId = 20L, userId = 15L)
+
+        assertEquals(20L, result.planId)
+        assertEquals(target.plan.category, result.category)
+        assertEquals(target.plan.title, result.title)
+        assertEquals(target.plan.content, result.content)
+        assertEquals(isCreator, result.canEdit)
+    }
+
+    @Test
+    fun `존재하지 않는 계획은 상세 조회할 수 없다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `활성 그룹 멤버가 아니면 메모 상세를 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `위치 계획은 상세 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED, exception.errorCode)
+    }
+
     @Test
     fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
         val context = meetingContext()
@@ -89,7 +139,7 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `계획 작성자는 종료된 만남에서도 자신의 계획을 수정하고 삭제할 수 있다`() {
+    fun `계획 작성자는 종료된 만남에서도 자신의 계획을 삭제할 수 있다`() {
         stubPlanList(
             loginGroupMemberId = 10L,
             planCreatorId = 10L,
@@ -100,13 +150,12 @@ class PlanServiceTest {
 
         val result = getPlans()
 
-        assertTrue(result.items.single().canEdit)
         assertTrue(result.items.single().canDelete)
         assertEquals("광주광역시 동구", result.items.single().content)
     }
 
     @Test
-    fun `만남 생성자는 다른 사용자의 계획을 수정할 수 없지만 삭제할 수 있다`() {
+    fun `만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
         val memoContent = "가".repeat(Plan.CONTENT_MAX_LENGTH)
         stubPlanList(
             loginGroupMemberId = 10L,
@@ -120,11 +169,10 @@ class PlanServiceTest {
 
         assertTrue(result.items.single().canDelete)
         assertEquals(memoContent, result.items.single().content)
-        assertFalse(result.items.single().canEdit)
     }
 
     @Test
-    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 수정하거나 삭제할 수 없다`() {
+    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 삭제할 수 없다`() {
         stubPlanList(
             loginGroupMemberId = 10L,
             planCreatorId = 11L,
@@ -135,58 +183,55 @@ class PlanServiceTest {
         val result = getPlans()
 
         assertFalse(result.items.single().canDelete)
-        assertFalse(result.items.single().canEdit)
         assertNull(result.items.single().content)
     }
 
     @Test
-    fun `계획 작성자는 자신의 계획을 수정할 수 있다`() {
-        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+    fun `메모 작성자는 자신의 메모를 수정할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
 
         val result =
-            planService.updateLocationPlan(
+            planService.updateMemoPlan(
                 planId = 20L,
                 userId = 15L,
                 category = PlanCategory.CAFE,
-                title = "수정한 카페",
-                url = "https://example.com/updated-cafe",
+                title = "수정한 메모",
+                content = "변경한 내용",
             )
 
         assertSame(target.plan, result)
-        assertEquals(PlanType.LOCATION, result.type)
+        assertEquals(PlanType.MEMO, result.type)
         assertEquals(PlanCategory.CAFE, result.category)
-        assertEquals("수정한 카페", result.title)
-        assertEquals("https://example.com/updated-cafe", result.url)
+        assertEquals("수정한 메모", result.title)
+        assertEquals("변경한 내용", result.content)
     }
 
     @Test
-    fun `위치 해석을 생략한 사이 URL이 변경되면 위치 정보를 보존하고 충돌을 반환한다`() {
+    fun `위치 계획 작성자도 위치를 메모로 수정할 수 없다`() {
         val target = stubPlanActionTarget(loginIsPlanCreator = true)
-        target.plan.updateLocation(PlanCategory.RESTAURANT, "다른 요청의 맛집", "https://maps.google.com/new-place")
-        target.plan.failLocationResolution(MapProvider.GOOGLE, externalPlaceId = "new-place-id")
 
         val exception =
             assertFailsWith<BusinessException> {
-                planService.updateLocationPlan(
+                planService.updateMemoPlan(
                     planId = 20L,
                     userId = 15L,
-                    category = PlanCategory.CAFE,
-                    title = "수정한 카페",
-                    url = "https://example.com/place",
-                    expectedUrlWhenResolutionSkipped = "https://example.com/place",
+                    category = PlanCategory.OTHER,
+                    title = "수정 시도",
+                    content = "변경 시도",
                 )
             }
 
-        assertEquals(PreLogErrorCode.PLAN_UPDATE_CONFLICT, exception.errorCode)
-        assertEquals("https://maps.google.com/new-place", target.plan.url)
-        assertEquals(LocationResolutionStatus.FAILED, target.plan.locationStatus)
-        assertEquals(MapProvider.GOOGLE, target.plan.location?.provider)
-        assertEquals("new-place-id", target.plan.location?.externalPlaceId)
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_NOT_SUPPORTED, exception.errorCode)
+        assertEquals(PlanType.LOCATION, target.plan.type)
+        assertEquals(PlanCategory.RESTAURANT, target.plan.category)
+        assertEquals("맛집", target.plan.title)
+        assertEquals("https://example.com/place", target.plan.url)
+        assertNull(target.plan.content)
     }
 
     @Test
     fun `계획 작성자가 아니면 계획을 수정할 수 없다`() {
-        val target = stubPlanActionTarget(loginIsPlanCreator = false)
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, type = PlanType.MEMO)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -200,9 +245,9 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
-        assertEquals(PlanType.LOCATION, target.plan.type)
-        assertEquals("맛집", target.plan.title)
-        assertEquals("https://example.com/place", target.plan.url)
+        assertEquals(PlanType.MEMO, target.plan.type)
+        assertEquals("준비물", target.plan.title)
+        assertEquals("가".repeat(Plan.CONTENT_MAX_LENGTH), target.plan.content)
     }
 
     @Test
@@ -245,12 +290,12 @@ class PlanServiceTest {
 
         val updateException =
             assertFailsWith<BusinessException> {
-                planService.updateLocationPlan(
+                planService.updateMemoPlan(
                     planId = 20L,
                     userId = 15L,
                     category = PlanCategory.CAFE,
                     title = "카페",
-                    url = "https://example.com/cafe",
+                    content = "내용",
                 )
             }
         val deleteException =
@@ -531,6 +576,7 @@ class PlanServiceTest {
     private fun stubPlanActionTarget(
         loginIsPlanCreator: Boolean,
         loginIsMeetingCreator: Boolean = false,
+        type: PlanType = PlanType.LOCATION,
     ): PlanActionTarget {
         val context = meetingContext()
         val planCreator = mock(GroupMember::class.java)
@@ -543,14 +589,27 @@ class PlanServiceTest {
         }
 
         val plan =
-            Plan.createLocation(
-                meeting = context.meeting,
-                creator = planCreator,
-                category = PlanCategory.RESTAURANT,
-                title = "맛집",
-                url = "https://example.com/place",
-                currentDate = LocalDate.of(2026, 9, 22),
-            )
+            when (type) {
+                PlanType.LOCATION ->
+                    Plan.createLocation(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.RESTAURANT,
+                        title = "맛집",
+                        url = "https://example.com/place",
+                        currentDate = LocalDate.of(2026, 9, 22),
+                    )
+
+                PlanType.MEMO ->
+                    Plan.createMemo(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.OTHER,
+                        title = "준비물",
+                        content = "가".repeat(Plan.CONTENT_MAX_LENGTH),
+                        currentDate = LocalDate.of(2026, 9, 22),
+                    )
+            }
         ReflectionTestUtils.setField(plan, "id", 20L)
 
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)

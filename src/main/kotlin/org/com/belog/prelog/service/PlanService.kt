@@ -21,6 +21,7 @@ import org.com.belog.prelog.service.command.PreLogNotificationCommands
 import org.com.belog.prelog.service.query.PlanListCursor
 import org.com.belog.prelog.service.result.MapPlanListItemResult
 import org.com.belog.prelog.service.result.MapPlanListResult
+import org.com.belog.prelog.service.result.PlanDetailResult
 import org.com.belog.prelog.service.result.PlanListItemResult
 import org.com.belog.prelog.service.result.PlanListResult
 import org.com.belog.prelog.service.result.PlanLocationResolution
@@ -42,6 +43,26 @@ class PlanService(
     private val userService: UserService,
     private val clock: Clock,
 ) {
+    @Transactional(readOnly = true)
+    fun getPlanDetail(
+        planId: Long,
+        userId: Long,
+    ): PlanDetailResult {
+        val plan = findPlan(planId)
+        val groupMember = findGroupMember(plan.meeting, userId)
+        if (plan.type != PlanType.MEMO) {
+            throw BusinessException(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED)
+        }
+
+        return PlanDetailResult(
+            planId = checkNotNull(plan.id) { "조회된 계획의 ID가 없습니다." },
+            category = plan.category,
+            title = plan.title,
+            content = checkNotNull(plan.content) { "메모 계획의 본문이 없습니다." },
+            canEdit = plan.isCreatedBy(groupMember),
+        )
+    }
+
     @Transactional(readOnly = true)
     fun getPlans(
         meetingId: Long,
@@ -196,47 +217,30 @@ class PlanService(
     }
 
     @Transactional
-    fun updateLocationPlan(
-        planId: Long,
-        userId: Long,
-        category: PlanCategory,
-        title: String,
-        url: String,
-        locationResolution: PlanLocationResolution? = null,
-        expectedUrlWhenResolutionSkipped: String? = null,
-    ): Plan =
-        updatePlan(planId, userId) { plan ->
-            if (expectedUrlWhenResolutionSkipped != null && plan.url != expectedUrlWhenResolutionSkipped) {
-                throw BusinessException(PreLogErrorCode.PLAN_UPDATE_CONFLICT)
-            }
-            plan.updateLocation(category = category, title = title, url = url)
-            locationResolution?.let { resolution -> plan.applyLocationResolution(resolution) }
-        }
-
-    @Transactional(readOnly = true)
-    fun getLocationUrlForUpdate(
-        planId: Long,
-        userId: Long,
-    ): String? {
-        val plan = findPlan(planId)
-        val groupMember = findGroupMember(plan.meeting, userId)
-        if (!plan.isCreatedBy(groupMember)) {
-            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
-        }
-        return plan.url
-    }
-
-    @Transactional
     fun updateMemoPlan(
         planId: Long,
         userId: Long,
         category: PlanCategory,
         title: String,
         content: String,
-    ): Plan =
-        updatePlan(planId, userId) { plan ->
-            plan.updateMemo(category = category, title = title, content = content)
+    ): Plan {
+        val plan = findPlan(planId)
+        val groupMember = findGroupMember(plan.meeting, userId)
+        if (!plan.isCreatedBy(groupMember)) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
         }
+        if (plan.type != PlanType.MEMO) {
+            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_NOT_SUPPORTED)
+        }
+
+        try {
+            plan.updateMemo(category = category, title = title, content = content)
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(PreLogErrorCode.INVALID_PLAN, exception)
+        }
+
+        return plan
+    }
 
     @Transactional
     fun deletePlan(
@@ -291,28 +295,6 @@ class PlanService(
         val plan = findPlan(planId)
         val meeting = plan.meeting
         findGroupMember(meeting, userId)
-
-        return plan
-    }
-
-    private fun updatePlan(
-        planId: Long,
-        userId: Long,
-        update: (Plan) -> Unit,
-    ): Plan {
-        val plan = findPlan(planId)
-        val meeting = plan.meeting
-        val groupMember = findGroupMember(meeting, userId)
-
-        if (!plan.isCreatedBy(groupMember)) {
-            throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
-        }
-
-        try {
-            update(plan)
-        } catch (exception: IllegalArgumentException) {
-            throw BusinessException(PreLogErrorCode.INVALID_PLAN, exception)
-        }
 
         return plan
     }
@@ -392,7 +374,6 @@ class PlanService(
             likeCount = 0,
             likedByMe = false,
             pinned = pinned,
-            canEdit = isPlanCreator,
             canDelete = isPlanCreator || isMeetingCreator,
             createdAt = checkNotNull(createdAt) { "조회된 계획의 생성 시각이 없습니다." },
         )
