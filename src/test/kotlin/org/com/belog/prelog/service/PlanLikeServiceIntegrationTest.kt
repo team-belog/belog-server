@@ -117,6 +117,35 @@ class PlanLikeServiceIntegrationTest {
     }
 
     @Test
+    fun `좋아요 등록과 취소 후 목록을 재조회하면 변경된 좋아요 상태를 반환한다`() {
+        val context = savePlanContext()
+
+        fun getPlan() =
+            planService
+                .getPlans(
+                    meetingId = context.meetingId,
+                    userId = context.userId,
+                    category = null,
+                    pinnedOnly = false,
+                    cursor = null,
+                ).items
+                .single()
+
+        val likeResult = planLikeService.likePlan(context.planId, context.userId)
+        val likedPlan = getPlan()
+
+        assertEquals(context.planId, likedPlan.planId)
+        assertTrue(likedPlan.likedByMe)
+        assertEquals(likeResult.likeCount, likedPlan.likeCount)
+
+        val unlikeResult = planLikeService.unlikePlan(context.planId, context.userId)
+        val unlikedPlan = getPlan()
+
+        assertFalse(unlikedPlan.likedByMe)
+        assertEquals(unlikeResult.likeCount, unlikedPlan.likeCount)
+    }
+
+    @Test
     fun `동일한 사용자가 동시에 좋아요를 등록해도 한 건만 생성된다`() {
         val context = savePlanContext()
         val executor = Executors.newFixedThreadPool(CONCURRENT_REQUEST_COUNT)
