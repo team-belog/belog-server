@@ -1,4 +1,4 @@
-package org.com.belog.meeting.service
+package org.com.belog.meeting.service.command
 
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.notification.domain.NotificationType

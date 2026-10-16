@@ -19,6 +19,7 @@ import org.com.belog.postlog.domain.PostLogTicket
 import org.com.belog.postlog.repository.PostLogDraftRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.repository.PostLogTicketRepository
+import org.com.belog.postlog.service.command.PostLogNotificationCommands
 import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import org.com.belog.postlog.service.result.PostLogTicketMemberResult

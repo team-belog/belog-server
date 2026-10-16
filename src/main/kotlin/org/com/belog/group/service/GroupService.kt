@@ -15,6 +15,7 @@ import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
 import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.command.GroupNotificationCommands
 import org.com.belog.group.service.query.GroupListCursor
 import org.com.belog.group.service.result.ActiveMeetingResult
 import org.com.belog.group.service.result.CreatedGroup

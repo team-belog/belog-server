@@ -15,6 +15,7 @@ import org.com.belog.notification.repository.NotificationOutboxRepository
 import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.postlog.service.command.ValidatedPostLogPhotoRegistrationTarget
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider

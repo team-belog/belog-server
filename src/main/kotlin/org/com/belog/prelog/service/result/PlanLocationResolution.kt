@@ -1,4 +1,4 @@
-package org.com.belog.prelog.service
+package org.com.belog.prelog.service.result
 
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.PlanLocation

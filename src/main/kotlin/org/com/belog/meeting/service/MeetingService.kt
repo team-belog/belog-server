@@ -18,6 +18,7 @@ import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.command.MeetingNotificationCommands
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.com.belog.meeting.service.result.PastMeetingListResult
 import org.com.belog.meeting.service.result.PastMeetingResult

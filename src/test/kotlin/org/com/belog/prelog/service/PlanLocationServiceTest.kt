@@ -5,9 +5,11 @@ import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.infrastructure.PlanLocationResolver
 import org.com.belog.prelog.infrastructure.google.GoogleMapUrlDetector
 import org.com.belog.prelog.infrastructure.kakao.KakaoMapUrlDetector
 import org.com.belog.prelog.infrastructure.naver.NaverMapUrlDetector
+import org.com.belog.prelog.service.result.PlanLocationResolution
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify

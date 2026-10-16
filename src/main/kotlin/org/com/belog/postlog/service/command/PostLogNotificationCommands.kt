@@ -1,4 +1,4 @@
-package org.com.belog.postlog.service
+package org.com.belog.postlog.service.command
 
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.command.CreateNotificationCommand

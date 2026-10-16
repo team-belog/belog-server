@@ -10,6 +10,7 @@ import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.repository.PlanLikeRepository
 import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.prelog.service.command.PreLogNotificationCommands
 import org.com.belog.prelog.service.result.PlanLikeResult
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service

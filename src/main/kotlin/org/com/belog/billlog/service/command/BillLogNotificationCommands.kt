@@ -1,4 +1,4 @@
-package org.com.belog.billlog.service
+package org.com.belog.billlog.service.command
 
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.command.CreateNotificationCommand

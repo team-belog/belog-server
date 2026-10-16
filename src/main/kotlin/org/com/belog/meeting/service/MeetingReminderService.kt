@@ -3,6 +3,7 @@ package org.com.belog.meeting.service
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.command.MeetingNotificationCommands
 import org.com.belog.notification.service.NotificationService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service

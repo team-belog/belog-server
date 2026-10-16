@@ -16,6 +16,7 @@ import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.service.command.PostLogPhotoRegistrationTarget
 import org.com.belog.postlog.service.command.PostLogPhotoUploadTarget
+import org.com.belog.postlog.service.command.ValidatedPostLogPhotoRegistrationTarget
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.postlog.service.result.PostLogPhotoUploadResult
