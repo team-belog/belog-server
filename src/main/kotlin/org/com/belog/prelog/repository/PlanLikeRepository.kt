@@ -11,6 +11,34 @@ import org.springframework.data.repository.query.Param
 interface PlanLikeRepository :
     JpaRepository<PlanLike, Long>,
     PlanLikeRepositoryCustom {
+    @Query(
+        """
+        SELECT new org.com.belog.prelog.repository.PlanLikeCount(
+            planLike.plan.id,
+            COUNT(planLike.id)
+        )
+        FROM PlanLike planLike
+        WHERE planLike.plan.id IN :planIds
+        GROUP BY planLike.plan.id
+        """,
+    )
+    fun countByPlanIds(
+        @Param("planIds") planIds: Collection<Long>,
+    ): List<PlanLikeCount>
+
+    @Query(
+        """
+        SELECT planLike.plan.id
+        FROM PlanLike planLike
+        WHERE planLike.plan.id IN :planIds
+          AND planLike.groupMember.id = :groupMemberId
+        """,
+    )
+    fun findLikedPlanIds(
+        @Param("planIds") planIds: Collection<Long>,
+        @Param("groupMemberId") groupMemberId: Long,
+    ): List<Long>
+
     @Lock(LockModeType.PESSIMISTIC_READ)
     @Query(
         """
