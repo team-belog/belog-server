@@ -2,8 +2,8 @@ package org.com.belog.prelog.infrastructure.google
 
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.PlanLocation
-import org.com.belog.prelog.service.PlanLocationResolution
-import org.com.belog.prelog.service.PlanLocationResolver
+import org.com.belog.prelog.infrastructure.PlanLocationResolver
+import org.com.belog.prelog.service.result.PlanLocationResolution
 import org.springframework.stereotype.Component
 import java.net.URI
 

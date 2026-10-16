@@ -8,6 +8,7 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.command.GroupNotificationCommands
 import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.group.service.result.JoinedGroup
 import org.com.belog.notification.service.NotificationService

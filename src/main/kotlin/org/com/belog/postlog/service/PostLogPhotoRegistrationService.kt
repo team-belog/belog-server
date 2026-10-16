@@ -10,12 +10,12 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
-import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.postlog.service.command.PostLogNotificationCommands
+import org.com.belog.postlog.service.command.ValidatedPostLogPhotoRegistrationTarget
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.OffsetDateTime
 import java.time.temporal.ChronoUnit
 
 @Service
@@ -115,8 +115,3 @@ class PostLogPhotoRegistrationService(
             capturedAt == target.capturedAt.toInstant().truncatedTo(ChronoUnit.MICROS) &&
             capturedOffsetMinutes == target.capturedAt.offset.totalSeconds / PostLogPhoto.SECONDS_PER_MINUTE
 }
-
-data class ValidatedPostLogPhotoRegistrationTarget(
-    val objectKey: PostLogPhotoObjectKey,
-    val capturedAt: OffsetDateTime,
-)

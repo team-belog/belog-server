@@ -2,7 +2,7 @@ package org.com.belog.prelog.infrastructure.google
 
 import org.com.belog.prelog.config.GoogleMapsProperties
 import org.com.belog.prelog.domain.MapProvider
-import org.com.belog.prelog.service.PlanLocationResolution
+import org.com.belog.prelog.service.result.PlanLocationResolution
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer

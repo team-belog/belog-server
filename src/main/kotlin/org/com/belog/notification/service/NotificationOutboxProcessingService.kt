@@ -2,31 +2,16 @@ package org.com.belog.notification.service
 
 import org.com.belog.notification.config.NotificationOutboxWorkerProperties
 import org.com.belog.notification.domain.NotificationOutbox
-import org.com.belog.notification.domain.NotificationTargetType
-import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.infrastructure.PushSendOutcome
 import org.com.belog.notification.infrastructure.PushSendResult
 import org.com.belog.notification.repository.NotificationDeviceRepository
 import org.com.belog.notification.repository.NotificationOutboxRepository
+import org.com.belog.notification.service.result.OutboxSendContext
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
-
-data class OutboxSendContext(
-    val notificationId: Long,
-    val type: NotificationType,
-    val message: String,
-    val targetType: NotificationTargetType,
-    val targetId: Long?,
-    val pushNotificationEnabled: Boolean,
-    val recipientActive: Boolean,
-    val activeFcmTokens: List<String>,
-) {
-    val isSendable: Boolean
-        get() = pushNotificationEnabled && recipientActive && activeFcmTokens.isNotEmpty()
-}
 
 @Service
 class NotificationOutboxProcessingService(

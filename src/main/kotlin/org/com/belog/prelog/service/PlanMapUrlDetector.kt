@@ -1,6 +1,7 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.prelog.domain.MapProvider
+import org.com.belog.prelog.infrastructure.MapUrlDetector
 import org.springframework.stereotype.Component
 import java.net.URI
 

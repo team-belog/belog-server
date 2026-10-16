@@ -2,6 +2,7 @@ package org.com.belog.group.service
 
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.command.GroupNotificationCommands
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.notification.service.NotificationService

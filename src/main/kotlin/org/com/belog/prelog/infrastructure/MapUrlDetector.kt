@@ -1,4 +1,4 @@
-package org.com.belog.prelog.service
+package org.com.belog.prelog.infrastructure
 
 import org.com.belog.prelog.domain.MapProvider
 import java.net.URI
