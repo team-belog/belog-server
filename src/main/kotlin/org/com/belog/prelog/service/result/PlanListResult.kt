@@ -22,7 +22,6 @@ data class PlanListItemResult(
     val likeCount: Long,
     val likedByMe: Boolean,
     val pinned: Boolean,
-    val canEdit: Boolean,
     val canDelete: Boolean,
     val createdAt: Instant,
 )

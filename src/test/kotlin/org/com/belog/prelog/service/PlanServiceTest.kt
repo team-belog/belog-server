@@ -139,7 +139,7 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `계획 작성자는 종료된 만남에서도 자신의 계획을 수정하고 삭제할 수 있다`() {
+    fun `계획 작성자는 종료된 만남에서도 자신의 계획을 삭제할 수 있다`() {
         stubPlanList(
             loginGroupMemberId = 10L,
             planCreatorId = 10L,
@@ -150,13 +150,12 @@ class PlanServiceTest {
 
         val result = getPlans()
 
-        assertTrue(result.items.single().canEdit)
         assertTrue(result.items.single().canDelete)
         assertEquals("광주광역시 동구", result.items.single().content)
     }
 
     @Test
-    fun `만남 생성자는 다른 사용자의 계획을 수정할 수 없지만 삭제할 수 있다`() {
+    fun `만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
         val memoContent = "가".repeat(Plan.CONTENT_MAX_LENGTH)
         stubPlanList(
             loginGroupMemberId = 10L,
@@ -170,11 +169,10 @@ class PlanServiceTest {
 
         assertTrue(result.items.single().canDelete)
         assertEquals(memoContent, result.items.single().content)
-        assertFalse(result.items.single().canEdit)
     }
 
     @Test
-    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 수정하거나 삭제할 수 없다`() {
+    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 삭제할 수 없다`() {
         stubPlanList(
             loginGroupMemberId = 10L,
             planCreatorId = 11L,
@@ -185,7 +183,6 @@ class PlanServiceTest {
         val result = getPlans()
 
         assertFalse(result.items.single().canDelete)
-        assertFalse(result.items.single().canEdit)
         assertNull(result.items.single().content)
     }
 
