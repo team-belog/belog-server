@@ -142,6 +142,10 @@ class Meeting protected constructor(
     var lastDatePollRemindedAt: Instant? = null
         protected set
 
+    @Column(name = "ended_at")
+    var endedAt: Instant? = null
+        protected set
+
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null
         protected set
@@ -207,6 +211,18 @@ class Meeting protected constructor(
         check(isDatePollReminderCooldownElapsed(remindedAt)) { "일정 조율 리마인드 대기 시간이 지나지 않았습니다." }
 
         lastDatePollRemindedAt = remindedAt
+    }
+
+    fun end(
+        endedAt: Instant,
+        currentDate: LocalDate,
+    ) {
+        check(this.endedAt == null) { "이미 종료된 만남입니다." }
+        check(status == MeetingStatus.CONFIRMED) { "일정이 확정된 만남만 종료할 수 있습니다." }
+        val startDate = checkNotNull(startDate) { "확정된 만남의 시작일이 없습니다." }
+        check(!currentDate.isBefore(startDate)) { "만남 시작일 이전에는 만남을 종료할 수 없습니다." }
+
+        this.endedAt = endedAt
     }
 
     fun delete(deletedAt: Instant) {

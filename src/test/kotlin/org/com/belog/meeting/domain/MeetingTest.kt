@@ -47,6 +47,48 @@ class MeetingTest {
     }
 
     @Test
+    fun `시작일부터 확정된 만남을 종료할 수 있다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 20), endDate = LocalDate.of(2026, 9, 22))
+        val endedAt = Instant.parse("2026-09-20T03:00:00Z")
+
+        meeting.end(endedAt = endedAt, currentDate = LocalDate.of(2026, 9, 20))
+
+        assertEquals(endedAt, meeting.endedAt)
+    }
+
+    @Test
+    fun `이미 종료된 만남은 다시 종료할 수 없다`() {
+        val meeting = createFixedMeeting()
+        val endedAt = Instant.parse("2026-09-20T03:00:00Z")
+        meeting.end(endedAt = endedAt, currentDate = LocalDate.of(2026, 9, 20))
+
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-21T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 21))
+        }
+        assertEquals(endedAt, meeting.endedAt)
+    }
+
+    @Test
+    fun `일정 조율 중인 만남은 종료할 수 없다`() {
+        val meeting = createPollMeeting()
+
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-20T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 20))
+        }
+        assertNull(meeting.endedAt)
+    }
+
+    @Test
+    fun `만남 시작일 이전에는 만남을 종료할 수 없다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 21), endDate = LocalDate.of(2026, 9, 22))
+
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-20T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 20))
+        }
+        assertNull(meeting.endedAt)
+    }
+
+    @Test
     fun `확정 날짜 만남을 생성하면 생성자와 날짜 정보를 저장하고 즉시 확정 상태가 된다`() {
         val group = createGroup("AB12CD")
         val creator = GroupMember.createMember(group, completedUser("creator-subject", "생성자"))
