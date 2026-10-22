@@ -19,4 +19,5 @@ enum class MeetingSuccessCode(
     MEETING_DELETED(HttpStatus.NO_CONTENT, "MEETING-S009", "만남이 삭제되었습니다."),
     DATE_POLL_REMINDER_SENT(HttpStatus.NO_CONTENT, "MEETING-S010", "미응답자에게 일정 조율 리마인드를 전송했습니다."),
     MEETING_MEMBERS_RETRIEVED(HttpStatus.OK, "MEETING-S011", "만남 멤버 목록을 조회했습니다."),
+    MEETING_ENDED(HttpStatus.OK, "MEETING-S012", "만남을 종료했습니다."),
 }

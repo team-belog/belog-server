@@ -33,4 +33,7 @@ enum class MeetingErrorCode(
     MEETING_DATE_REQUIRED(HttpStatus.BAD_REQUEST, "MEETING-E023", "확정된 만남의 시작일과 종료일은 필수입니다."),
     DATE_POLL_REMINDER_TARGET_NOT_FOUND(HttpStatus.CONFLICT, "MEETING-E024", "리마인드를 전송할 미응답자가 없습니다."),
     DATE_POLL_REMINDER_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "MEETING-E025", "일정 조율 리마인드는 1분 후에 다시 보낼 수 있습니다."),
+    MEETING_END_ALREADY_ENDED(HttpStatus.CONFLICT, "MEETING-E026", "이미 종료된 만남입니다."),
+    MEETING_END_NOT_STARTED(HttpStatus.CONFLICT, "MEETING-E027", "일정이 확정된 만남은 시작일부터 종료할 수 있습니다."),
+    MEETING_END_LOGS_INCOMPLETE(HttpStatus.CONFLICT, "MEETING-E028", "Pre-log, Bill-log, Post-log를 모두 작성해야 만남을 종료할 수 있습니다."),
 }

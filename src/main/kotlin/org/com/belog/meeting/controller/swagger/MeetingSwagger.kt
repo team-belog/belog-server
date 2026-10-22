@@ -288,6 +288,76 @@ interface MeetingSwagger {
     ): ResponseEntity<Void>
 
     @Operation(
+        summary = "만남 종료",
+        description =
+            "만남 방장이 만남을 종료합니다. 일정이 확정된 만남은 시작일부터 종료할 수 있으며, " +
+                "Pre-log 계획, Bill-log 지출, Post-log 사진이 각각 1개 이상 등록되어 있어야 합니다. " +
+                "종료한 만남은 되돌릴 수 없습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 종료 성공",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = END_MEETING_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 방장이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 상태상 종료 불가",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "이미 종료된 만남", value = MEETING_END_ALREADY_ENDED_EXAMPLE),
+                            ExampleObject(name = "시작 전 또는 일정 조율 중인 만남", value = MEETING_END_NOT_STARTED_EXAMPLE),
+                            ExampleObject(name = "작성되지 않은 로그 존재", value = MEETING_END_LOGS_INCOMPLETE_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun endMeeting(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "만남 상세 조회",
         description =
             "만남 기본 정보와 로그인 사용자의 수정 권한, " +
@@ -419,6 +489,9 @@ private const val CREATE_POLL_MEETING_SUCCESS_EXAMPLE =
 private const val UPDATE_MEETING_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S008","message":"만남이 수정되었습니다.","data":null}"""
 
+private const val END_MEETING_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S012","message":"만남을 종료했습니다.","data":null}"""
+
 private const val MEETING_DETAIL_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S006","message":"만남 상세 정보를 조회했습니다.","data":{"meetingId":7,"groupId":1,"groupName":"피놀리와 기니휘기","meetingName":"1박 2일 광주 여행","scheduleType":"FIXED","meetingStatus":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","location":"광주광역시 000 000","canEditMeeting":true,"logStatuses":{"preLog":"IN_PROGRESS","billLog":"NOT_STARTED","postLog":"NOT_STARTED"}}}"""
 
@@ -466,3 +539,12 @@ private const val PAST_MEETING_DATE_SELECTION_EXAMPLE =
 
 private const val MEETING_DATE_REQUIRED_EXAMPLE =
     """{"code":"MEETING-E023","message":"확정된 만남의 시작일과 종료일은 필수입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val MEETING_END_ALREADY_ENDED_EXAMPLE =
+    """{"code":"MEETING-E026","message":"이미 종료된 만남입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val MEETING_END_NOT_STARTED_EXAMPLE =
+    """{"code":"MEETING-E027","message":"일정이 확정된 만남은 시작일부터 종료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val MEETING_END_LOGS_INCOMPLETE_EXAMPLE =
+    """{"code":"MEETING-E028","message":"Pre-log, Bill-log, Post-log를 모두 작성해야 만남을 종료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

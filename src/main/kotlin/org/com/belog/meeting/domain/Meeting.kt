@@ -218,12 +218,12 @@ class Meeting protected constructor(
         currentDate: LocalDate,
     ) {
         check(this.endedAt == null) { "이미 종료된 만남입니다." }
-        check(status == MeetingStatus.CONFIRMED) { "일정이 확정된 만남만 종료할 수 있습니다." }
-        val startDate = checkNotNull(startDate) { "확정된 만남의 시작일이 없습니다." }
-        check(!currentDate.isBefore(startDate)) { "만남 시작일 이전에는 만남을 종료할 수 없습니다." }
+        check(hasStarted(currentDate)) { "일정이 확정된 만남은 시작일부터 종료할 수 있습니다." }
 
         this.endedAt = endedAt
     }
+
+    fun hasStarted(currentDate: LocalDate): Boolean = status == MeetingStatus.CONFIRMED && startDate?.isAfter(currentDate) == false
 
     fun delete(deletedAt: Instant) {
         require(this.deletedAt == null) { "이미 삭제된 만남입니다." }
