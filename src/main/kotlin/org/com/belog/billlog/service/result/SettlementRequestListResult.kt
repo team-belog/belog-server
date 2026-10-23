@@ -2,6 +2,7 @@ package org.com.belog.billlog.service.result
 
 import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.user.domain.BankAccount
 import java.math.BigDecimal
 
 enum class SettlementRequestAction {
@@ -22,6 +23,7 @@ data class SettlementRequestListItemResult(
     val amount: BigDecimal,
     val sender: SettlementParticipantResult,
     val receiver: SettlementParticipantResult,
+    val receiverBankAccount: BankAccount?,
     val status: SettlementRequestStatus,
     val action: SettlementRequestAction,
 )
