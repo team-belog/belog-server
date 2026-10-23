@@ -3,7 +3,6 @@ package org.com.belog.group.service
 import org.com.belog.billlog.service.SettlementRequestService
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
-import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME
 import org.com.belog.group.domain.Group
@@ -246,9 +245,8 @@ class GroupService(
     ): GroupDetailResult {
         val group = findGroup(groupId)
         val currentMember = findCurrentMember(groupId, userId)
-        val currentDate = clock.currentBusinessDate()
         val schedulingMeetings = meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING)
-        val activeMeetings = meetingRepository.findActiveMeetings(groupId, currentDate, MeetingStatus.CONFIRMED)
+        val activeMeetings = meetingRepository.findActiveMeetings(groupId, MeetingStatus.CONFIRMED)
         val participantsByMeetingId = createMeetingParticipantResults(schedulingMeetings + activeMeetings)
         val respondedMeetingIds =
             if (schedulingMeetings.isEmpty()) {

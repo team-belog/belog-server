@@ -1,33 +1,33 @@
 package org.com.belog.home.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
-import org.com.belog.home.controller.cursor.CompletedMeetingCursorCodec
-import org.com.belog.home.service.result.CompletedMeetingListResult
-import org.com.belog.home.service.result.CompletedMeetingParticipantResult
-import org.com.belog.home.service.result.CompletedMeetingResult
+import org.com.belog.home.controller.cursor.TicketCursorCodec
+import org.com.belog.home.service.result.TicketListResult
+import org.com.belog.home.service.result.TicketParticipantResult
+import org.com.belog.home.service.result.TicketResult
 import java.time.LocalDate
 
-@Schema(description = "종료된 만남 티켓 목록 조회 결과")
-data class CompletedMeetingListResponse(
-    @field:Schema(description = "종료된 만남 티켓 목록")
-    val items: List<CompletedMeetingResponse>,
+@Schema(description = "생성한 티켓 목록 조회 결과")
+data class TicketListResponse(
+    @field:Schema(description = "생성한 티켓 목록")
+    val items: List<TicketResponse>,
     @field:Schema(description = "다음 페이지 커서. 다음 페이지가 없으면 null", nullable = true)
     val nextCursor: String?,
     @field:Schema(description = "다음 페이지 존재 여부", example = "true")
     val hasNext: Boolean,
 ) {
     companion object {
-        fun from(result: CompletedMeetingListResult): CompletedMeetingListResponse =
-            CompletedMeetingListResponse(
-                items = result.items.map(CompletedMeetingResponse::from),
-                nextCursor = result.nextCursor?.let(CompletedMeetingCursorCodec::encode),
+        fun from(result: TicketListResult): TicketListResponse =
+            TicketListResponse(
+                items = result.items.map(TicketResponse::from),
+                nextCursor = result.nextCursor?.let(TicketCursorCodec::encode),
                 hasNext = result.hasNext,
             )
     }
 }
 
-@Schema(description = "종료된 만남 티켓")
-data class CompletedMeetingResponse(
+@Schema(description = "생성한 티켓")
+data class TicketResponse(
     @field:Schema(description = "개인 Post-log 티켓 ID", example = "31")
     val ticketId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
@@ -45,11 +45,11 @@ data class CompletedMeetingResponse(
     @field:Schema(description = "전체 참여자 수", example = "3")
     val participantCount: Int,
     @field:Schema(description = "참여자 목록")
-    val participants: List<CompletedMeetingParticipantResponse>,
+    val participants: List<TicketParticipantResponse>,
 ) {
     companion object {
-        fun from(result: CompletedMeetingResult): CompletedMeetingResponse =
-            CompletedMeetingResponse(
+        fun from(result: TicketResult): TicketResponse =
+            TicketResponse(
                 ticketId = result.ticketId,
                 name = result.name,
                 memory = result.memory,
@@ -58,21 +58,21 @@ data class CompletedMeetingResponse(
                 endDate = result.endDate,
                 location = result.location,
                 participantCount = result.participantCount,
-                participants = result.participants.map(CompletedMeetingParticipantResponse::from),
+                participants = result.participants.map(TicketParticipantResponse::from),
             )
     }
 }
 
-@Schema(description = "종료된 만남 참여자")
-data class CompletedMeetingParticipantResponse(
+@Schema(description = "티켓 만남의 참여자")
+data class TicketParticipantResponse(
     @field:Schema(description = "그룹 멤버 ID", example = "21")
     val groupMemberId: Long,
     @field:Schema(description = "닉네임", example = "이정원")
     val nickname: String,
 ) {
     companion object {
-        fun from(result: CompletedMeetingParticipantResult): CompletedMeetingParticipantResponse =
-            CompletedMeetingParticipantResponse(
+        fun from(result: TicketParticipantResult): TicketParticipantResponse =
+            TicketParticipantResponse(
                 groupMemberId = result.groupMemberId,
                 nickname = result.nickname,
             )

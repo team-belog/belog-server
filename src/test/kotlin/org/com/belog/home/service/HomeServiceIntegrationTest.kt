@@ -112,15 +112,18 @@ class HomeServiceIntegrationTest {
     }
 
     @Test
-    fun `진행 목록은 조율 중과 종료되지 않은 확정 만남의 상태를 날짜 경계에 맞게 반환한다`() {
+    fun `진행 목록은 조율 중과 종료하지 않은 확정 만남의 상태를 날짜 경계에 맞게 반환한다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val other = saveGroupMember(group, "other")
         val scheduling = saveSchedulingMeeting(group, viewer, "일정 조율 중")
+        val endDatePassed = saveFixedMeeting(group, viewer, "종료일 지남", date(8, 15), date(8, 16))
         val endsToday = saveFixedMeeting(group, viewer, "오늘 종료", date(8, 17), date(8, 18))
         val startsToday = saveFixedMeeting(group, viewer, "오늘 시작", date(8, 18), date(8, 20))
         val upcoming = saveFixedMeeting(group, viewer, "시작 전", date(8, 19), date(8, 20))
-        saveFixedMeeting(group, viewer, "종료됨", date(8, 16), date(8, 17))
+        val ended = saveFixedMeeting(group, viewer, "종료됨", date(8, 16), date(8, 17))
+        ended.end(endedAt = FIXED_INSTANT, currentDate = date(8, 18))
+        meetingRepository.saveAndFlush(ended)
         saveFixedMeeting(group, other, "미참여 만남", date(8, 19), date(8, 20))
         val deletedMeeting = saveFixedMeeting(group, viewer, "삭제된 만남", date(8, 20), date(8, 21))
         deletedMeeting.delete(FIXED_INSTANT)
@@ -129,12 +132,13 @@ class HomeServiceIntegrationTest {
         val result = homeService.getActiveMeetings(checkNotNull(viewer.user.id), null, null, 50)
 
         assertEquals(
-            listOf(scheduling.id, endsToday.id, startsToday.id, upcoming.id),
+            listOf(scheduling.id, endDatePassed.id, endsToday.id, startsToday.id, upcoming.id),
             result.items.map { meeting -> meeting.meetingId },
         )
         assertEquals(
             listOf(
                 HomeMeetingProgressStatus.SCHEDULING,
+                HomeMeetingProgressStatus.IN_PROGRESS,
                 HomeMeetingProgressStatus.IN_PROGRESS,
                 HomeMeetingProgressStatus.IN_PROGRESS,
                 HomeMeetingProgressStatus.UPCOMING,
@@ -174,14 +178,16 @@ class HomeServiceIntegrationTest {
     }
 
     @Test
-    fun `종료 목록은 로그인 사용자가 만든 종료된 티켓만 반환한다`() {
+    fun `티켓 목록은 만남 종료와 삭제 여부와 관계없이 로그인 사용자가 만든 티켓을 반환한다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val other = saveGroupMember(group, "other")
-        val includedMeeting = saveFixedMeeting(group, viewer, "포함", date(8, 16), date(8, 17))
-        val includedTicket = saveTicket(includedMeeting, viewer)
-        val endsToday = saveFixedMeeting(group, viewer, "오늘 종료", date(8, 17), date(8, 18))
-        saveTicket(endsToday, viewer)
+        val endedMeeting = saveFixedMeeting(group, viewer, "종료한 만남", date(8, 16), date(8, 17))
+        val endedMeetingTicket = saveTicket(endedMeeting, viewer)
+        endedMeeting.end(endedAt = FIXED_INSTANT, currentDate = date(8, 18))
+        meetingRepository.saveAndFlush(endedMeeting)
+        val notEndedMeeting = saveFixedMeeting(group, viewer, "종료하지 않은 만남", date(8, 17), date(8, 18))
+        val notEndedMeetingTicket = saveTicket(notEndedMeeting, viewer)
         saveFixedMeeting(group, viewer, "티켓 없음", date(8, 15), date(8, 16))
         val draftMeeting = saveFixedMeeting(group, viewer, "임시 저장", date(8, 14), date(8, 15))
         saveDraft(draftMeeting, viewer)
@@ -192,13 +198,16 @@ class HomeServiceIntegrationTest {
         deletedMeeting.delete(FIXED_INSTANT)
         meetingRepository.saveAndFlush(deletedMeeting)
 
-        val result = homeService.getCompletedMeetings(checkNotNull(viewer.user.id), null, 50)
+        val result = homeService.getTickets(checkNotNull(viewer.user.id), null, 50)
 
-        assertEquals(listOf(includedTicket.id, deletedMeetingTicket.id), result.items.map { item -> item.ticketId })
+        assertEquals(
+            listOf(notEndedMeetingTicket.id, endedMeetingTicket.id, deletedMeetingTicket.id),
+            result.items.map { item -> item.ticketId },
+        )
     }
 
     @Test
-    fun `종료 목록은 종료일과 티켓 ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
+    fun `티켓 목록은 종료일과 티켓 ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val tickets =
@@ -217,9 +226,9 @@ class HomeServiceIntegrationTest {
                 ).map { ticket -> ticket.id }
         val viewerUserId = checkNotNull(viewer.user.id)
 
-        val firstPage = homeService.getCompletedMeetings(viewerUserId, null, 2)
-        val secondPage = homeService.getCompletedMeetings(viewerUserId, firstPage.nextCursor, 2)
-        val thirdPage = homeService.getCompletedMeetings(viewerUserId, secondPage.nextCursor, 2)
+        val firstPage = homeService.getTickets(viewerUserId, null, 2)
+        val secondPage = homeService.getTickets(viewerUserId, firstPage.nextCursor, 2)
+        val thirdPage = homeService.getTickets(viewerUserId, secondPage.nextCursor, 2)
 
         assertEquals(
             expectedTicketIds,

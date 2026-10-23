@@ -6,10 +6,10 @@ import org.com.belog.global.annotation.LoginUserId
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.home.code.HomeSuccessCode
 import org.com.belog.home.controller.cursor.ActiveMeetingCursorCodec
-import org.com.belog.home.controller.cursor.CompletedMeetingCursorCodec
+import org.com.belog.home.controller.cursor.TicketCursorCodec
 import org.com.belog.home.controller.dto.response.ActiveMeetingListResponse
-import org.com.belog.home.controller.dto.response.CompletedMeetingListResponse
 import org.com.belog.home.controller.dto.response.HomeCalendarResponse
+import org.com.belog.home.controller.dto.response.TicketListResponse
 import org.com.belog.home.controller.swagger.HomeSwagger
 import org.com.belog.home.service.HomeService
 import org.springframework.format.annotation.DateTimeFormat
@@ -68,24 +68,24 @@ class HomeController(
     }
 
     @GetMapping("/meetings/completed")
-    override fun getCompletedMeetings(
+    override fun getTickets(
         @LoginUserId userId: Long,
         @RequestParam(required = false) cursor: String?,
         @RequestParam(defaultValue = "10") @Min(1) @Max(50) size: Int,
-    ): ResponseEntity<CommonResponse<CompletedMeetingListResponse>> {
+    ): ResponseEntity<CommonResponse<TicketListResponse>> {
         val result =
-            homeService.getCompletedMeetings(
+            homeService.getTickets(
                 userId = userId,
-                cursor = CompletedMeetingCursorCodec.decode(cursor),
+                cursor = TicketCursorCodec.decode(cursor),
                 size = size,
             )
 
         return ResponseEntity
-            .status(HomeSuccessCode.HOME_COMPLETED_MEETINGS_RETRIEVED.status)
+            .status(HomeSuccessCode.HOME_TICKETS_RETRIEVED.status)
             .body(
                 CommonResponse.success(
-                    HomeSuccessCode.HOME_COMPLETED_MEETINGS_RETRIEVED,
-                    CompletedMeetingListResponse.from(result),
+                    HomeSuccessCode.HOME_TICKETS_RETRIEVED,
+                    TicketListResponse.from(result),
                 ),
             )
     }

@@ -18,7 +18,6 @@ import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
 import java.net.URI
-import java.time.LocalDate
 
 private const val PLAN_TITLE_MIN_LENGTH = 1
 private const val PLAN_TITLE_MAX_LENGTH = 100
@@ -187,9 +186,8 @@ class Plan protected constructor(
             category: PlanCategory,
             title: String,
             url: String,
-            currentDate: LocalDate,
         ): Plan {
-            validateCreation(meeting, creator, currentDate)
+            validateCreation(meeting, creator)
 
             return Plan(
                 meeting = meeting,
@@ -208,9 +206,8 @@ class Plan protected constructor(
             category: PlanCategory,
             title: String,
             content: String,
-            currentDate: LocalDate,
         ): Plan {
-            validateCreation(meeting, creator, currentDate)
+            validateCreation(meeting, creator)
 
             return Plan(
                 meeting = meeting,
@@ -226,12 +223,11 @@ class Plan protected constructor(
         private fun validateCreation(
             meeting: Meeting,
             creator: GroupMember,
-            currentDate: LocalDate,
         ) {
             require(creator.belongsTo(meeting.group)) {
                 "계획 생성자는 해당 만남이 속한 그룹의 멤버여야 합니다."
             }
-            require(!meeting.isEnded(currentDate)) {
+            require(!meeting.isEnded()) {
                 "종료된 만남에는 계획을 추가할 수 없습니다."
             }
         }

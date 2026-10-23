@@ -19,31 +19,61 @@ import kotlin.test.assertTrue
 
 class MeetingTest {
     @Test
-    fun `종료일이 현재 날짜보다 이전이면 종료된 만남이다`() {
+    fun `종료일이 지나도 종료하지 않으면 종료된 만남이 아니다`() {
         val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 22))
 
-        assertTrue(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        assertFalse(meeting.isEnded())
     }
 
     @Test
-    fun `종료일 당일에는 종료된 만남이 아니다`() {
-        val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 23))
+    fun `시작된 만남은 로그를 모두 작성해야 종료할 수 있다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 20))
+        val currentDate = LocalDate.of(2026, 9, 20)
 
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        assertTrue(meeting.canEnd(currentDate = currentDate, hasAllLogs = true))
+        assertFalse(meeting.canEnd(currentDate = currentDate, hasAllLogs = false))
     }
 
     @Test
-    fun `종료일 전에는 종료된 만남이 아니다`() {
-        val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 24))
+    fun `시작일부터 확정된 만남을 종료할 수 있다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 20), endDate = LocalDate.of(2026, 9, 22))
+        val endedAt = Instant.parse("2026-09-20T03:00:00Z")
 
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        meeting.end(endedAt = endedAt, currentDate = LocalDate.of(2026, 9, 20))
+
+        assertEquals(endedAt, meeting.endedAt)
     }
 
     @Test
-    fun `일정 미확정 만남은 종료된 만남이 아니다`() {
+    fun `이미 종료된 만남은 다시 종료할 수 없다`() {
+        val meeting = createFixedMeeting()
+        val endedAt = Instant.parse("2026-09-20T03:00:00Z")
+        meeting.end(endedAt = endedAt, currentDate = LocalDate.of(2026, 9, 20))
+
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-21T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 21))
+        }
+        assertEquals(endedAt, meeting.endedAt)
+    }
+
+    @Test
+    fun `일정 조율 중인 만남은 종료할 수 없다`() {
         val meeting = createPollMeeting()
 
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-20T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 20))
+        }
+        assertNull(meeting.endedAt)
+    }
+
+    @Test
+    fun `만남 시작일 이전에는 만남을 종료할 수 없다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 21), endDate = LocalDate.of(2026, 9, 22))
+
+        assertFailsWith<IllegalStateException> {
+            meeting.end(endedAt = Instant.parse("2026-09-20T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 20))
+        }
+        assertNull(meeting.endedAt)
     }
 
     @Test

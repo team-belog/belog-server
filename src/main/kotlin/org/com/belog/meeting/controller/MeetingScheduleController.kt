@@ -10,7 +10,6 @@ import org.com.belog.meeting.controller.dto.response.MeetingDatePollResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDatePollResultsResponse
 import org.com.belog.meeting.controller.swagger.MeetingScheduleSwagger
 import org.com.belog.meeting.service.MeetingDatePollService
-import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -23,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController
 @RestController
 @RequestMapping("/api/v1/meetings/{meetingId}")
 class MeetingScheduleController(
-    private val meetingService: MeetingService,
     private val meetingDatePollService: MeetingDatePollService,
 ) : MeetingScheduleSwagger {
     @GetMapping("/date-poll")
@@ -95,7 +93,7 @@ class MeetingScheduleController(
         @PathVariable meetingId: Long,
         @Valid @RequestBody request: ConfirmMeetingDateRequest,
     ): ResponseEntity<CommonResponse<Nothing>> {
-        meetingService.confirmMeetingDate(
+        meetingDatePollService.confirmMeetingDate(
             meetingId = meetingId,
             userId = userId,
             candidateDateRangeId = request.candidateDateRangeId,

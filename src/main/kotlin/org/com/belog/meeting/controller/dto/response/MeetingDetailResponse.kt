@@ -1,5 +1,6 @@
 package org.com.belog.meeting.controller.dto.response
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
 import org.com.belog.meeting.domain.MeetingLogStatus
 import org.com.belog.meeting.domain.MeetingScheduleType
@@ -27,8 +28,18 @@ data class MeetingDetailResponse(
     val endDate: LocalDate?,
     @field:Schema(description = "장소. 미등록 시 null", example = "광주광역시 000 000", nullable = true)
     val location: String?,
+    @field:Schema(description = "만남 종료 여부", example = "false")
+    @get:JsonProperty("isEnded")
+    val isEnded: Boolean,
     @field:Schema(description = "만남 정보 수정 권한", example = "true")
     val canEditMeeting: Boolean,
+    @field:Schema(
+        description =
+            "만남 종료 가능 여부. 만남 방장이고, 일정이 확정되어 시작일이 지났으며, " +
+                "Pre-log, Bill-log, Post-log가 모두 작성 중인 종료 전 만남이면 true",
+        example = "false",
+    )
+    val canEndMeeting: Boolean,
     @field:Schema(description = "로그별 작성 상태")
     val logStatuses: MeetingLogStatusesResponse,
 ) {
@@ -44,7 +55,9 @@ data class MeetingDetailResponse(
                 startDate = result.startDate,
                 endDate = result.endDate,
                 location = result.location,
+                isEnded = result.isEnded,
                 canEditMeeting = result.canEditMeeting,
+                canEndMeeting = result.canEndMeeting,
                 logStatuses =
                     MeetingLogStatusesResponse(
                         preLog = result.preLogStatus,

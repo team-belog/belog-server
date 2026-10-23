@@ -40,12 +40,12 @@ import kotlin.test.assertTrue
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(MeetingServiceTest.FixedClockConfig::class)
+@Import(MeetingDatePollServiceTest.FixedClockConfig::class)
 @Testcontainers(disabledWithoutDocker = true)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class MeetingServiceConcurrencyTest {
+class MeetingDateConfirmationConcurrencyTest {
     @Autowired
-    private lateinit var meetingService: MeetingService
+    private lateinit var meetingDatePollService: MeetingDatePollService
 
     @Autowired
     private lateinit var meetingRepository: MeetingRepository
@@ -98,7 +98,7 @@ class MeetingServiceConcurrencyTest {
                     executor.submit<MeetingErrorCode?> {
                         startSignal.await()
                         try {
-                            meetingService.confirmMeetingDate(
+                            meetingDatePollService.confirmMeetingDate(
                                 meetingId = meetingId,
                                 userId = userId,
                                 candidateDateRangeId = requireNotNull(candidate.id),

@@ -1,9 +1,9 @@
 package org.com.belog.group.service
 
+import org.com.belog.global.time.atStartOfBusinessDay
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.group.service.command.GroupNotificationCommands
-import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.notification.service.NotificationService
 import org.springframework.data.domain.PageRequest
@@ -27,10 +27,8 @@ class GroupReminderService(
         require(size > 0) { "리마인드 대상 조회 개수는 1개 이상이어야 합니다." }
 
         return meetingRepository.findInactiveGroupIds(
-            lastEndDate = currentDate.minusDays(GROUP_INACTIVE_DAYS),
+            endedBefore = inactiveCutoffDate(currentDate).plusDays(1).atStartOfBusinessDay(),
             cursor = cursor,
-            confirmedStatus = MeetingStatus.CONFIRMED,
-            schedulingStatus = MeetingStatus.SCHEDULING,
             pageable = PageRequest.of(0, size),
         )
     }
@@ -43,9 +41,9 @@ class GroupReminderService(
         groupRepository.findActiveById(groupId) ?: return
         val lastMeeting =
             meetingRepository
-                .findLatestEndedMeetings(groupId, currentDate, MeetingStatus.CONFIRMED, PageRequest.of(0, 1))
+                .findLatestEndedMeetings(groupId, PageRequest.of(0, 1))
                 .firstOrNull() ?: return
-        if (!lastMeeting.isEndedOnOrBefore(currentDate.minusDays(GROUP_INACTIVE_DAYS)) || hasNewMeeting(groupId, currentDate)) {
+        if (!lastMeeting.isEndedOnOrBefore(inactiveCutoffDate(currentDate)) || hasNotEndedMeeting(groupId)) {
             return
         }
 
@@ -61,12 +59,9 @@ class GroupReminderService(
         notificationService.createAll(commands)
     }
 
-    private fun hasNewMeeting(
-        groupId: Long,
-        currentDate: LocalDate,
-    ): Boolean =
-        meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING).isNotEmpty() ||
-            meetingRepository.findActiveMeetings(groupId, currentDate, MeetingStatus.CONFIRMED).isNotEmpty()
+    private fun inactiveCutoffDate(currentDate: LocalDate): LocalDate = currentDate.minusDays(GROUP_INACTIVE_DAYS)
+
+    private fun hasNotEndedMeeting(groupId: Long): Boolean = meetingRepository.existsByGroupIdAndEndedAtIsNullAndDeletedAtIsNull(groupId)
 
     companion object {
         private const val GROUP_INACTIVE_DAYS = 60L

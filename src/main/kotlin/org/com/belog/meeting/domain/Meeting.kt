@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import org.com.belog.global.domain.BaseEntity
+import org.com.belog.global.time.toBusinessDate
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import java.time.Duration
@@ -68,8 +69,8 @@ private const val MEETING_LOCATION_MAX_LENGTH = 20
             columnList = "end_date, id",
         ),
         Index(
-            name = "idx_meetings_group_end_date",
-            columnList = "group_id, end_date",
+            name = "idx_meetings_group_ended_at",
+            columnList = "group_id, ended_at",
         ),
     ],
 )
@@ -142,6 +143,10 @@ class Meeting protected constructor(
     var lastDatePollRemindedAt: Instant? = null
         protected set
 
+    @Column(name = "ended_at")
+    var endedAt: Instant? = null
+        protected set
+
     @Column(name = "deleted_at")
     var deletedAt: Instant? = null
         protected set
@@ -173,13 +178,13 @@ class Meeting protected constructor(
         owner = newOwner
     }
 
-    fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
+    fun isEnded(): Boolean = endedAt != null
 
     fun startsOn(date: LocalDate): Boolean = startDate == date
 
     fun endsOn(date: LocalDate): Boolean = endDate == date
 
-    fun isEndedOnOrBefore(date: LocalDate): Boolean = endDate?.isAfter(date) == false
+    fun isEndedOnOrBefore(date: LocalDate): Boolean = endedAt?.toBusinessDate()?.isAfter(date) == false
 
     fun updateDetails(
         name: String,
@@ -208,6 +213,23 @@ class Meeting protected constructor(
 
         lastDatePollRemindedAt = remindedAt
     }
+
+    fun end(
+        endedAt: Instant,
+        currentDate: LocalDate,
+    ) {
+        check(!isEnded()) { "이미 종료된 만남입니다." }
+        check(hasStarted(currentDate)) { "일정이 확정된 만남은 시작일부터 종료할 수 있습니다." }
+
+        this.endedAt = endedAt
+    }
+
+    fun hasStarted(currentDate: LocalDate): Boolean = status == MeetingStatus.CONFIRMED && startDate?.isAfter(currentDate) == false
+
+    fun canEnd(
+        currentDate: LocalDate,
+        hasAllLogs: Boolean,
+    ): Boolean = !isEnded() && hasStarted(currentDate) && hasAllLogs
 
     fun delete(deletedAt: Instant) {
         require(this.deletedAt == null) { "이미 삭제된 만남입니다." }
@@ -260,7 +282,7 @@ class Meeting protected constructor(
             return false
         }
 
-        require(!isEnded(currentDate)) {
+        require(!isEnded()) {
             "종료된 만남의 일정은 변경할 수 없습니다."
         }
         require(!dateRange.endDate.isBefore(currentDate)) {

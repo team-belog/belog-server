@@ -16,6 +16,7 @@ import org.com.belog.meeting.controller.swagger.MeetingSwagger
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.service.MeetingDetailService
+import org.com.belog.meeting.service.MeetingEndService
 import org.com.belog.meeting.service.MeetingMemberService
 import org.com.belog.meeting.service.MeetingService
 import org.springframework.http.ResponseEntity
@@ -32,6 +33,7 @@ class MeetingController(
     private val meetingService: MeetingService,
     private val meetingDetailService: MeetingDetailService,
     private val meetingMemberService: MeetingMemberService,
+    private val meetingEndService: MeetingEndService,
 ) : MeetingSwagger {
     @PostMapping("/api/v1/groups/{groupId}/meetings")
     override fun createMeeting(
@@ -104,6 +106,18 @@ class MeetingController(
         return ResponseEntity
             .status(MeetingSuccessCode.MEETING_DELETED.status)
             .build()
+    }
+
+    @PostMapping("/api/v1/meetings/{meetingId}/end")
+    override fun endMeeting(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        meetingEndService.endMeeting(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_ENDED.status)
+            .body(CommonResponse.success(MeetingSuccessCode.MEETING_ENDED))
     }
 
     @GetMapping("/api/v1/meetings/{meetingId}")

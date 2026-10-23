@@ -5,18 +5,18 @@ import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.home.domain.HomeMeetingProgressStatus
 import org.com.belog.home.repository.HomeActiveMeetingRepository
 import org.com.belog.home.repository.HomeCalendarRepository
-import org.com.belog.home.repository.HomeCompletedMeetingRepository
+import org.com.belog.home.repository.HomeTicketRepository
 import org.com.belog.home.service.query.ActiveMeetingCursor
 import org.com.belog.home.service.query.ActiveMeetingCursorType
-import org.com.belog.home.service.query.CompletedMeetingCursor
+import org.com.belog.home.service.query.TicketCursor
 import org.com.belog.home.service.result.ActiveMeetingListResult
 import org.com.belog.home.service.result.ActiveMeetingParticipantResult
 import org.com.belog.home.service.result.ActiveMeetingResult
-import org.com.belog.home.service.result.CompletedMeetingListResult
-import org.com.belog.home.service.result.CompletedMeetingParticipantResult
-import org.com.belog.home.service.result.CompletedMeetingResult
 import org.com.belog.home.service.result.HomeCalendarMeetingResult
 import org.com.belog.home.service.result.HomeCalendarResult
+import org.com.belog.home.service.result.TicketListResult
+import org.com.belog.home.service.result.TicketParticipantResult
+import org.com.belog.home.service.result.TicketResult
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.notification.service.NotificationQueryService
@@ -32,7 +32,7 @@ import java.time.YearMonth
 class HomeService(
     private val homeCalendarRepository: HomeCalendarRepository,
     private val homeActiveMeetingRepository: HomeActiveMeetingRepository,
-    private val homeCompletedMeetingRepository: HomeCompletedMeetingRepository,
+    private val homeTicketRepository: HomeTicketRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
     private val userService: UserService,
@@ -88,7 +88,6 @@ class HomeService(
                     userId = userId,
                     schedulingStatus = MeetingStatus.SCHEDULING,
                     confirmedStatus = MeetingStatus.CONFIRMED,
-                    currentDate = currentDate,
                     query = normalizedQuery,
                     pageable = pageable,
                 )
@@ -99,7 +98,6 @@ class HomeService(
                             userId = userId,
                             schedulingStatus = MeetingStatus.SCHEDULING,
                             confirmedStatus = MeetingStatus.CONFIRMED,
-                            currentDate = currentDate,
                             query = normalizedQuery,
                             cursorMeetingId = cursor.meetingId,
                             pageable = pageable,
@@ -109,7 +107,6 @@ class HomeService(
                         homeActiveMeetingRepository.findActivePageAfterConfirmed(
                             userId = userId,
                             confirmedStatus = MeetingStatus.CONFIRMED,
-                            currentDate = currentDate,
                             query = normalizedQuery,
                             cursorStartDate = requireNotNull(cursor.startDate),
                             cursorMeetingId = cursor.meetingId,
@@ -176,29 +173,26 @@ class HomeService(
     }
 
     @Transactional(readOnly = true)
-    fun getCompletedMeetings(
+    fun getTickets(
         userId: Long,
-        cursor: CompletedMeetingCursor?,
+        cursor: TicketCursor?,
         size: Int,
-    ): CompletedMeetingListResult {
-        require(size in MIN_COMPLETED_MEETING_PAGE_SIZE..MAX_COMPLETED_MEETING_PAGE_SIZE) {
-            "종료된 만남 조회 개수는 ${MIN_COMPLETED_MEETING_PAGE_SIZE}개 이상 " +
-                "${MAX_COMPLETED_MEETING_PAGE_SIZE}개 이하여야 합니다."
+    ): TicketListResult {
+        require(size in MIN_TICKET_PAGE_SIZE..MAX_TICKET_PAGE_SIZE) {
+            "티켓 조회 개수는 ${MIN_TICKET_PAGE_SIZE}개 이상 " +
+                "${MAX_TICKET_PAGE_SIZE}개 이하여야 합니다."
         }
 
-        val currentDate = clock.currentBusinessDate()
         val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
         val tickets =
             if (cursor == null) {
-                homeCompletedMeetingRepository.findCompletedPage(
+                homeTicketRepository.findTicketPage(
                     userId = userId,
-                    currentDate = currentDate,
                     pageable = pageable,
                 )
             } else {
-                homeCompletedMeetingRepository.findCompletedPageAfter(
+                homeTicketRepository.findTicketPageAfter(
                     userId = userId,
-                    currentDate = currentDate,
                     cursorEndDate = cursor.endDate,
                     cursorTicketId = cursor.ticketId,
                     pageable = pageable,
@@ -208,12 +202,12 @@ class HomeService(
         val pageItems = tickets.take(size)
         val participantsByMeetingId = findParticipantsByMeetingId(pageItems.map(PostLogTicket::sourceMeetingId))
 
-        return CompletedMeetingListResult(
+        return TicketListResult(
             items =
                 pageItems.map { ticket ->
                     val participants = participantsByMeetingId[ticket.sourceMeetingId].orEmpty()
 
-                    CompletedMeetingResult(
+                    TicketResult(
                         ticketId = requireNotNull(ticket.id),
                         name = ticket.meetingName,
                         memory = ticket.memory,
@@ -225,7 +219,7 @@ class HomeService(
                         participants =
                             participants.map { participant ->
                                 val groupMember = participant.groupMember
-                                CompletedMeetingParticipantResult(
+                                TicketParticipantResult(
                                     groupMemberId = requireNotNull(groupMember.id),
                                     nickname = userService.resolveDisplayNickname(groupMember.user),
                                 )
@@ -237,7 +231,7 @@ class HomeService(
                     .lastOrNull()
                     ?.takeIf { hasNext }
                     ?.let { ticket ->
-                        CompletedMeetingCursor(
+                        TicketCursor(
                             endDate = requireNotNull(ticket.meetingEndDate),
                             ticketId = requireNotNull(ticket.id),
                         )
@@ -258,8 +252,8 @@ class HomeService(
     companion object {
         private const val MIN_ACTIVE_MEETING_PAGE_SIZE = 1
         private const val MAX_ACTIVE_MEETING_PAGE_SIZE = 50
-        private const val MIN_COMPLETED_MEETING_PAGE_SIZE = 1
-        private const val MAX_COMPLETED_MEETING_PAGE_SIZE = 50
+        private const val MIN_TICKET_PAGE_SIZE = 1
+        private const val MAX_TICKET_PAGE_SIZE = 50
         private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
         private const val PREVIEW_PARTICIPANT_COUNT = 3
     }

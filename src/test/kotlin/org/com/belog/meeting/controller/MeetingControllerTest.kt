@@ -7,11 +7,13 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDetailService
+import org.com.belog.meeting.service.MeetingEndService
 import org.com.belog.meeting.service.MeetingMemberService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.com.belog.meeting.service.result.MeetingMemberResult
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -44,6 +46,20 @@ class MeetingControllerTest {
 
     @MockitoBean
     private lateinit var meetingMemberService: MeetingMemberService
+
+    @MockitoBean
+    private lateinit var meetingEndService: MeetingEndService
+
+    @Test
+    fun `만남을 종료하면 200과 종료 성공 코드를 반환한다`() {
+        mockMvc
+            .perform(post("/api/v1/meetings/7/end").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S012"))
+            .andExpect(jsonPath("$.message").value("만남을 종료했습니다."))
+
+        verify(meetingEndService).endMeeting(meetingId = 7L, userId = 15L)
+    }
 
     @Test
     fun `만남 멤버 목록은 서비스의 순서와 그룹 멤버 ID 및 본인 여부를 반환한다`() {

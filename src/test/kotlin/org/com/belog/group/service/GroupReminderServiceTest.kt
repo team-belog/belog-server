@@ -1,6 +1,7 @@
 package org.com.belog.group.service
 
 import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.global.time.atStartOfBusinessDay
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
@@ -139,15 +140,16 @@ class GroupReminderServiceTest {
         startDate: LocalDate,
         endDate: LocalDate,
     ): Meeting =
-        Meeting.createFixed(
-            group = group,
-            creator = creator,
-            name = "광주 여행",
-            location = null,
-            dateRange = MeetingDateRange(startDate, endDate),
-            confirmedAt = Instant.parse("2026-09-15T00:00:00Z"),
-            currentDate = startDate,
-        )
+        Meeting
+            .createFixed(
+                group = group,
+                creator = creator,
+                name = "광주 여행",
+                location = null,
+                dateRange = MeetingDateRange(startDate, endDate),
+                confirmedAt = Instant.parse("2026-09-15T00:00:00Z"),
+                currentDate = startDate,
+            ).apply { end(endedAt = endDate.atStartOfBusinessDay(), currentDate = endDate) }
 
     private fun saveGroupMember(
         group: Group,

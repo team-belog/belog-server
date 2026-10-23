@@ -22,7 +22,7 @@ import org.com.belog.group.service.GroupCoverImageService
 import org.com.belog.group.service.GroupMembershipService
 import org.com.belog.group.service.GroupService
 import org.com.belog.meeting.code.MeetingSuccessCode
-import org.com.belog.meeting.service.MeetingService
+import org.com.belog.meeting.service.PastMeetingService
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
@@ -40,7 +40,7 @@ class GroupController(
     private val groupService: GroupService,
     private val groupCoverImageService: GroupCoverImageService,
     private val groupMembershipService: GroupMembershipService,
-    private val meetingService: MeetingService,
+    private val pastMeetingService: PastMeetingService,
 ) : GroupSwagger {
     @GetMapping
     override fun getMyGroups(
@@ -130,7 +130,7 @@ class GroupController(
         @RequestParam(defaultValue = "10") size: Int,
     ): ResponseEntity<CommonResponse<PastMeetingListResponse>> {
         val result =
-            meetingService.getPastMeetings(
+            pastMeetingService.getPastMeetings(
                 groupId = groupId,
                 userId = userId,
                 cursor = cursor,

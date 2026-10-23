@@ -162,7 +162,7 @@ class GroupDetailServiceTest {
                 ),
             )
         `when`(meetingRepository.findSchedulingMeetings(1L, MeetingStatus.SCHEDULING)).thenReturn(listOf(scheduling))
-        `when`(meetingRepository.findActiveMeetings(1L, LocalDate.of(2026, 10, 13), MeetingStatus.CONFIRMED))
+        `when`(meetingRepository.findActiveMeetings(1L, MeetingStatus.CONFIRMED))
             .thenReturn(listOf(active))
         return listOf(scheduling, active)
     }

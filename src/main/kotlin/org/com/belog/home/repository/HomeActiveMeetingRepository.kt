@@ -18,7 +18,7 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
         WHERE participant.groupMember.user.id = :userId
           AND (
               meeting.status = :schedulingStatus
-              OR (meeting.status = :confirmedStatus AND meeting.endDate >= :currentDate)
+              OR (meeting.status = :confirmedStatus AND meeting.endedAt IS NULL)
           )
           AND meeting.deletedAt IS NULL
           AND (
@@ -36,7 +36,6 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
         @Param("userId") userId: Long,
         @Param("schedulingStatus") schedulingStatus: MeetingStatus,
         @Param("confirmedStatus") confirmedStatus: MeetingStatus,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("query") query: String,
         pageable: Pageable,
     ): List<Meeting>
@@ -50,7 +49,7 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
         WHERE participant.groupMember.user.id = :userId
           AND (
               (meeting.status = :schedulingStatus AND meeting.id > :cursorMeetingId)
-              OR (meeting.status = :confirmedStatus AND meeting.endDate >= :currentDate)
+              OR (meeting.status = :confirmedStatus AND meeting.endedAt IS NULL)
           )
           AND meeting.deletedAt IS NULL
           AND (
@@ -68,7 +67,6 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
         @Param("userId") userId: Long,
         @Param("schedulingStatus") schedulingStatus: MeetingStatus,
         @Param("confirmedStatus") confirmedStatus: MeetingStatus,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("query") query: String,
         @Param("cursorMeetingId") cursorMeetingId: Long,
         pageable: Pageable,
@@ -82,7 +80,7 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
         JOIN FETCH meeting.group
         WHERE participant.groupMember.user.id = :userId
           AND meeting.status = :confirmedStatus
-          AND meeting.endDate >= :currentDate
+          AND meeting.endedAt IS NULL
           AND meeting.deletedAt IS NULL
           AND (
               :query = ''
@@ -99,7 +97,6 @@ interface HomeActiveMeetingRepository : Repository<Meeting, Long> {
     fun findActivePageAfterConfirmed(
         @Param("userId") userId: Long,
         @Param("confirmedStatus") confirmedStatus: MeetingStatus,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("query") query: String,
         @Param("cursorStartDate") cursorStartDate: LocalDate,
         @Param("cursorMeetingId") cursorMeetingId: Long,

@@ -13,16 +13,14 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
-import org.com.belog.meeting.domain.MeetingScheduleType
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.command.MeetingNotificationCommands
 import org.com.belog.meeting.service.result.CreatedMeeting
-import org.com.belog.meeting.service.result.PastMeetingListResult
-import org.com.belog.meeting.service.result.PastMeetingResult
 import org.com.belog.notification.service.NotificationService
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,48 +35,11 @@ class MeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
+    private val postLogTicketRepository: PostLogTicketRepository,
     private val settlementRequestService: SettlementRequestService,
     private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
-    @Transactional(readOnly = true)
-    fun getPastMeetings(
-        groupId: Long,
-        userId: Long,
-        cursor: Long?,
-        size: Int,
-    ): PastMeetingListResult {
-        require(size in MIN_PAST_MEETING_PAGE_SIZE..MAX_PAST_MEETING_PAGE_SIZE) {
-            "지난 만남 조회 개수는 ${MIN_PAST_MEETING_PAGE_SIZE}개 이상 ${MAX_PAST_MEETING_PAGE_SIZE}개 이하여야 합니다."
-        }
-        validateGroupMember(groupId, userId)
-
-        val meetings =
-            meetingRepository.findPastMeetingPage(
-                groupId = groupId,
-                currentDate = clock.currentBusinessDate(),
-                cursor = cursor,
-                status = MeetingStatus.CONFIRMED,
-                pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT),
-            )
-        val hasNext = meetings.size > size
-        val pageItems = meetings.take(size)
-
-        return PastMeetingListResult(
-            items =
-                pageItems.map { meeting ->
-                    PastMeetingResult(
-                        meetingId = requireNotNull(meeting.id),
-                        name = meeting.name,
-                        startDate = requireNotNull(meeting.startDate),
-                        endDate = requireNotNull(meeting.endDate),
-                    )
-                },
-            nextCursor = pageItems.lastOrNull()?.id?.takeIf { hasNext },
-            hasNext = hasNext,
-        )
-    }
-
     @Transactional
     fun createFixedMeeting(
         groupId: Long,
@@ -188,92 +149,6 @@ class MeetingService(
     }
 
     @Transactional
-    fun confirmMeetingDate(
-        meetingId: Long,
-        userId: Long,
-        candidateDateRangeId: Long,
-    ): Boolean {
-        val meeting = findMeetingForUpdate(meetingId)
-        validateScheduleManager(meeting, userId)
-        if (meeting.scheduleType != MeetingScheduleType.POLL) {
-            throw BusinessException(MeetingErrorCode.NOT_DATE_POLL_MEETING)
-        }
-
-        val candidateDateRange =
-            meetingCandidateDateRangeRepository.findByMeetingIdAndId(
-                meetingId = meetingId,
-                candidateDateRangeId = candidateDateRangeId,
-            ) ?: throw BusinessException(MeetingErrorCode.INVALID_AVAILABLE_DATE)
-
-        if (
-            meeting.status == MeetingStatus.CONFIRMED &&
-            meeting.startDate == candidateDateRange.startDate &&
-            meeting.endDate == candidateDateRange.endDate
-        ) {
-            return false
-        }
-        if (meeting.status != MeetingStatus.SCHEDULING) {
-            throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
-        }
-
-        val currentDate = clock.currentBusinessDate()
-        if (candidateDateRange.startDate.isBefore(currentDate)) {
-            throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
-        }
-
-        val confirmed =
-            meeting.confirmDate(
-                candidateDateRange = candidateDateRange,
-                confirmedAt = Instant.now(clock),
-                currentDate = currentDate,
-            )
-        if (confirmed) {
-            notifyParticipantsOfConfirmedDate(
-                meetingId = meetingId,
-                ownerUserId = userId,
-                confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate),
-            )
-        }
-        return confirmed
-    }
-
-    private fun notifyParticipantsOfConfirmedDate(
-        meetingId: Long,
-        ownerUserId: Long,
-        confirmedDateRange: MeetingDateRange,
-    ) {
-        val recipientUserIds =
-            meetingParticipantRepository
-                .findAllWithMemberAndUserByMeetingId(meetingId)
-                .map { participant -> participant.groupMember }
-                .filter { groupMember -> groupMember.isActive }
-                .map { groupMember -> requireNotNull(groupMember.user.id) }
-                .filter { recipientUserId -> recipientUserId != ownerUserId }
-
-        notificationService.createAll(
-            recipientUserIds.map { recipientUserId ->
-                MeetingNotificationCommands.meetingDateConfirmed(
-                    meetingId = meetingId,
-                    recipientUserId = recipientUserId,
-                    ownerUserId = ownerUserId,
-                    confirmedDateRange = confirmedDateRange,
-                )
-            },
-        )
-    }
-
-    @Transactional
-    fun updateMeetingDate(
-        meetingId: Long,
-        userId: Long,
-        dateRange: MeetingDateRange,
-    ): Boolean {
-        val meeting = findMeetingForUpdate(meetingId)
-        validateScheduleManager(meeting, userId)
-        return updateConfirmedDate(meeting, dateRange)
-    }
-
-    @Transactional
     fun updateMeeting(
         meetingId: Long,
         userId: Long,
@@ -358,17 +233,24 @@ class MeetingService(
         }
 
         val currentDate = clock.currentBusinessDate()
-        if (meeting.isEnded(currentDate)) {
+        if (meeting.isEnded()) {
             throw BusinessException(MeetingErrorCode.MEETING_ALREADY_ENDED)
         }
         if (dateRange.endDate.isBefore(currentDate)) {
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
         }
 
-        return meeting.changeConfirmedDate(
-            dateRange = dateRange,
-            currentDate = currentDate,
-        )
+        val changed =
+            meeting.changeConfirmedDate(
+                dateRange = dateRange,
+                currentDate = currentDate,
+            )
+        if (changed) {
+            postLogTicketRepository.findAllBySourceMeetingId(requireNotNull(meeting.id)).forEach { ticket ->
+                ticket.updateMeetingDates(dateRange)
+            }
+        }
+        return changed
     }
 
     private fun findMeetingForUpdate(meetingId: Long): Meeting =
@@ -393,18 +275,6 @@ class MeetingService(
 
         return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, creatorUserId)
             ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-    }
-
-    private fun validateGroupMember(
-        groupId: Long,
-        userId: Long,
-    ) {
-        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
-            throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        }
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
     }
 
     private fun findParticipants(
@@ -467,10 +337,6 @@ class MeetingService(
     }
 
     companion object {
-        const val DEFAULT_PAST_MEETING_PAGE_SIZE = 10
-        const val MAX_PAST_MEETING_PAGE_SIZE = 50
         private const val CREATOR_COUNT = 1
-        private const val MIN_PAST_MEETING_PAGE_SIZE = 1
-        private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
     }
 }

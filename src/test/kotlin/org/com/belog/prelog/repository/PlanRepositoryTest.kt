@@ -189,7 +189,6 @@ class PlanRepositoryTest {
             category = category,
             title = title,
             url = "https://example.com/place",
-            currentDate = LocalDate.of(2026, 9, 22),
         )
 
     private fun createGroup(): Group =
