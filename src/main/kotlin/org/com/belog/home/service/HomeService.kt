@@ -88,7 +88,6 @@ class HomeService(
                     userId = userId,
                     schedulingStatus = MeetingStatus.SCHEDULING,
                     confirmedStatus = MeetingStatus.CONFIRMED,
-                    currentDate = currentDate,
                     query = normalizedQuery,
                     pageable = pageable,
                 )
@@ -99,7 +98,6 @@ class HomeService(
                             userId = userId,
                             schedulingStatus = MeetingStatus.SCHEDULING,
                             confirmedStatus = MeetingStatus.CONFIRMED,
-                            currentDate = currentDate,
                             query = normalizedQuery,
                             cursorMeetingId = cursor.meetingId,
                             pageable = pageable,
@@ -109,7 +107,6 @@ class HomeService(
                         homeActiveMeetingRepository.findActivePageAfterConfirmed(
                             userId = userId,
                             confirmedStatus = MeetingStatus.CONFIRMED,
-                            currentDate = currentDate,
                             query = normalizedQuery,
                             cursorStartDate = requireNotNull(cursor.startDate),
                             cursorMeetingId = cursor.meetingId,
@@ -186,19 +183,16 @@ class HomeService(
                 "${MAX_COMPLETED_MEETING_PAGE_SIZE}개 이하여야 합니다."
         }
 
-        val currentDate = clock.currentBusinessDate()
         val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
         val tickets =
             if (cursor == null) {
                 homeCompletedMeetingRepository.findCompletedPage(
                     userId = userId,
-                    currentDate = currentDate,
                     pageable = pageable,
                 )
             } else {
                 homeCompletedMeetingRepository.findCompletedPageAfter(
                     userId = userId,
-                    currentDate = currentDate,
                     cursorEndDate = cursor.endDate,
                     cursorTicketId = cursor.ticketId,
                     pageable = pageable,

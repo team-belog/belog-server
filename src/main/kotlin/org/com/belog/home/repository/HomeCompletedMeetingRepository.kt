@@ -13,13 +13,12 @@ interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
         SELECT ticket
         FROM PostLogTicket ticket
         WHERE ticket.owner.id = :userId
-          AND ticket.meetingEndDate < :currentDate
+          AND ticket.meetingEndDate IS NOT NULL
         ORDER BY ticket.meetingEndDate DESC, ticket.id DESC
         """,
     )
     fun findCompletedPage(
         @Param("userId") userId: Long,
-        @Param("currentDate") currentDate: LocalDate,
         pageable: Pageable,
     ): List<PostLogTicket>
 
@@ -28,7 +27,7 @@ interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
         SELECT ticket
         FROM PostLogTicket ticket
         WHERE ticket.owner.id = :userId
-          AND ticket.meetingEndDate < :currentDate
+          AND ticket.meetingEndDate IS NOT NULL
           AND (
               ticket.meetingEndDate < :cursorEndDate
               OR (ticket.meetingEndDate = :cursorEndDate AND ticket.id < :cursorTicketId)
@@ -38,7 +37,6 @@ interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
     )
     fun findCompletedPageAfter(
         @Param("userId") userId: Long,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("cursorEndDate") cursorEndDate: LocalDate,
         @Param("cursorTicketId") cursorTicketId: Long,
         pageable: Pageable,
