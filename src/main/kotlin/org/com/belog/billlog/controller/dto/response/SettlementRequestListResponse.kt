@@ -7,6 +7,7 @@ import org.com.belog.billlog.service.result.SettlementParticipantResult
 import org.com.belog.billlog.service.result.SettlementRequestAction
 import org.com.belog.billlog.service.result.SettlementRequestListItemResult
 import org.com.belog.billlog.service.result.SettlementRequestListResult
+import org.com.belog.user.domain.BankAccount
 
 @Schema(description = "진행 중인 정산 현황 조회 결과")
 data class SettlementRequestListResponse(
@@ -34,9 +35,9 @@ data class SettlementRequestListItemResponse(
     @field:Schema(description = "정산 금액", example = "7500")
     val amount: Long,
     @field:Schema(description = "정산금을 보내는 참여자")
-    val sender: SettlementParticipantResponse,
+    val sender: SettlementSenderResponse,
     @field:Schema(description = "정산금을 받는 참여자")
-    val receiver: SettlementParticipantResponse,
+    val receiver: SettlementReceiverResponse,
     @field:Schema(
         description = "정산 상태",
         example = "PENDING",
@@ -55,16 +56,16 @@ data class SettlementRequestListItemResponse(
             SettlementRequestListItemResponse(
                 settlementRequestId = result.settlementRequestId,
                 amount = result.amount,
-                sender = SettlementParticipantResponse.from(result.sender),
-                receiver = SettlementParticipantResponse.from(result.receiver),
+                sender = SettlementSenderResponse.from(result.sender),
+                receiver = SettlementReceiverResponse.from(result.receiver, result.receiverBankAccount),
                 status = result.status,
                 action = result.action,
             )
     }
 }
 
-@Schema(description = "정산 참여자")
-data class SettlementParticipantResponse(
+@Schema(description = "정산금을 보내는 참여자")
+data class SettlementSenderResponse(
     @field:Schema(description = "만남 참여자 ID", example = "32")
     val meetingParticipantId: Long,
     @field:Schema(description = "닉네임", example = "바비")
@@ -76,12 +77,60 @@ data class SettlementParticipantResponse(
     val isMe: Boolean,
 ) {
     companion object {
-        fun from(result: SettlementParticipantResult): SettlementParticipantResponse =
-            SettlementParticipantResponse(
+        fun from(result: SettlementParticipantResult): SettlementSenderResponse =
+            SettlementSenderResponse(
                 meetingParticipantId = result.meetingParticipantId,
                 nickname = result.nickname,
                 profileImageUrl = result.profileImageUrl,
                 isMe = result.isMe,
+            )
+    }
+}
+
+@Schema(description = "정산금을 받는 참여자")
+data class SettlementReceiverResponse(
+    @field:Schema(description = "만남 참여자 ID", example = "31")
+    val meetingParticipantId: Long,
+    @field:Schema(description = "닉네임", example = "정바미")
+    val nickname: String,
+    @field:Schema(description = "조회 가능한 프로필 이미지 URL. 기본 이미지 사용 시 null", nullable = true)
+    val profileImageUrl: String?,
+    @field:Schema(description = "로그인 사용자 본인 여부", example = "true")
+    @get:JsonProperty("isMe")
+    val isMe: Boolean,
+    @field:Schema(description = "정산금을 받을 계좌. 계좌 미등록 또는 탈퇴한 사용자이면 null", nullable = true)
+    val bankAccount: SettlementBankAccountResponse?,
+) {
+    companion object {
+        fun from(
+            result: SettlementParticipantResult,
+            bankAccount: BankAccount?,
+        ): SettlementReceiverResponse =
+            SettlementReceiverResponse(
+                meetingParticipantId = result.meetingParticipantId,
+                nickname = result.nickname,
+                profileImageUrl = result.profileImageUrl,
+                isMe = result.isMe,
+                bankAccount = bankAccount?.let(SettlementBankAccountResponse::from),
+            )
+    }
+}
+
+@Schema(description = "정산 계좌")
+data class SettlementBankAccountResponse(
+    @field:Schema(description = "은행 코드", example = "KAKAO_BANK")
+    val bankCode: String,
+    @field:Schema(description = "은행 이름", example = "카카오뱅크")
+    val bankName: String,
+    @field:Schema(description = "계좌번호", example = "3333012345678")
+    val accountNumber: String,
+) {
+    companion object {
+        fun from(bankAccount: BankAccount): SettlementBankAccountResponse =
+            SettlementBankAccountResponse(
+                bankCode = bankAccount.bank.name,
+                bankName = bankAccount.bank.displayName,
+                accountNumber = bankAccount.accountNumber,
             )
     }
 }

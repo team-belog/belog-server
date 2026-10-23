@@ -1,6 +1,7 @@
 package org.com.belog.billlog.service.result
 
 import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.user.domain.BankAccount
 
 enum class SettlementRequestAction {
     SEND_REMINDER,
@@ -19,6 +20,7 @@ data class SettlementRequestListItemResult(
     val amount: Long,
     val sender: SettlementParticipantResult,
     val receiver: SettlementParticipantResult,
+    val receiverBankAccount: BankAccount?,
     val status: SettlementRequestStatus,
     val action: SettlementRequestAction,
 )
