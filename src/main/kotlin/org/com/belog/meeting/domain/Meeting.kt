@@ -69,8 +69,8 @@ private const val MEETING_LOCATION_MAX_LENGTH = 20
             columnList = "end_date, id",
         ),
         Index(
-            name = "idx_meetings_group_end_date",
-            columnList = "group_id, end_date",
+            name = "idx_meetings_group_ended_at",
+            columnList = "group_id, ended_at",
         ),
     ],
 )
