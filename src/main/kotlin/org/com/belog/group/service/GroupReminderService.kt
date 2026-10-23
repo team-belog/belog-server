@@ -45,7 +45,7 @@ class GroupReminderService(
             meetingRepository
                 .findLatestEndedMeetings(groupId, currentDate, MeetingStatus.CONFIRMED, PageRequest.of(0, 1))
                 .firstOrNull() ?: return
-        if (!lastMeeting.isEndedOnOrBefore(currentDate.minusDays(GROUP_INACTIVE_DAYS)) || hasNewMeeting(groupId, currentDate)) {
+        if (!lastMeeting.isEndedOnOrBefore(currentDate.minusDays(GROUP_INACTIVE_DAYS)) || hasNewMeeting(groupId)) {
             return
         }
 
@@ -61,12 +61,9 @@ class GroupReminderService(
         notificationService.createAll(commands)
     }
 
-    private fun hasNewMeeting(
-        groupId: Long,
-        currentDate: LocalDate,
-    ): Boolean =
+    private fun hasNewMeeting(groupId: Long): Boolean =
         meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING).isNotEmpty() ||
-            meetingRepository.findActiveMeetings(groupId, currentDate, MeetingStatus.CONFIRMED).isNotEmpty()
+            meetingRepository.findActiveMeetings(groupId, MeetingStatus.CONFIRMED).isNotEmpty()
 
     companion object {
         private const val GROUP_INACTIVE_DAYS = 60L

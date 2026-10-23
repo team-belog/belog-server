@@ -86,7 +86,7 @@ class MeetingRepositoryTest {
 
         val schedulingMeetings = meetingRepository.findSchedulingMeetings(requireNotNull(group.id), MeetingStatus.SCHEDULING)
         val activeMeetings =
-            meetingRepository.findActiveMeetings(requireNotNull(group.id), LocalDate.of(2026, 9, 21), MeetingStatus.CONFIRMED)
+            meetingRepository.findActiveMeetings(requireNotNull(group.id), MeetingStatus.CONFIRMED)
 
         assertEquals(listOf(scheduling.id), schedulingMeetings.map { it.id })
         assertTrue(Hibernate.isInitialized(schedulingMeetings.single().createdBy))
@@ -97,6 +97,29 @@ class MeetingRepositoryTest {
             assertEquals(successor.id, meeting.owner.id)
             assertEquals("새 만남장", meeting.owner.user.nickname)
         }
+    }
+
+    @Test
+    fun `종료한 만남만 지난 만남으로 조회되고 종료일이 지나도 종료하지 않은 만남은 진행 중으로 조회된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val ended = createMeeting(group, creator, "종료한 만남")
+        ended.end(endedAt = Instant.parse("2026-09-21T03:00:00Z"), currentDate = LocalDate.of(2026, 9, 21))
+        val notEnded = createMeeting(group, creator, "종료하지 않은 만남")
+        meetingRepository.saveAllAndFlush(listOf(ended, notEnded))
+        val groupId = requireNotNull(group.id)
+
+        val activeMeetings = meetingRepository.findActiveMeetings(groupId, MeetingStatus.CONFIRMED)
+        val pastMeetings =
+            meetingRepository.findPastMeetingPage(
+                groupId = groupId,
+                cursor = null,
+                status = MeetingStatus.CONFIRMED,
+                pageable = PageRequest.of(0, 10),
+            )
+
+        assertEquals(listOf(notEnded.id), activeMeetings.map { it.id })
+        assertEquals(listOf(ended.id), pastMeetings.map { it.id })
     }
 
     @Test
@@ -257,14 +280,13 @@ class MeetingRepositoryTest {
         assertTrue(meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING).isEmpty())
         assertTrue(
             meetingRepository
-                .findActiveMeetings(groupId, LocalDate.of(2026, 9, 21), MeetingStatus.CONFIRMED)
+                .findActiveMeetings(groupId, MeetingStatus.CONFIRMED)
                 .isEmpty(),
         )
         assertTrue(
             meetingRepository
                 .findPastMeetingPage(
                     groupId = groupId,
-                    currentDate = LocalDate.of(2026, 9, 23),
                     cursor = null,
                     status = MeetingStatus.CONFIRMED,
                     pageable = PageRequest.of(0, 10),

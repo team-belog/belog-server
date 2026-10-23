@@ -78,14 +78,13 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         JOIN FETCH owner.user
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
-          AND meeting.endDate >= :currentDate
+          AND meeting.endedAt IS NULL
           AND meeting.deletedAt IS NULL
         ORDER BY meeting.startDate ASC, meeting.id ASC
         """,
     )
     fun findActiveMeetings(
         @Param("groupId") groupId: Long,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("status") status: MeetingStatus,
     ): List<Meeting>
 
@@ -95,7 +94,7 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
         FROM Meeting meeting
         WHERE meeting.group.id = :groupId
           AND meeting.status = :status
-          AND meeting.endDate < :currentDate
+          AND meeting.endedAt IS NOT NULL
           AND (:cursor IS NULL OR meeting.id < :cursor)
           AND meeting.deletedAt IS NULL
         ORDER BY meeting.id DESC
@@ -103,7 +102,6 @@ interface MeetingRepository : JpaRepository<Meeting, Long> {
     )
     fun findPastMeetingPage(
         @Param("groupId") groupId: Long,
-        @Param("currentDate") currentDate: LocalDate,
         @Param("cursor") cursor: Long?,
         @Param("status") status: MeetingStatus,
         pageable: Pageable,
