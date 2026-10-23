@@ -1,9 +1,11 @@
 package org.com.belog.meeting.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingAvailableDate
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.com.belog.meeting.domain.MeetingScheduleType
@@ -219,6 +221,83 @@ class MeetingDatePollService(
                     ownerUserId = userId,
                     remindedAt = remindedAt,
                     reminderId = reminderId,
+                )
+            },
+        )
+    }
+
+    @Transactional
+    fun confirmMeetingDate(
+        meetingId: Long,
+        userId: Long,
+        candidateDateRangeId: Long,
+    ): Boolean {
+        val meeting =
+            meetingRepository.findByIdForUpdate(meetingId)
+                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+        if (meeting.owner.user.id != userId) {
+            throw BusinessException(MeetingErrorCode.NOT_MEETING_OWNER)
+        }
+        validateDatePollMeeting(meeting)
+
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.findByMeetingIdAndId(
+                meetingId = meetingId,
+                candidateDateRangeId = candidateDateRangeId,
+            ) ?: throw BusinessException(MeetingErrorCode.INVALID_AVAILABLE_DATE)
+
+        if (
+            meeting.status == MeetingStatus.CONFIRMED &&
+            meeting.startDate == candidateDateRange.startDate &&
+            meeting.endDate == candidateDateRange.endDate
+        ) {
+            return false
+        }
+        if (meeting.status != MeetingStatus.SCHEDULING) {
+            throw BusinessException(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING)
+        }
+
+        val currentDate = clock.currentBusinessDate()
+        if (candidateDateRange.startDate.isBefore(currentDate)) {
+            throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
+        }
+
+        val confirmed =
+            meeting.confirmDate(
+                candidateDateRange = candidateDateRange,
+                confirmedAt = Instant.now(clock),
+                currentDate = currentDate,
+            )
+        if (confirmed) {
+            notifyParticipantsOfConfirmedDate(
+                meetingId = meetingId,
+                ownerUserId = userId,
+                confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate),
+            )
+        }
+        return confirmed
+    }
+
+    private fun notifyParticipantsOfConfirmedDate(
+        meetingId: Long,
+        ownerUserId: Long,
+        confirmedDateRange: MeetingDateRange,
+    ) {
+        val recipientUserIds =
+            meetingParticipantRepository
+                .findAllWithMemberAndUserByMeetingId(meetingId)
+                .map { participant -> participant.groupMember }
+                .filter { groupMember -> groupMember.isActive }
+                .map { groupMember -> requireNotNull(groupMember.user.id) }
+                .filter { recipientUserId -> recipientUserId != ownerUserId }
+
+        notificationService.createAll(
+            recipientUserIds.map { recipientUserId ->
+                MeetingNotificationCommands.meetingDateConfirmed(
+                    meetingId = meetingId,
+                    recipientUserId = recipientUserId,
+                    ownerUserId = ownerUserId,
+                    confirmedDateRange = confirmedDateRange,
                 )
             },
         )

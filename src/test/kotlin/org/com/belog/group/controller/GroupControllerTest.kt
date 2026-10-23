@@ -14,7 +14,7 @@ import org.com.belog.group.service.result.GroupDetailResult
 import org.com.belog.group.service.result.GroupMeetingParticipantResult
 import org.com.belog.group.service.result.GroupMemberResult
 import org.com.belog.group.service.result.SchedulingMeetingResult
-import org.com.belog.meeting.service.MeetingService
+import org.com.belog.meeting.service.PastMeetingService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.verify
@@ -54,7 +54,7 @@ class GroupControllerTest {
     private lateinit var groupMembershipService: GroupMembershipService
 
     @MockitoBean
-    private lateinit var meetingService: MeetingService
+    private lateinit var pastMeetingService: PastMeetingService
 
     @Test
     fun `그룹 상세 조회의 두 만남 목록에 만남장 정보를 반환한다`() {

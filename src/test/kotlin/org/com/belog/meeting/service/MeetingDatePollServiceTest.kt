@@ -13,6 +13,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingAvailableDateRepository
 import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
 import org.com.belog.meeting.repository.MeetingParticipantRepository
@@ -413,7 +414,7 @@ class MeetingDatePollServiceTest {
             userId = requireNotNull(context.creator.user.id),
         )
 
-        val command = requestedReminderCommands().single().single() as CreateNotificationCommand
+        val command = requestedNotificationBatches().single().single() as CreateNotificationCommand
         assertEquals(memberUserId, command.recipientUserId)
         assertEquals(context.creator.user.id, command.actorUserId)
         assertEquals(NotificationType.DATE_POLL_REMINDER, command.type)
@@ -438,7 +439,7 @@ class MeetingDatePollServiceTest {
             }
 
         assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
-        assertEquals(emptyList(), requestedReminderCommands())
+        assertEquals(emptyList(), requestedNotificationBatches())
     }
 
     @Test
@@ -459,7 +460,7 @@ class MeetingDatePollServiceTest {
             }
 
         assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TARGET_NOT_FOUND, exception.errorCode)
-        assertEquals(emptyList(), requestedReminderCommands())
+        assertEquals(emptyList(), requestedNotificationBatches())
     }
 
     @Test
@@ -481,7 +482,7 @@ class MeetingDatePollServiceTest {
             }
 
         assertEquals(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING, exception.errorCode)
-        assertEquals(emptyList(), requestedReminderCommands())
+        assertEquals(emptyList(), requestedNotificationBatches())
     }
 
     @Test
@@ -497,7 +498,7 @@ class MeetingDatePollServiceTest {
             }
 
         assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TOO_FREQUENT, exception.errorCode)
-        assertEquals(1, requestedReminderCommands().size)
+        assertEquals(1, requestedNotificationBatches().size)
     }
 
     @Test
@@ -512,8 +513,107 @@ class MeetingDatePollServiceTest {
         )
         meetingRepository.flush()
 
-        assertEquals(1, requestedReminderCommands().size)
+        assertEquals(1, requestedNotificationBatches().size)
         assertEquals(FIXED_INSTANT, meetingRepository.findById(meetingId).orElseThrow().lastDatePollRemindedAt)
+    }
+
+    @Test
+    fun `만남 생성자가 후보 일정을 최종 일정으로 확정한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val changed =
+            meetingDatePollService.confirmMeetingDate(
+                meetingId = requireNotNull(meeting.id),
+                userId = requireNotNull(creator.user.id),
+                candidateDateRangeId = requireNotNull(candidateDateRange.id),
+            )
+
+        assertTrue(changed)
+        assertEquals(MeetingStatus.CONFIRMED, meeting.status)
+        assertEquals(candidateDateRange.startDate, meeting.startDate)
+        assertEquals(candidateDateRange.endDate, meeting.endDate)
+        assertEquals(FIXED_INSTANT, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `후보 일정을 확정하면 방장과 탈퇴한 멤버를 제외한 참여자에게 확정 알림이 저장된다`() {
+        val context = saveConfirmationContext()
+
+        meetingDatePollService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        val meetingId = requireNotNull(context.meeting.id)
+        val recipientUserId = requireNotNull(context.participant.user.id)
+        assertEquals(
+            listOf(
+                setOf(
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.owner.user.id,
+                        type = NotificationType.MEETING_DATE_CONFIRMED,
+                        message = "일정이 9월 22일~9월 23일로 확정됐어요",
+                        targetId = meetingId,
+                        deduplicationKey = "MEETING_DATE_CONFIRMED:$meetingId:$recipientUserId",
+                    ),
+                ),
+            ),
+            requestedNotificationBatches().map { commands -> commands.toSet() },
+        )
+    }
+
+    @Test
+    fun `이미 확정된 일정으로 다시 확정하면 확정 알림이 다시 저장되지 않는다`() {
+        val context = saveConfirmationContext()
+        repeat(2) {
+            meetingDatePollService.confirmMeetingDate(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.owner.user.id),
+                candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+            )
+        }
+
+        assertEquals(1, requestedNotificationBatches().size)
+    }
+
+    @Test
+    fun `생성자가 아닌 사용자는 후보 일정을 확정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "멤버")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.confirmMeetingDate(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(member.user.id),
+                    candidateDateRangeId = requireNotNull(candidateDateRange.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
+        assertEquals(MeetingStatus.SCHEDULING, meeting.status)
     }
 
     private fun updateLastDatePollRemindedAt(
@@ -529,7 +629,7 @@ class MeetingDatePollServiceTest {
         entityManager.clear()
     }
 
-    private fun requestedReminderCommands(): List<List<*>> =
+    private fun requestedNotificationBatches(): List<List<*>> =
         mockingDetails(notificationService)
             .invocations
             .filter { invocation -> invocation.method.name == "createAll" }
@@ -565,6 +665,28 @@ class MeetingDatePollServiceTest {
                 ),
             )
         return PollContext(group, creator, member, meeting, candidates)
+    }
+
+    private fun saveConfirmationContext(): ConfirmationContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val owner = saveGroupMember(group, "owner-subject", "방장")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+        val withdrawnParticipant = saveGroupMember(group, "withdrawn-subject", "탈퇴자")
+        val meeting = meetingRepository.save(createPollMeeting(group, owner))
+        meetingParticipantRepository.saveAll(
+            listOf(owner, participant, withdrawnParticipant).map { member -> MeetingParticipant.create(meeting, member) },
+        )
+        withdrawnParticipant.withdraw(FIXED_INSTANT)
+        groupMemberRepository.flush()
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+        return ConfirmationContext(owner, participant, meeting, candidateDateRange)
     }
 
     private fun deleteMeeting(meeting: Meeting) {
@@ -686,6 +808,13 @@ class MeetingDatePollServiceTest {
         val member: GroupMember,
         val meeting: Meeting,
         val candidates: List<MeetingCandidateDateRange>,
+    )
+
+    data class ConfirmationContext(
+        val owner: GroupMember,
+        val participant: GroupMember,
+        val meeting: Meeting,
+        val candidateDateRange: MeetingCandidateDateRange,
     )
 
     data class PollResultsContext(

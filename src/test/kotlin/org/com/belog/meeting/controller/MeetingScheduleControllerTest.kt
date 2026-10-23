@@ -4,7 +4,6 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.service.MeetingDatePollService
-import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CandidateDatePollResult
 import org.com.belog.meeting.service.result.CandidateDateRangeResult
 import org.com.belog.meeting.service.result.DatePollMemberResult
@@ -36,9 +35,6 @@ import java.time.LocalDate
 class MeetingScheduleControllerTest {
     @Autowired
     private lateinit var mockMvc: MockMvc
-
-    @MockitoBean
-    private lateinit var meetingService: MeetingService
 
     @MockitoBean
     private lateinit var meetingDatePollService: MeetingDatePollService
@@ -173,7 +169,7 @@ class MeetingScheduleControllerTest {
             .andExpect(jsonPath("$.message").value("만남 일정을 확정했습니다."))
             .andExpect(jsonPath("$.data").isEmpty)
 
-        verify(meetingService).confirmMeetingDate(
+        verify(meetingDatePollService).confirmMeetingDate(
             meetingId = 7L,
             userId = 15L,
             candidateDateRangeId = 101L,
