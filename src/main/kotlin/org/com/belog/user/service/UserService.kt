@@ -123,7 +123,8 @@ class UserService(
         userId: Long,
         profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
-        name: String,
+        lastName: String,
+        firstName: String,
         bankAccount: BankAccount,
     ) {
         profileImageObjectKey?.let(profileImageStorage::verify)
@@ -133,7 +134,8 @@ class UserService(
                 userId = userId,
                 profileImageObjectKey = profileImageObjectKey,
                 nickname = nickname,
-                name = name,
+                lastName = lastName,
+                firstName = firstName,
                 bankAccount = bankAccount,
             )
         }
@@ -165,7 +167,8 @@ class UserService(
         userId: Long,
         profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
-        name: String,
+        lastName: String,
+        firstName: String,
         bankAccount: BankAccount,
     ) {
         val user =
@@ -184,7 +187,8 @@ class UserService(
         user.completeOnboarding(
             profileImageObjectKey = profileImageObjectKey,
             nickname = normalizedNickname,
-            name = name,
+            lastName = lastName,
+            firstName = firstName,
             bankAccount = bankAccount,
             completedAt = Instant.now(clock),
         )

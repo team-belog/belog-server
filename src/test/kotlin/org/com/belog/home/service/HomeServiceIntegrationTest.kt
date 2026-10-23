@@ -328,8 +328,9 @@ class HomeServiceIntegrationTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = userKey,
-            name = userKey,
-            bankAccount = BankAccount.create(Bank.KB_KOOKMIN, "123456789012", userKey),
+            lastName = "홍",
+            firstName = userKey,
+            bankAccount = BankAccount.create(Bank.KB_KOOKMIN, "123456789012"),
             completedAt = Instant.parse("2026-07-01T00:00:00Z"),
         )
         return userRepository.saveAndFlush(user)

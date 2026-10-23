@@ -299,12 +299,12 @@ class PostLogPhotoServiceQueryTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = userKey.take(NICKNAME_MAX_LENGTH),
-            name = userKey.take(NAME_MAX_LENGTH),
+            lastName = "홍",
+            firstName = userKey.take(NAME_MAX_LENGTH),
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
                     accountNumber = "123456789012",
-                    accountHolderName = userKey,
                 ),
             completedAt = Instant.parse("2026-09-20T00:00:00Z"),
         )

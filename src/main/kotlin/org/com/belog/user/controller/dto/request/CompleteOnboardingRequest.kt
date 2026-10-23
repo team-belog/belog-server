@@ -31,14 +31,24 @@ data class CompleteOnboardingRequest(
     val nickname: String,
     @field:Schema(
         requiredMode = Schema.RequiredMode.REQUIRED,
-        maxLength = User.NAME_MAX_LENGTH,
+        maxLength = User.LAST_NAME_MAX_LENGTH,
     )
-    @field:NotBlank(message = "사용자 이름은 비어 있을 수 없습니다.")
+    @field:NotBlank(message = "성은 비어 있을 수 없습니다.")
     @field:Size(
-        max = User.NAME_MAX_LENGTH,
-        message = "사용자 이름은 ${User.NAME_MAX_LENGTH}자를 초과할 수 없습니다.",
+        max = User.LAST_NAME_MAX_LENGTH,
+        message = "성은 ${User.LAST_NAME_MAX_LENGTH}자를 초과할 수 없습니다.",
     )
-    val name: String,
+    val lastName: String,
+    @field:Schema(
+        requiredMode = Schema.RequiredMode.REQUIRED,
+        maxLength = User.FIRST_NAME_MAX_LENGTH,
+    )
+    @field:NotBlank(message = "이름은 비어 있을 수 없습니다.")
+    @field:Size(
+        max = User.FIRST_NAME_MAX_LENGTH,
+        message = "이름은 ${User.FIRST_NAME_MAX_LENGTH}자를 초과할 수 없습니다.",
+    )
+    val firstName: String,
     @field:NotNull(message = "은행 코드는 필수입니다.")
     val bankCode: Bank?,
     @field:NotBlank(message = "계좌번호는 비어 있을 수 없습니다.")
@@ -51,10 +61,4 @@ data class CompleteOnboardingRequest(
     )
     @field:Pattern(regexp = "^\\d+$", message = "계좌번호는 숫자만 포함할 수 있습니다.")
     val accountNumber: String,
-    @field:NotBlank(message = "예금주명은 비어 있을 수 없습니다.")
-    @field:Size(
-        max = BankAccount.ACCOUNT_HOLDER_NAME_MAX_LENGTH,
-        message = "예금주명은 ${BankAccount.ACCOUNT_HOLDER_NAME_MAX_LENGTH}자를 초과할 수 없습니다.",
-    )
-    val accountHolderName: String,
 )

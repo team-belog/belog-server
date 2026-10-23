@@ -156,28 +156,29 @@ class UserServiceTest {
             userId = userId,
             profileImageObjectKey = null,
             nickname = "belog",
-            name = " 홍 길동 ",
+            lastName = " 홍 ",
+            firstName = " 길동 ",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
                     accountNumber = "123456789012",
-                    accountHolderName = "홍길동",
                 ),
         )
 
         val user = userRepository.findById(userId).orElseThrow()
         assertEquals(null, user.profileImageObjectKey)
-        assertEquals("홍 길동", user.name)
+        assertEquals("홍", user.lastName)
+        assertEquals("길동", user.firstName)
         assertTrue(user.isOnboardingCompleted)
     }
 
     @Test
-    fun `온보딩 완료 사용자의 이름을 null로 변경할 수 없다`() {
+    fun `온보딩 완료 사용자의 성을 null로 변경할 수 없다`() {
         val userId = createUser("google-subject", "user@example.com")
         completeOnboarding(userId, "belog")
 
         assertFailsWith<DataAccessException> {
-            jdbcTemplate.update("UPDATE users SET name = NULL WHERE id = ?", userId)
+            jdbcTemplate.update("UPDATE users SET last_name = NULL WHERE id = ?", userId)
         }
     }
 
@@ -217,14 +218,12 @@ class UserServiceTest {
                 BankAccount.create(
                     bank = Bank.SHINHAN,
                     accountNumber = "110123456789",
-                    accountHolderName = "김빌로그",
                 ),
         )
 
         val updatedBankAccount = requireNotNull(userRepository.findById(userId).orElseThrow().bankAccount)
         assertEquals(Bank.SHINHAN, updatedBankAccount.bank)
         assertEquals("110123456789", updatedBankAccount.accountNumber)
-        assertEquals("김빌로그", updatedBankAccount.accountHolderName)
     }
 
     @Test
@@ -239,7 +238,6 @@ class UserServiceTest {
                 BankAccount.create(
                     bank = Bank.SHINHAN,
                     accountNumber = updatedAccountNumber,
-                    accountHolderName = "홍길동",
                 ),
         )
 
@@ -266,7 +264,6 @@ class UserServiceTest {
                         BankAccount.create(
                             bank = Bank.SHINHAN,
                             accountNumber = "110123456789",
-                            accountHolderName = "홍길동",
                         ),
                 )
             }
@@ -610,12 +607,12 @@ class UserServiceTest {
             userId = userId,
             profileImageObjectKey = ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp"),
             nickname = nickname,
-            name = "홍길동",
+            lastName = "홍",
+            firstName = "길동",
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
                     accountNumber = "123456789012",
-                    accountHolderName = "홍길동",
                 ),
         )
     }

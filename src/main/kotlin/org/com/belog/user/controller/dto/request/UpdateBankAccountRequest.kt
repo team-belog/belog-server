@@ -20,10 +20,4 @@ data class UpdateBankAccountRequest(
     )
     @field:Pattern(regexp = "^\\d+$", message = "계좌번호는 숫자만 포함할 수 있습니다.")
     val accountNumber: String,
-    @field:NotBlank(message = "예금주명은 비어 있을 수 없습니다.")
-    @field:Size(
-        max = BankAccount.ACCOUNT_HOLDER_NAME_MAX_LENGTH,
-        message = "예금주명은 ${BankAccount.ACCOUNT_HOLDER_NAME_MAX_LENGTH}자를 초과할 수 없습니다.",
-    )
-    val accountHolderName: String,
 )

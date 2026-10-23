@@ -10,7 +10,6 @@ class BankAccountTest {
             BankAccount.create(
                 bank = Bank.SHINHAN,
                 accountNumber = "",
-                accountHolderName = "홍길동",
             )
         }
     }
@@ -21,18 +20,6 @@ class BankAccountTest {
             BankAccount.create(
                 bank = Bank.SHINHAN,
                 accountNumber = "110-ABC-456789",
-                accountHolderName = "홍길동",
-            )
-        }
-    }
-
-    @Test
-    fun `예금주명이 비어 있으면 생성할 수 없다`() {
-        assertFailsWith<IllegalArgumentException> {
-            BankAccount.create(
-                bank = Bank.SHINHAN,
-                accountNumber = "110123456789",
-                accountHolderName = " ",
             )
         }
     }
