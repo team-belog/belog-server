@@ -14,8 +14,8 @@ import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.home.controller.dto.response.ActiveMeetingListResponse
-import org.com.belog.home.controller.dto.response.CompletedMeetingListResponse
 import org.com.belog.home.controller.dto.response.HomeCalendarResponse
+import org.com.belog.home.controller.dto.response.TicketListResponse
 import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -123,7 +123,7 @@ interface HomeSwagger {
     ): ResponseEntity<CommonResponse<ActiveMeetingListResponse>>
 
     @Operation(
-        summary = "종료된 만남 티켓 목록 조회",
+        summary = "생성한 티켓 목록 조회",
         description =
             "로그인 사용자가 생성한 Post-log 티켓을 만남 종료 여부와 관계없이 조회합니다. " +
                 "티켓은 생성 시점의 만남 정보를 보존하므로 만남이 삭제되어도 포함하며 종료일과 티켓 ID 내림차순으로 정렬합니다. " +
@@ -133,12 +133,12 @@ interface HomeSwagger {
         value = [
             ApiResponse(
                 responseCode = "200",
-                description = "종료된 만남 티켓 목록 조회 성공",
+                description = "생성한 티켓 목록 조회 성공",
                 useReturnTypeSchema = true,
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
-                        examples = [ExampleObject(value = COMPLETED_MEETINGS_SUCCESS_EXAMPLE)],
+                        examples = [ExampleObject(value = TICKETS_SUCCESS_EXAMPLE)],
                     ),
                 ],
             ),
@@ -159,7 +159,7 @@ interface HomeSwagger {
             ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
         ],
     )
-    fun getCompletedMeetings(
+    fun getTickets(
         @Parameter(hidden = true)
         @LoginUserId
         userId: Long,
@@ -171,7 +171,7 @@ interface HomeSwagger {
         @Min(1)
         @Max(50)
         size: Int,
-    ): ResponseEntity<CommonResponse<CompletedMeetingListResponse>>
+    ): ResponseEntity<CommonResponse<TicketListResponse>>
 
     companion object {
         private const val HOME_CALENDAR_SUCCESS_EXAMPLE =
@@ -180,8 +180,8 @@ interface HomeSwagger {
         private const val ACTIVE_MEETINGS_SUCCESS_EXAMPLE =
             """{"code":"HOME-S002","message":"진행 중인 만남 목록을 조회했습니다.","data":{"items":[{"meetingId":10,"name":"제주 여행","startDate":null,"endDate":null,"groupName":"피놀리와 기니휘기","progressStatus":"SCHEDULING","participantCount":3,"previewParticipants":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":null}]},{"meetingId":11,"name":"1박 2일 광주 여행","startDate":"2026-08-20","endDate":"2026-08-21","groupName":"피놀리와 기니휘기","progressStatus":"UPCOMING","participantCount":3,"previewParticipants":[]}],"nextCursor":null,"hasNext":false}}"""
 
-        private const val COMPLETED_MEETINGS_SUCCESS_EXAMPLE =
-            """{"code":"HOME-S003","message":"종료된 만남 목록을 조회했습니다.","data":{"items":[{"ticketId":31,"name":"1박 2일 광주 여행","memory":"친구들과 다녀온 첫 여행","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-07-17","endDate":"2026-07-18","location":"광주","participantCount":2,"participants":[{"groupMemberId":21,"nickname":"이정원"},{"groupMemberId":22,"nickname":"김민지"}]}],"nextCursor":null,"hasNext":false}}"""
+        private const val TICKETS_SUCCESS_EXAMPLE =
+            """{"code":"HOME-S003","message":"티켓 목록을 조회했습니다.","data":{"items":[{"ticketId":31,"name":"1박 2일 광주 여행","memory":"친구들과 다녀온 첫 여행","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-07-17","endDate":"2026-07-18","location":"광주","participantCount":2,"participants":[{"groupMemberId":21,"nickname":"이정원"},{"groupMemberId":22,"nickname":"김민지"}]}],"nextCursor":null,"hasNext":false}}"""
 
         private const val INVALID_CURSOR_EXAMPLE =
             """{"code":"HOME-E001","message":"홈 만남 목록 커서가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-10-01T00:00:00Z"}}"""

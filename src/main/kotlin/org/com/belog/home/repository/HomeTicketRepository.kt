@@ -7,7 +7,7 @@ import org.springframework.data.repository.Repository
 import org.springframework.data.repository.query.Param
 import java.time.LocalDate
 
-interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
+interface HomeTicketRepository : Repository<PostLogTicket, Long> {
     @Query(
         """
         SELECT ticket
@@ -17,7 +17,7 @@ interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
         ORDER BY ticket.meetingEndDate DESC, ticket.id DESC
         """,
     )
-    fun findCompletedPage(
+    fun findTicketPage(
         @Param("userId") userId: Long,
         pageable: Pageable,
     ): List<PostLogTicket>
@@ -35,7 +35,7 @@ interface HomeCompletedMeetingRepository : Repository<PostLogTicket, Long> {
         ORDER BY ticket.meetingEndDate DESC, ticket.id DESC
         """,
     )
-    fun findCompletedPageAfter(
+    fun findTicketPageAfter(
         @Param("userId") userId: Long,
         @Param("cursorEndDate") cursorEndDate: LocalDate,
         @Param("cursorTicketId") cursorTicketId: Long,

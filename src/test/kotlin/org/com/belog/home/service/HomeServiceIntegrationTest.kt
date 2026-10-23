@@ -178,7 +178,7 @@ class HomeServiceIntegrationTest {
     }
 
     @Test
-    fun `종료 목록은 만남 종료와 삭제 여부와 관계없이 로그인 사용자가 만든 티켓을 반환한다`() {
+    fun `티켓 목록은 만남 종료와 삭제 여부와 관계없이 로그인 사용자가 만든 티켓을 반환한다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val other = saveGroupMember(group, "other")
@@ -198,7 +198,7 @@ class HomeServiceIntegrationTest {
         deletedMeeting.delete(FIXED_INSTANT)
         meetingRepository.saveAndFlush(deletedMeeting)
 
-        val result = homeService.getCompletedMeetings(checkNotNull(viewer.user.id), null, 50)
+        val result = homeService.getTickets(checkNotNull(viewer.user.id), null, 50)
 
         assertEquals(
             listOf(notEndedMeetingTicket.id, endedMeetingTicket.id, deletedMeetingTicket.id),
@@ -207,7 +207,7 @@ class HomeServiceIntegrationTest {
     }
 
     @Test
-    fun `종료 목록은 종료일과 티켓 ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
+    fun `티켓 목록은 종료일과 티켓 ID가 같은 페이지 경계에서도 중복과 누락이 없다`() {
         val group = saveGroup()
         val viewer = saveGroupMember(group, "viewer")
         val tickets =
@@ -226,9 +226,9 @@ class HomeServiceIntegrationTest {
                 ).map { ticket -> ticket.id }
         val viewerUserId = checkNotNull(viewer.user.id)
 
-        val firstPage = homeService.getCompletedMeetings(viewerUserId, null, 2)
-        val secondPage = homeService.getCompletedMeetings(viewerUserId, firstPage.nextCursor, 2)
-        val thirdPage = homeService.getCompletedMeetings(viewerUserId, secondPage.nextCursor, 2)
+        val firstPage = homeService.getTickets(viewerUserId, null, 2)
+        val secondPage = homeService.getTickets(viewerUserId, firstPage.nextCursor, 2)
+        val thirdPage = homeService.getTickets(viewerUserId, secondPage.nextCursor, 2)
 
         assertEquals(
             expectedTicketIds,

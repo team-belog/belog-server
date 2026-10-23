@@ -1,15 +1,15 @@
 package org.com.belog.home.service.result
 
-import org.com.belog.home.service.query.CompletedMeetingCursor
+import org.com.belog.home.service.query.TicketCursor
 import java.time.LocalDate
 
-data class CompletedMeetingListResult(
-    val items: List<CompletedMeetingResult>,
-    val nextCursor: CompletedMeetingCursor?,
+data class TicketListResult(
+    val items: List<TicketResult>,
+    val nextCursor: TicketCursor?,
     val hasNext: Boolean,
 )
 
-data class CompletedMeetingResult(
+data class TicketResult(
     val ticketId: Long,
     val name: String,
     val memory: String,
@@ -18,10 +18,10 @@ data class CompletedMeetingResult(
     val endDate: LocalDate,
     val location: String?,
     val participantCount: Int,
-    val participants: List<CompletedMeetingParticipantResult>,
+    val participants: List<TicketParticipantResult>,
 )
 
-data class CompletedMeetingParticipantResult(
+data class TicketParticipantResult(
     val groupMemberId: Long,
     val nickname: String,
 )

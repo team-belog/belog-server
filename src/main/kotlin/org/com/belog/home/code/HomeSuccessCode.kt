@@ -10,5 +10,5 @@ enum class HomeSuccessCode(
 ) : SuccessCode {
     HOME_CALENDAR_RETRIEVED(HttpStatus.OK, "HOME-S001", "홈 달력을 조회했습니다."),
     HOME_ACTIVE_MEETINGS_RETRIEVED(HttpStatus.OK, "HOME-S002", "진행 중인 만남 목록을 조회했습니다."),
-    HOME_COMPLETED_MEETINGS_RETRIEVED(HttpStatus.OK, "HOME-S003", "종료된 만남 목록을 조회했습니다."),
+    HOME_TICKETS_RETRIEVED(HttpStatus.OK, "HOME-S003", "티켓 목록을 조회했습니다."),
 }
