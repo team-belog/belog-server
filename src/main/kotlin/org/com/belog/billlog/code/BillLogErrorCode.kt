@@ -11,7 +11,7 @@ enum class BillLogErrorCode(
     INVALID_BILL(HttpStatus.BAD_REQUEST, "BILL_LOG-E001", "결제 내역 정보가 올바르지 않습니다."),
     EMPTY_BILL_ITEM(HttpStatus.BAD_REQUEST, "BILL_LOG-E002", "결제 항목은 한 개 이상이어야 합니다."),
     EMPTY_BILL_SHARE(HttpStatus.BAD_REQUEST, "BILL_LOG-E003", "개인별 부담 금액은 한 명 이상 입력해야 합니다."),
-    INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "BILL_LOG-E004", "결제 금액은 0원보다 커야 합니다."),
+    INVALID_AMOUNT(HttpStatus.BAD_REQUEST, "BILL_LOG-E004", "결제 금액은 0보다 커야 합니다."),
     ITEM_TOTAL_MISMATCH(HttpStatus.BAD_REQUEST, "BILL_LOG-E005", "결제 항목 합계가 결제 총액과 일치하지 않습니다."),
     SHARE_TOTAL_MISMATCH(HttpStatus.BAD_REQUEST, "BILL_LOG-E006", "개인별 부담 금액 합계가 결제 총액과 일치하지 않습니다."),
     DUPLICATE_SHARE_PARTICIPANT(HttpStatus.BAD_REQUEST, "BILL_LOG-E007", "개인별 부담 금액에 중복된 참여자가 있습니다."),
@@ -35,4 +35,5 @@ enum class BillLogErrorCode(
     SETTLEMENT_REMINDER_ACCESS_DENIED(HttpStatus.FORBIDDEN, "BILL_LOG-E025", "결제자만 정산 리마인드를 보낼 수 있습니다."),
     SETTLEMENT_REQUEST_ALREADY_COMPLETED(HttpStatus.CONFLICT, "BILL_LOG-E026", "이미 완료된 정산 요청입니다."),
     SETTLEMENT_REMINDER_TOO_FREQUENT(HttpStatus.TOO_MANY_REQUESTS, "BILL_LOG-E027", "정산 리마인드는 1분 후에 다시 보낼 수 있습니다."),
+    INVALID_CURRENCY_AMOUNT(HttpStatus.BAD_REQUEST, "BILL_LOG-E028", "결제 금액의 소수점 자릿수가 화폐 단위와 맞지 않습니다."),
 }

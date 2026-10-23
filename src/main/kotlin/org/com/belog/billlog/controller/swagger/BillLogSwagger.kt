@@ -276,7 +276,7 @@ interface BillLogSwagger {
 }
 
 private const val GET_BILL_LOG_SUMMARY_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S003","message":"Bill-log 요약 정보를 조회했습니다.","data":{"totalSpentAmount":11000,"completedParticipantCount":1,"pendingParticipantCount":2}}"""
+    """{"code":"BILL_LOG-S003","message":"Bill-log 요약 정보를 조회했습니다.","data":{"totalSpentAmounts":[{"currency":"KRW","amount":11000},{"currency":"USD","amount":12.50}],"completedParticipantCount":1,"pendingParticipantCount":2}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""

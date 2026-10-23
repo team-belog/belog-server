@@ -205,7 +205,7 @@ interface SettlementRequestSwagger {
 }
 
 private const val GET_SETTLEMENT_REQUESTS_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S004","message":"정산 현황을 조회했습니다.","data":{"items":[{"settlementRequestId":101,"amount":7500,"sender":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"receiver":{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":null,"isMe":true},"status":"PENDING","action":"SEND_REMINDER"},{"settlementRequestId":90,"amount":12000,"sender":{"meetingParticipantId":33,"nickname":"아랑","profileImageUrl":null,"isMe":false},"receiver":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"status":"COMPLETED","action":"NONE"}],"nextCursor":null,"hasNext":false}}"""
+    """{"code":"BILL_LOG-S004","message":"정산 현황을 조회했습니다.","data":{"items":[{"settlementRequestId":101,"currency":"KRW","amount":7500,"sender":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"receiver":{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":null,"isMe":true},"status":"PENDING","action":"SEND_REMINDER"},{"settlementRequestId":90,"currency":"USD","amount":12.50,"sender":{"meetingParticipantId":33,"nickname":"아랑","profileImageUrl":null,"isMe":false},"receiver":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"status":"COMPLETED","action":"NONE"}],"nextCursor":null,"hasNext":false}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""

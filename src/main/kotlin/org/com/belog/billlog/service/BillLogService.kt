@@ -1,6 +1,7 @@
 package org.com.belog.billlog.service
 
 import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.CurrencyAmount
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.domain.calculateBillDayNumber
@@ -48,7 +49,7 @@ class BillLogService(
         findAccessibleMeeting(meetingId, userId)
 
         return BillLogSummaryResult(
-            totalSpentAmount = billRepository.sumTotalAmountByMeetingId(meetingId),
+            totalSpentAmounts = sumTotalAmountsByCurrency(meetingId),
             completedParticipantCount =
                 settlementRequestRepository.countCompletedParticipantsByMeetingId(
                     meetingId = meetingId,
@@ -107,14 +108,18 @@ class BillLogService(
                     BillDayResult(
                         dayNumber = calculateBillDayNumber(meetingStartDate, paymentDate),
                         paymentDate = paymentDate,
-                        dailyTotalAmount = sumAmounts(bills.map { bill -> bill.totalAmount }),
+                        dailyTotalAmounts =
+                            CurrencyAmount.sumByCurrency(
+                                bills.map { bill -> CurrencyAmount(bill.currency, bill.totalAmount) },
+                            ),
                         bills =
                             bills.map { bill ->
                                 BillListItemResult(
                                     billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
                                     title = bill.title,
                                     payerNickname = userService.resolveDisplayNickname(bill.payer.groupMember.user),
-                                    totalAmount = bill.totalAmount,
+                                    currency = bill.currency,
+                                    totalAmount = bill.currency.normalize(bill.totalAmount),
                                 )
                             },
                     )
@@ -169,12 +174,12 @@ class BillLogService(
         return meeting
     }
 
-    private fun sumAmounts(amounts: List<Long>): Long =
-        try {
-            amounts.fold(0L) { total, amount -> Math.addExact(total, amount) }
-        } catch (_: ArithmeticException) {
-            throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
-        }
+    private fun sumTotalAmountsByCurrency(meetingId: Long): List<CurrencyAmount> =
+        CurrencyAmount.sumByCurrency(
+            billRepository
+                .sumTotalAmountsByMeetingIdGroupByCurrency(meetingId)
+                .map { total -> CurrencyAmount(total.currency, total.totalAmount) },
+        )
 
     private fun SettlementRequest.toListItemResult(userId: Long): SettlementRequestListItemResult {
         val senderParticipant = participant
@@ -194,7 +199,8 @@ class BillLogService(
 
         return SettlementRequestListItemResult(
             settlementRequestId = checkNotNull(id) { "조회된 정산 요청의 ID가 없습니다." },
-            amount = amount,
+            currency = bill.currency,
+            amount = bill.currency.normalize(amount),
             sender = senderParticipant.toResult(senderUser, senderUserId == userId),
             receiver = receiverParticipant.toResult(receiverUser, receiverUserId == userId),
             status = status,

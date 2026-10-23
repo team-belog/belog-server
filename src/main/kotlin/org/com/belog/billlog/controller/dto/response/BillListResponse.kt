@@ -1,9 +1,11 @@
 package org.com.belog.billlog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.service.result.BillDayResult
 import org.com.belog.billlog.service.result.BillListItemResult
 import org.com.belog.billlog.service.result.BillListResult
+import java.math.BigDecimal
 import java.time.LocalDate
 
 @Schema(description = "결제 내역 목록 조회 결과")
@@ -34,8 +36,8 @@ data class BillDayResponse(
     val dayNumber: Int,
     @field:Schema(description = "결제일", example = "2026-08-06")
     val paymentDate: LocalDate,
-    @field:Schema(description = "해당 날짜의 총 결제 금액", example = "15000")
-    val dailyTotalAmount: Long,
+    @field:Schema(description = "해당 날짜의 화폐 단위별 총 결제 금액. 화폐 단위 순서는 KRW, USD, JPY, EUR")
+    val dailyTotalAmounts: List<CurrencyAmountResponse>,
     @field:Schema(description = "해당 날짜의 결제 내역")
     val bills: List<BillListItemResponse>,
 ) {
@@ -44,7 +46,7 @@ data class BillDayResponse(
             BillDayResponse(
                 dayNumber = result.dayNumber,
                 paymentDate = result.paymentDate,
-                dailyTotalAmount = result.dailyTotalAmount,
+                dailyTotalAmounts = result.dailyTotalAmounts.map(CurrencyAmountResponse::from),
                 bills = result.bills.map(BillListItemResponse::from),
             )
     }
@@ -58,8 +60,10 @@ data class BillListItemResponse(
     val title: String,
     @field:Schema(description = "결제자 닉네임", example = "정바미")
     val payerNickname: String,
+    @field:Schema(description = "결제 화폐 단위", example = "KRW", allowableValues = ["KRW", "USD", "JPY", "EUR"])
+    val currency: BillCurrency,
     @field:Schema(description = "결제 금액", example = "7500")
-    val totalAmount: Long,
+    val totalAmount: BigDecimal,
 ) {
     companion object {
         fun from(result: BillListItemResult): BillListItemResponse =
@@ -67,6 +71,7 @@ data class BillListItemResponse(
                 billId = result.billId,
                 title = result.title,
                 payerNickname = result.payerNickname,
+                currency = result.currency,
                 totalAmount = result.totalAmount,
             )
     }

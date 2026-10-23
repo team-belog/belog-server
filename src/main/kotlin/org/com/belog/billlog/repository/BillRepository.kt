@@ -1,10 +1,12 @@
 package org.com.belog.billlog.repository
 
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 
@@ -13,14 +15,15 @@ interface BillRepository : JpaRepository<Bill, Long> {
 
     @Query(
         """
-        SELECT COALESCE(SUM(bill.totalAmount), 0)
+        SELECT bill.currency AS currency, SUM(bill.totalAmount) AS totalAmount
         FROM Bill bill
         WHERE bill.meeting.id = :meetingId
+        GROUP BY bill.currency
         """,
     )
-    fun sumTotalAmountByMeetingId(
+    fun sumTotalAmountsByMeetingIdGroupByCurrency(
         @Param("meetingId") meetingId: Long,
-    ): Long
+    ): List<CurrencyTotalAmount>
 
     @Query(
         """
@@ -75,4 +78,9 @@ interface BillRepository : JpaRepository<Bill, Long> {
     fun findByIdWithMeetingAndPayer(
         @Param("billId") billId: Long,
     ): Bill?
+}
+
+interface CurrencyTotalAmount {
+    val currency: BillCurrency
+    val totalAmount: BigDecimal
 }

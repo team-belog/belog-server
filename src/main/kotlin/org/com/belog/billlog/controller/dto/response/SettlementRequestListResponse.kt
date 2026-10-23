@@ -2,11 +2,13 @@ package org.com.belog.billlog.controller.dto.response
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.service.result.SettlementParticipantResult
 import org.com.belog.billlog.service.result.SettlementRequestAction
 import org.com.belog.billlog.service.result.SettlementRequestListItemResult
 import org.com.belog.billlog.service.result.SettlementRequestListResult
+import java.math.BigDecimal
 
 @Schema(description = "진행 중인 정산 현황 조회 결과")
 data class SettlementRequestListResponse(
@@ -31,8 +33,10 @@ data class SettlementRequestListResponse(
 data class SettlementRequestListItemResponse(
     @field:Schema(description = "정산 요청 ID", example = "101")
     val settlementRequestId: Long,
+    @field:Schema(description = "정산 화폐 단위", example = "KRW", allowableValues = ["KRW", "USD", "JPY", "EUR"])
+    val currency: BillCurrency,
     @field:Schema(description = "정산 금액", example = "7500")
-    val amount: Long,
+    val amount: BigDecimal,
     @field:Schema(description = "정산금을 보내는 참여자")
     val sender: SettlementParticipantResponse,
     @field:Schema(description = "정산금을 받는 참여자")
@@ -54,6 +58,7 @@ data class SettlementRequestListItemResponse(
         fun from(result: SettlementRequestListItemResult): SettlementRequestListItemResponse =
             SettlementRequestListItemResponse(
                 settlementRequestId = result.settlementRequestId,
+                currency = result.currency,
                 amount = result.amount,
                 sender = SettlementParticipantResponse.from(result.sender),
                 receiver = SettlementParticipantResponse.from(result.receiver),

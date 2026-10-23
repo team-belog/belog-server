@@ -17,6 +17,7 @@ import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
+import java.math.BigDecimal
 
 private const val BILL_TITLE_MIN_LENGTH = 1
 private const val BILL_TITLE_MAX_LENGTH = 100
@@ -60,8 +61,11 @@ class Bill protected constructor(
     val payer: MeetingParticipant,
     @Column(nullable = false, length = BILL_TITLE_MAX_LENGTH)
     val title: String,
-    @Column(name = "total_amount", nullable = false)
-    val totalAmount: Long,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = BillCurrency.COLUMN_LENGTH)
+    val currency: BillCurrency,
+    @Column(name = "total_amount", nullable = false, precision = BillAmount.PRECISION, scale = BillAmount.SCALE)
+    val totalAmount: BigDecimal,
     @Enumerated(EnumType.STRING)
     @Column(name = "split_type", nullable = false, length = 20)
     val splitType: BillSplitType,
@@ -80,7 +84,8 @@ class Bill protected constructor(
             creator: GroupMember,
             payer: MeetingParticipant,
             title: String,
-            totalAmount: Long,
+            currency: BillCurrency,
+            totalAmount: BigDecimal,
             splitType: BillSplitType,
         ): Bill {
             require(creator.belongsTo(meeting.group)) {
@@ -89,8 +94,14 @@ class Bill protected constructor(
             require(payer.belongsTo(meeting)) {
                 "결제자는 해당 만남의 참여자여야 합니다."
             }
-            require(totalAmount > 0) {
-                "결제 총액은 0원보다 커야 합니다."
+            require(totalAmount.signum() > 0) {
+                "결제 총액은 0보다 커야 합니다."
+            }
+            require(currency.supports(totalAmount)) {
+                "결제 총액의 소수점 자릿수가 화폐 단위와 맞지 않습니다."
+            }
+            require(BillAmount.isStorable(totalAmount)) {
+                "결제 총액이 허용 범위를 초과했습니다."
             }
 
             val normalizedTitle = title.trim()
@@ -103,7 +114,8 @@ class Bill protected constructor(
                 createdBy = creator,
                 payer = payer,
                 title = normalizedTitle,
-                totalAmount = totalAmount,
+                currency = currency,
+                totalAmount = currency.normalize(totalAmount),
                 splitType = splitType,
             )
         }

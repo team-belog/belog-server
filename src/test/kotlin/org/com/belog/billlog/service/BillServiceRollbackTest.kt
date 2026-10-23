@@ -1,5 +1,6 @@
 package org.com.belog.billlog.service
 
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.repository.SettlementRequestRepository
@@ -38,6 +39,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -123,17 +125,18 @@ class BillServiceRollbackTest {
                 creatorUserId = requireNotNull(creator.user.id),
                 title = "아랑이 카페",
                 payerMemberId = requireNotNull(creator.id),
-                totalAmount = 11_000L,
+                currency = BillCurrency.KRW,
+                totalAmount = BigDecimal.valueOf(11_000L),
                 splitType = BillSplitType.EQUAL_SPLIT,
                 items =
                     listOf(
-                        BillItemCommand("아메리카노", 4_000L),
-                        BillItemCommand("프라푸치노", 7_000L),
+                        BillItemCommand("아메리카노", BigDecimal.valueOf(4_000L)),
+                        BillItemCommand("프라푸치노", BigDecimal.valueOf(7_000L)),
                     ),
                 shares =
                     listOf(
-                        BillShareCommand(requireNotNull(creator.id), 4_000L),
-                        BillShareCommand(requireNotNull(member.id), 7_000L),
+                        BillShareCommand(requireNotNull(creator.id), BigDecimal.valueOf(4_000L)),
+                        BillShareCommand(requireNotNull(member.id), BigDecimal.valueOf(7_000L)),
                     ),
             )
 

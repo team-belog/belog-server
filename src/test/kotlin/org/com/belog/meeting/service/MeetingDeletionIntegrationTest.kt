@@ -1,6 +1,7 @@
 package org.com.belog.meeting.service
 
 import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillItemRepository
@@ -41,6 +42,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.util.concurrent.Callable
@@ -196,13 +198,14 @@ class MeetingDeletionIntegrationTest {
             creatorUserId = context.creatorUserId,
             title = "저녁 식사",
             payerMemberId = context.creatorMemberId,
-            totalAmount = 20_000L,
+            currency = BillCurrency.KRW,
+            totalAmount = BigDecimal.valueOf(20_000L),
             splitType = BillSplitType.EQUAL_SPLIT,
-            items = listOf(BillItemCommand(name = "식사", amount = 20_000L)),
+            items = listOf(BillItemCommand(name = "식사", amount = BigDecimal.valueOf(20_000L))),
             shares =
                 listOf(
-                    BillShareCommand(participantMemberId = context.creatorMemberId, amount = 10_000L),
-                    BillShareCommand(participantMemberId = context.memberId, amount = 10_000L),
+                    BillShareCommand(participantMemberId = context.creatorMemberId, amount = BigDecimal.valueOf(10_000L)),
+                    BillShareCommand(participantMemberId = context.memberId, amount = BigDecimal.valueOf(10_000L)),
                 ),
         )
 

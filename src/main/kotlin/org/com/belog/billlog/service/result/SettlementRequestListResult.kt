@@ -1,6 +1,8 @@
 package org.com.belog.billlog.service.result
 
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.SettlementRequestStatus
+import java.math.BigDecimal
 
 enum class SettlementRequestAction {
     SEND_REMINDER,
@@ -16,7 +18,8 @@ data class SettlementRequestListResult(
 
 data class SettlementRequestListItemResult(
     val settlementRequestId: Long,
-    val amount: Long,
+    val currency: BillCurrency,
+    val amount: BigDecimal,
     val sender: SettlementParticipantResult,
     val receiver: SettlementParticipantResult,
     val status: SettlementRequestStatus,

@@ -1,5 +1,6 @@
 package org.com.belog.billlog.service
 
+import org.com.belog.billlog.domain.BillAmount
 import org.com.belog.billlog.domain.ReceiptExtraction
 import org.com.belog.billlog.domain.ReceiptExtractionItem
 import org.com.belog.billlog.infrastructure.UpstageReceiptExtractionClient
@@ -7,7 +8,6 @@ import org.com.belog.billlog.service.result.ReceiptAnalysisItemResult
 import org.com.belog.billlog.service.result.ReceiptAnalysisResult
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
-import java.math.BigInteger
 import java.time.LocalDate
 
 @Service
@@ -33,7 +33,7 @@ class ReceiptAnalysisService(
 
     private fun ReceiptExtraction.toAnalysisResult(): ReceiptAnalysisResult {
         val normalizedItems = items.map { item -> item.toAnalysisItemResult() }
-        val normalizedTotalAmount = totalAmount.toLongExactOrNull()
+        val normalizedTotalAmount = totalAmount.toBillAmountOrNull()
 
         return ReceiptAnalysisResult(
             title = title.normalizeText(),
@@ -47,22 +47,22 @@ class ReceiptAnalysisService(
     private fun ReceiptExtractionItem.toAnalysisItemResult(): ReceiptAnalysisItemResult =
         ReceiptAnalysisItemResult(
             name = name.normalizeText(),
-            amount = amount.toLongExactOrNull(),
+            amount = amount.toBillAmountOrNull(),
         )
 
     private fun requiresAmountConfirmation(
         items: List<ReceiptAnalysisItemResult>,
-        totalAmount: Long?,
+        totalAmount: BigDecimal?,
     ): Boolean {
         if (items.isEmpty() || totalAmount == null || items.any { item -> item.amount == null }) {
             return true
         }
 
         val itemTotal =
-            items.fold(BigInteger.ZERO) { sum, item ->
-                sum + BigInteger.valueOf(checkNotNull(item.amount))
+            items.fold(BigDecimal.ZERO) { sum, item ->
+                sum.add(checkNotNull(item.amount))
             }
-        return itemTotal != BigInteger.valueOf(totalAmount)
+        return itemTotal.compareTo(totalAmount) != 0
     }
 
     private fun String?.normalizeText(): String? = this?.trim()?.takeIf(String::isNotEmpty)
@@ -70,5 +70,9 @@ class ReceiptAnalysisService(
     private fun String?.toLocalDateOrNull(): LocalDate? =
         normalizeText()?.let { value -> runCatching { LocalDate.parse(value) }.getOrNull() }
 
-    private fun BigDecimal?.toLongExactOrNull(): Long? = this?.let { value -> runCatching(value::longValueExact).getOrNull() }
+    private fun BigDecimal?.toBillAmountOrNull(): BigDecimal? {
+        val strippedAmount = this?.stripTrailingZeros() ?: return null
+        val amount = if (strippedAmount.scale() < 0) strippedAmount.setScale(0) else strippedAmount
+        return amount.takeIf { value -> value.scale() <= BillAmount.SCALE && BillAmount.isStorable(value) }
+    }
 }
