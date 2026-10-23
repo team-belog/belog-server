@@ -20,6 +20,7 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.command.MeetingNotificationCommands
 import org.com.belog.meeting.service.result.CreatedMeeting
 import org.com.belog.notification.service.NotificationService
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -34,6 +35,7 @@ class MeetingService(
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
+    private val postLogTicketRepository: PostLogTicketRepository,
     private val settlementRequestService: SettlementRequestService,
     private val notificationService: NotificationService,
     private val clock: Clock,
@@ -238,10 +240,17 @@ class MeetingService(
             throw BusinessException(MeetingErrorCode.PAST_MEETING_DATE_SELECTION)
         }
 
-        return meeting.changeConfirmedDate(
-            dateRange = dateRange,
-            currentDate = currentDate,
-        )
+        val changed =
+            meeting.changeConfirmedDate(
+                dateRange = dateRange,
+                currentDate = currentDate,
+            )
+        if (changed) {
+            postLogTicketRepository.findAllBySourceMeetingId(requireNotNull(meeting.id)).forEach { ticket ->
+                ticket.updateMeetingDates(dateRange)
+            }
+        }
+        return changed
     }
 
     private fun findMeetingForUpdate(meetingId: Long): Meeting =

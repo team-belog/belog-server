@@ -22,6 +22,8 @@ import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -89,6 +91,9 @@ class MeetingDatePollServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var postLogTicketRepository: PostLogTicketRepository
 
     @Autowired
     private lateinit var jdbcTemplate: JdbcTemplate
@@ -543,6 +548,30 @@ class MeetingDatePollServiceTest {
         assertEquals(candidateDateRange.startDate, meeting.startDate)
         assertEquals(candidateDateRange.endDate, meeting.endDate)
         assertEquals(FIXED_INSTANT, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `후보 일정을 확정하면 일정 조율 중 생성한 티켓에도 확정 일정이 저장된다`() {
+        val context = saveConfirmationContext()
+        val ticket =
+            postLogTicketRepository.saveAndFlush(
+                PostLogTicket.issue(
+                    meeting = context.meeting,
+                    creator = context.participant,
+                    memory = "함께한 추억",
+                    coverImageObjectKey = null,
+                    issuedAt = FIXED_INSTANT,
+                ),
+            )
+
+        meetingDatePollService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        assertEquals(context.candidateDateRange.startDate, ticket.meetingStartDate)
+        assertEquals(context.candidateDateRange.endDate, ticket.meetingEndDate)
     }
 
     @Test

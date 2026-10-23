@@ -22,6 +22,7 @@ import org.com.belog.meeting.service.result.DatePollMemberResult
 import org.com.belog.meeting.service.result.MeetingDatePollResult
 import org.com.belog.meeting.service.result.MeetingDatePollResults
 import org.com.belog.notification.service.NotificationService
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,6 +38,7 @@ class MeetingDatePollService(
     private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
     private val meetingAvailableDateRepository: MeetingAvailableDateRepository,
     private val userService: UserService,
+    private val postLogTicketRepository: PostLogTicketRepository,
     private val notificationService: NotificationService,
     private val clock: Clock,
 ) {
@@ -269,10 +271,14 @@ class MeetingDatePollService(
                 currentDate = currentDate,
             )
         if (confirmed) {
+            val confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate)
+            postLogTicketRepository.findAllBySourceMeetingId(meetingId).forEach { ticket ->
+                ticket.updateMeetingDates(confirmedDateRange)
+            }
             notifyParticipantsOfConfirmedDate(
                 meetingId = meetingId,
                 ownerUserId = userId,
-                confirmedDateRange = MeetingDateRange(candidateDateRange.startDate, candidateDateRange.endDate),
+                confirmedDateRange = confirmedDateRange,
             )
         }
         return confirmed

@@ -16,6 +16,7 @@ import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.user.domain.User
 import java.time.Instant
 import java.time.LocalDate
@@ -67,10 +68,8 @@ class PostLogTicket protected constructor(
     val meetingName: String,
     @Column(name = "meeting_location", length = Meeting.LOCATION_MAX_LENGTH)
     val meetingLocation: String?,
-    @Column(name = "meeting_start_date")
-    val meetingStartDate: LocalDate?,
-    @Column(name = "meeting_end_date")
-    val meetingEndDate: LocalDate?,
+    meetingStartDate: LocalDate?,
+    meetingEndDate: LocalDate?,
     @Column(nullable = false, length = PostLogMemory.MAX_LENGTH)
     val memory: String,
     @Column(name = "cover_image_object_key", length = COVER_IMAGE_OBJECT_KEY_MAX_LENGTH)
@@ -82,6 +81,19 @@ class PostLogTicket protected constructor(
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
         protected set
+
+    @Column(name = "meeting_start_date")
+    var meetingStartDate: LocalDate? = meetingStartDate
+        protected set
+
+    @Column(name = "meeting_end_date")
+    var meetingEndDate: LocalDate? = meetingEndDate
+        protected set
+
+    fun updateMeetingDates(dateRange: MeetingDateRange) {
+        meetingStartDate = dateRange.startDate
+        meetingEndDate = dateRange.endDate
+    }
 
     companion object {
         const val COVER_IMAGE_OBJECT_KEY_MAX_LENGTH = 512

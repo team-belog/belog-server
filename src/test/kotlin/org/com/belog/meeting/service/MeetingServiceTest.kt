@@ -20,6 +20,8 @@ import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -76,6 +78,9 @@ class MeetingServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var postLogTicketRepository: PostLogTicketRepository
 
     @MockitoBean
     private lateinit var notificationService: NotificationService
@@ -416,6 +421,41 @@ class MeetingServiceTest {
 
         assertEquals(MeetingErrorCode.INVALID_MEETING_DATE_RANGE, exception.errorCode)
         assertEquals(0L, meetingRepository.count())
+    }
+
+    @Test
+    fun `확정된 일정을 변경하면 만남의 티켓 일정도 함께 변경된다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting =
+            meetingRepository.save(
+                createFixedMeeting(
+                    group = group,
+                    creator = creator,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 22), LocalDate.of(2026, 9, 23)),
+                ),
+            )
+        val ticket =
+            postLogTicketRepository.saveAndFlush(
+                PostLogTicket.issue(
+                    meeting = meeting,
+                    creator = creator,
+                    memory = "함께한 추억",
+                    coverImageObjectKey = null,
+                    issuedAt = FIXED_INSTANT,
+                ),
+            )
+
+        meetingService.updateMeeting(
+            meetingId = requireNotNull(meeting.id),
+            userId = requireNotNull(creator.user.id),
+            name = "광주 여행",
+            location = null,
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+        )
+
+        assertEquals(LocalDate.of(2026, 9, 24), ticket.meetingStartDate)
+        assertEquals(LocalDate.of(2026, 9, 25), ticket.meetingEndDate)
     }
 
     @Test

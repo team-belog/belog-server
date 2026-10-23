@@ -17,6 +17,8 @@ interface PostLogTicketRepository : JpaRepository<PostLogTicket, Long> {
         creatorGroupMemberId: Long,
     ): Boolean
 
+    fun findAllBySourceMeetingId(sourceMeetingId: Long): List<PostLogTicket>
+
     fun findByIdAndOwnerId(
         id: Long,
         ownerId: Long,
