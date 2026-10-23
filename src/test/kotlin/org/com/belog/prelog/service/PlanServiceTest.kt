@@ -37,7 +37,6 @@ import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.util.ReflectionTestUtils
 import java.time.Instant
-import java.time.LocalDate
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -163,7 +162,7 @@ class PlanServiceTest {
             planCreatorId = 10L,
             isMeetingCreator = false,
             address = "광주광역시 동구",
-            endDate = LocalDate.of(2026, 9, 21),
+            ended = true,
         )
 
         val result = getPlans()
@@ -477,15 +476,11 @@ class PlanServiceTest {
         verifyNoInteractions(notificationService)
     }
 
-    private fun meetingContext(
-        endDate: LocalDate = LocalDate.of(2026, 9, 23),
-        ended: Boolean = false,
-    ): MeetingContext {
+    private fun meetingContext(ended: Boolean = false): MeetingContext {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
         `when`(group.id).thenReturn(3L)
         `when`(meeting.group).thenReturn(group)
-        `when`(meeting.endDate).thenReturn(endDate)
         `when`(meeting.isEnded()).thenReturn(ended)
         return MeetingContext(group, meeting)
     }
@@ -531,9 +526,9 @@ class PlanServiceTest {
         type: PlanType = PlanType.LOCATION,
         content: String? = null,
         address: String? = null,
-        endDate: LocalDate = LocalDate.of(2026, 9, 23),
+        ended: Boolean = false,
     ) {
-        val context = meetingContext(endDate)
+        val context = meetingContext(ended = ended)
         val loginGroupMember = mock(GroupMember::class.java)
         val planCreator = mock(GroupMember::class.java)
         val plan = mock(Plan::class.java)
