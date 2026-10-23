@@ -59,6 +59,12 @@ class BillShare protected constructor(
     val amount: BigDecimal,
     @Column(name = "allocation_order", nullable = false)
     val allocationOrder: Int,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+        name = "settlement_request_id",
+        foreignKey = ForeignKey(name = "fk_bill_log_bill_shares_settlement_request_id"),
+    )
+    val settlementRequest: SettlementRequest?,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -71,6 +77,7 @@ class BillShare protected constructor(
             participant: MeetingParticipant,
             amount: BigDecimal,
             allocationOrder: Int,
+            settlementRequest: SettlementRequest?,
         ): BillShare {
             require(participant.belongsTo(bill.meeting)) {
                 "부담자는 결제 내역이 속한 만남의 참여자여야 합니다."
@@ -84,12 +91,20 @@ class BillShare protected constructor(
             require(allocationOrder >= 0) {
                 "개인별 부담 금액 배분 순서는 0 이상이어야 합니다."
             }
+            if (participant.isSameParticipantAs(bill.payer)) {
+                require(settlementRequest == null) { "결제자의 부담분은 정산 요청에 포함할 수 없습니다." }
+            } else {
+                require(settlementRequest != null && settlementRequest.covers(bill, participant)) {
+                    "부담분은 결제자와 부담자 사이의 정산 요청에 포함되어야 합니다."
+                }
+            }
 
             return BillShare(
                 bill = bill,
                 participant = participant,
                 amount = bill.currency.normalize(amount),
                 allocationOrder = allocationOrder,
+                settlementRequest = settlementRequest,
             )
         }
     }

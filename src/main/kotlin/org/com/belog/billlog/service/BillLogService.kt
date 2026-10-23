@@ -182,8 +182,8 @@ class BillLogService(
         )
 
     private fun SettlementRequest.toListItemResult(userId: Long): SettlementRequestListItemResult {
-        val senderParticipant = participant
-        val receiverParticipant = bill.payer
+        val senderParticipant = sender
+        val receiverParticipant = receiver
         val senderUser = senderParticipant.groupMember.user
         val receiverUser = receiverParticipant.groupMember.user
         val senderUserId = checkNotNull(senderUser.id) { "송금자의 사용자 ID가 없습니다." }
@@ -199,8 +199,8 @@ class BillLogService(
 
         return SettlementRequestListItemResult(
             settlementRequestId = checkNotNull(id) { "조회된 정산 요청의 ID가 없습니다." },
-            currency = bill.currency,
-            amount = bill.currency.normalize(amount),
+            currency = currency,
+            amount = currency.normalize(amount),
             sender = senderParticipant.toResult(senderUser, senderUserId == userId),
             receiver = receiverParticipant.toResult(receiverUser, receiverUserId == userId),
             receiverBankAccount = receiverUser.bankAccount?.takeIf { receiverUser.isActive },

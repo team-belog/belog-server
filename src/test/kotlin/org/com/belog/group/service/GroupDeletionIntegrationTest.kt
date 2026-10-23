@@ -112,8 +112,8 @@ class GroupDeletionIntegrationTest {
     fun cleanUp() {
         notificationOutboxRepository.deleteAllInBatch()
         notificationRepository.deleteAllInBatch()
-        settlementRequestRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
+        settlementRequestRepository.deleteAllInBatch()
         billItemRepository.deleteAllInBatch()
         billRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
