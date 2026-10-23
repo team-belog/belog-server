@@ -360,20 +360,19 @@ class MeetingRepositoryTest {
     }
 
     @Test
-    fun `마지막 종료 여정이 기준일 이전이고 일정 조율 중인 만남이 없는 그룹 ID만 조회된다`() {
-        val lastEndDate = LocalDate.of(2026, 10, 1)
-        val inactiveGroup = saveGroupWithMeetingStartingOn("AB12CD", "inactive", lastEndDate.minusDays(1))
-        val recentGroup = saveGroupWithMeetingStartingOn("BC23DE", "recent", lastEndDate.minusDays(1))
-        meetingRepository.save(createMeetingStartingOn(recentGroup.group, recentGroup.creator, lastEndDate))
-        val schedulingGroup = saveGroupWithMeetingStartingOn("CD34EF", "poll", lastEndDate.minusDays(1))
+    fun `마지막 만남 종료 시각이 기준 시각 이전이고 종료하지 않은 만남이 없는 그룹 ID만 조회된다`() {
+        val endedBefore = Instant.parse("2026-10-01T15:00:00Z")
+        val inactiveGroup = saveGroupWithEndedMeeting("AB12CD", "inactive", endedBefore.minusMillis(1))
+        saveGroupWithEndedMeeting("BC23DE", "recent", endedBefore)
+        val notEndedGroup = saveGroupWithEndedMeeting("CD34EF", "active", endedBefore.minusSeconds(60))
+        meetingRepository.save(createMeetingStartingOn(notEndedGroup.group, notEndedGroup.creator, REMINDER_START_DATE))
+        val schedulingGroup = saveGroupWithEndedMeeting("DE45FG", "poll", endedBefore.minusSeconds(60))
         meetingRepository.saveAndFlush(createPollMeeting(schedulingGroup.group, schedulingGroup.creator))
 
         val groupIds =
             meetingRepository.findInactiveGroupIds(
-                lastEndDate = lastEndDate,
+                endedBefore = endedBefore,
                 cursor = null,
-                confirmedStatus = MeetingStatus.CONFIRMED,
-                schedulingStatus = MeetingStatus.SCHEDULING,
                 pageable = PageRequest.of(0, 10),
             )
 
@@ -403,14 +402,16 @@ class MeetingRepositoryTest {
         assertTrue(participants.all { Hibernate.isInitialized(it.groupMember) && Hibernate.isInitialized(it.groupMember.user) })
     }
 
-    private fun saveGroupWithMeetingStartingOn(
+    private fun saveGroupWithEndedMeeting(
         inviteCode: String,
         providerUserId: String,
-        startDate: LocalDate,
+        endedAt: Instant,
     ): GroupContext {
         val group = groupRepository.save(createGroup(inviteCode))
         val creator = saveGroupMember(group, "$providerUserId-subject", providerUserId)
-        meetingRepository.saveAndFlush(createMeetingStartingOn(group, creator, startDate))
+        val meeting = createMeetingStartingOn(group, creator, REMINDER_START_DATE)
+        meeting.end(endedAt = endedAt, currentDate = REMINDER_START_DATE)
+        meetingRepository.saveAndFlush(meeting)
         return GroupContext(group, creator)
     }
 

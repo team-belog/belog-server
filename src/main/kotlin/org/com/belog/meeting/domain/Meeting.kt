@@ -15,6 +15,7 @@ import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
 import org.com.belog.global.domain.BaseEntity
+import org.com.belog.global.time.toBusinessDate
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import java.time.Duration
@@ -183,7 +184,7 @@ class Meeting protected constructor(
 
     fun endsOn(date: LocalDate): Boolean = endDate == date
 
-    fun isEndedOnOrBefore(date: LocalDate): Boolean = endDate?.isAfter(date) == false
+    fun isEndedOnOrBefore(date: LocalDate): Boolean = endedAt?.toBusinessDate()?.isAfter(date) == false
 
     fun updateDetails(
         name: String,
