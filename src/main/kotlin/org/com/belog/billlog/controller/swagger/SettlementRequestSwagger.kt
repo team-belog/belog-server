@@ -24,7 +24,8 @@ interface SettlementRequestSwagger {
     @Operation(
         summary = "정산 현황 조회",
         description =
-            "해당 만남의 모든 정산 요청을 조회합니다. PENDING 요청을 COMPLETED 요청보다 먼저 배치하고, " +
+            "해당 만남의 모든 정산 요청을 조회합니다. 정산 요청은 같은 화폐의 두 참여자 사이 결제 내역을 상계한 결과이며, " +
+                "상계 결과 0원으로 자동 완료된 요청은 제외합니다. PENDING 요청을 COMPLETED 요청보다 먼저 배치하고, " +
                 "각 상태 안에서는 최신순으로 정렬합니다. 진행 중인 요청에서 로그인 사용자가 수취인이면 " +
                 "SEND_REMINDER, 송금자이면 MARK_COMPLETE, 그 외에는 NONE 액션을 반환합니다. " +
                 "수취인의 계좌 정보를 함께 반환하며, 수취인이 계좌를 등록하지 않았거나 탈퇴했다면 null입니다.",
@@ -98,7 +99,8 @@ interface SettlementRequestSwagger {
     @Operation(
         summary = "정산 요청 완료 처리",
         description =
-            "정산 요청 대상자가 송금을 완료한 뒤 자신의 요청을 COMPLETED 상태로 변경합니다. " +
+            "정산 요청 송금자가 송금을 완료한 뒤 자신의 요청을 COMPLETED 상태로 변경합니다. " +
+                "상계된 정산 요청을 완료하면 그 요청에 포함된 모든 결제 내역의 부담분이 함께 정산 완료됩니다. " +
                 "이미 완료된 요청은 최초 완료 시각을 유지하며 동일하게 성공합니다.",
     )
     @ApiResponses(
@@ -141,9 +143,10 @@ interface SettlementRequestSwagger {
     @Operation(
         summary = "정산 리마인드 전송",
         description =
-            "결제자가 아직 완료되지 않은 정산 요청의 대상자에게 리마인드 알림을 전송합니다. " +
-                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미하며, " +
-                "같은 정산 요청에는 마지막 전송 후 1분이 지나야 다시 전송할 수 있습니다.",
+            "수취인이 아직 완료되지 않은 정산 요청의 송금자에게 리마인드 알림을 전송합니다. " +
+                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미합니다. " +
+                "같은 정산 요청에는 마지막 전송 후 1분이 지나야 다시 전송할 수 있고, " +
+                "새 결제 내역으로 상계 금액이 바뀌면 대기 시간이 초기화됩니다.",
     )
     @ApiResponses(
         value = [
@@ -151,7 +154,7 @@ interface SettlementRequestSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 정산 요청의 결제자가 아님",
+                description = "해당 정산 요청의 수취인이 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -224,7 +227,7 @@ private const val NOT_FOUND_EXAMPLE =
     """{"code":"BILL_LOG-E013","message":"정산 요청을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val REMINDER_ACCESS_DENIED_EXAMPLE =
-    """{"code":"BILL_LOG-E025","message":"결제자만 정산 리마인드를 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+    """{"code":"BILL_LOG-E025","message":"정산 수취인만 리마인드를 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
 
 private const val ALREADY_COMPLETED_EXAMPLE =
     """{"code":"BILL_LOG-E026","message":"이미 완료된 정산 요청입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
