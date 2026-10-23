@@ -164,6 +164,35 @@ class BillLogServiceTest {
     }
 
     @Test
+    fun `정산 현황에 수취인의 계좌 정보를 함께 반환한다`() {
+        val context = saveMeetingContext()
+        val bill = saveBill(context, context.secondParticipant, "보낼 결제", 10_000L)
+        saveSettlementRequest(bill, context.firstParticipant, 10_000L, 0)
+        entityManager.clear()
+
+        val result = getSettlementRequestPage(context, cursor = null, size = 10)
+
+        val receiverBankAccount = requireNotNull(result.items.single().receiverBankAccount)
+        assertEquals(Bank.KB_KOOKMIN, receiverBankAccount.bank)
+        assertEquals("123456789012", receiverBankAccount.accountNumber)
+    }
+
+    @Test
+    fun `탈퇴한 수취인의 계좌 정보는 반환하지 않는다`() {
+        val context = saveMeetingContext()
+        val bill = saveBill(context, context.secondParticipant, "보낼 결제", 10_000L)
+        saveSettlementRequest(bill, context.firstParticipant, 10_000L, 0)
+        val receiverUser = context.secondParticipant.groupMember.user
+        receiverUser.withdraw(Instant.parse("2026-09-30T00:00:00Z"))
+        userRepository.saveAndFlush(receiverUser)
+        entityManager.clear()
+
+        val result = getSettlementRequestPage(context, cursor = null, size = 10)
+
+        assertNull(result.items.single().receiverBankAccount)
+    }
+
+    @Test
     fun `진행 중인 정산을 먼저 정렬하고 상태 경계에서도 커서로 중복 없이 조회한다`() {
         val context = saveMeetingContext()
         val bills =

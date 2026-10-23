@@ -197,6 +197,7 @@ class BillLogService(
             amount = amount,
             sender = senderParticipant.toResult(senderUser, senderUserId == userId),
             receiver = receiverParticipant.toResult(receiverUser, receiverUserId == userId),
+            receiverBankAccount = receiverUser.bankAccount?.takeIf { receiverUser.isActive },
             status = status,
             action = action,
         )

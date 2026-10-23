@@ -26,7 +26,8 @@ interface SettlementRequestSwagger {
         description =
             "해당 만남의 모든 정산 요청을 조회합니다. PENDING 요청을 COMPLETED 요청보다 먼저 배치하고, " +
                 "각 상태 안에서는 최신순으로 정렬합니다. 진행 중인 요청에서 로그인 사용자가 수취인이면 " +
-                "SEND_REMINDER, 송금자이면 MARK_COMPLETE, 그 외에는 NONE 액션을 반환합니다.",
+                "SEND_REMINDER, 송금자이면 MARK_COMPLETE, 그 외에는 NONE 액션을 반환합니다. " +
+                "수취인의 계좌 정보를 함께 반환하며, 수취인이 계좌를 등록하지 않았거나 탈퇴했다면 null입니다.",
     )
     @ApiResponses(
         value = [
@@ -205,7 +206,7 @@ interface SettlementRequestSwagger {
 }
 
 private const val GET_SETTLEMENT_REQUESTS_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S004","message":"정산 현황을 조회했습니다.","data":{"items":[{"settlementRequestId":101,"amount":7500,"sender":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"receiver":{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":null,"isMe":true},"status":"PENDING","action":"SEND_REMINDER"},{"settlementRequestId":90,"amount":12000,"sender":{"meetingParticipantId":33,"nickname":"아랑","profileImageUrl":null,"isMe":false},"receiver":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"status":"COMPLETED","action":"NONE"}],"nextCursor":null,"hasNext":false}}"""
+    """{"code":"BILL_LOG-S004","message":"정산 현황을 조회했습니다.","data":{"items":[{"settlementRequestId":101,"amount":7500,"sender":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"receiver":{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":null,"isMe":true,"bankAccount":{"bankCode":"KAKAO_BANK","bankName":"카카오뱅크","accountNumber":"3333012345678"}},"status":"PENDING","action":"SEND_REMINDER"},{"settlementRequestId":90,"amount":12000,"sender":{"meetingParticipantId":33,"nickname":"아랑","profileImageUrl":null,"isMe":false},"receiver":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false,"bankAccount":null},"status":"COMPLETED","action":"NONE"}],"nextCursor":null,"hasNext":false}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
