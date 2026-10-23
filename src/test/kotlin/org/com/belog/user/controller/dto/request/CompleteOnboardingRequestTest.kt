@@ -52,6 +52,13 @@ class CompleteOnboardingRequestTest {
     }
 
     @Test
+    fun `성 앞뒤 공백을 제거한 길이가 최대 길이 이하면 검증에 성공한다`() {
+        val request = validRequest().copy(lastName = " ${"가".repeat(User.LAST_NAME_MAX_LENGTH)} ")
+
+        assertTrue(validator.validate(request).none { violation -> violation.propertyPath.toString() == "lastName" })
+    }
+
+    @Test
     fun `이름이 공백뿐이면 검증에 실패한다`() {
         val request = validRequest().copy(firstName = " ")
 
