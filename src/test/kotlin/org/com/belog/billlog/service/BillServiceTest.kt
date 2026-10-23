@@ -2,6 +2,7 @@ package org.com.belog.billlog.service
 
 import jakarta.persistence.EntityManager
 import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillItemRepository
@@ -46,6 +47,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.math.BigDecimal
 import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
@@ -130,14 +132,14 @@ class BillServiceTest {
         val bill = billRepository.findAll().single()
         assertEquals(bill.id, result.billId)
         assertEquals("아랑이 카페", bill.title)
-        assertEquals(11_000L, bill.totalAmount)
+        assertEquals(BigDecimal.valueOf(11_000L), bill.totalAmount)
         assertEquals(BillSplitType.EQUAL_SPLIT, bill.splitType)
         assertEquals(context.creator.id, bill.createdBy.id)
         assertEquals(context.payerParticipant.id, bill.payer.id)
 
         val items = billItemRepository.findAll().sortedBy { item -> item.itemOrder }
         assertEquals(listOf("아메리카노", "프라푸치노"), items.map { item -> item.name })
-        assertEquals(listOf(4_000L, 7_000L), items.map { item -> item.amount })
+        assertEquals(amounts(4_000L, 7_000L), items.map { item -> item.amount })
         assertEquals(listOf(0, 1), items.map { item -> item.itemOrder })
 
         val shares = billShareRepository.findAll().sortedBy { share -> share.allocationOrder }
@@ -145,12 +147,12 @@ class BillServiceTest {
             listOf(context.payerParticipant.id, context.memberParticipant.id),
             shares.map { share -> share.participant.id },
         )
-        assertEquals(listOf(4_000L, 7_000L), shares.map { share -> share.amount })
+        assertEquals(amounts(4_000L, 7_000L), shares.map { share -> share.amount })
         assertEquals(listOf(0, 1), shares.map { share -> share.allocationOrder })
 
         val settlementRequest = settlementRequestRepository.findAll().single()
         assertEquals(context.memberParticipant.id, settlementRequest.participant.id)
-        assertEquals(7_000L, settlementRequest.amount)
+        assertEquals(BigDecimal.valueOf(7_000L), settlementRequest.amount)
         assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
     }
 
@@ -172,14 +174,14 @@ class BillServiceTest {
         assertEquals("작성자", result.payerNickname)
         assertEquals(BillSplitType.EQUAL_SPLIT, result.settlementMethod)
         assertEquals(listOf("아메리카노", "프라푸치노"), result.items.map { item -> item.name })
-        assertEquals(listOf(4_000L, 7_000L), result.items.map { item -> item.amount })
-        assertEquals(11_000L, result.totalAmount)
+        assertEquals(amounts(4_000L, 7_000L), result.items.map { item -> item.amount })
+        assertEquals(BigDecimal.valueOf(11_000L), result.totalAmount)
         assertEquals(
             listOf(context.payerParticipant.id, context.memberParticipant.id),
             result.shares.map { share -> share.meetingParticipantId },
         )
         assertEquals(listOf("작성자", "참여자"), result.shares.map { share -> share.nickname })
-        assertEquals(listOf(4_000L, 7_000L), result.shares.map { share -> share.amount })
+        assertEquals(amounts(4_000L, 7_000L), result.shares.map { share -> share.amount })
         assertEquals(listOf(null, null), result.shares.map { share -> share.profileImageUrl })
     }
 
@@ -225,14 +227,14 @@ class BillServiceTest {
         val command =
             createCommand(
                 context = context,
-                items = listOf(BillItemCommand("식사", 12_000L)),
+                items = listOf(BillItemCommand("식사", BigDecimal.valueOf(12_000L))),
                 shares =
                     listOf(
-                        BillShareCommand(requireNotNull(context.creator.id), 4_000L),
-                        BillShareCommand(requireNotNull(context.member.id), 3_000L),
-                        BillShareCommand(requireNotNull(thirdMember.id), 5_000L),
+                        BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                        BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(3_000L)),
+                        BillShareCommand(requireNotNull(thirdMember.id), BigDecimal.valueOf(5_000L)),
                     ),
-                totalAmount = 12_000L,
+                totalAmount = BigDecimal.valueOf(12_000L),
             )
 
         billService.registerBill(command)
@@ -293,12 +295,61 @@ class BillServiceTest {
     }
 
     @Test
+    fun `달러로 등록한 결제 내역은 화폐 단위와 소수 금액을 유지한다`() {
+        val context = saveMeetingContext()
+        val registeredBill =
+            billService.registerBill(
+                createCommand(
+                    context = context,
+                    currency = BillCurrency.USD,
+                    totalAmount = BigDecimal("12.50"),
+                    items = listOf(BillItemCommand("아메리카노", BigDecimal("4.5")), BillItemCommand("베이글", BigDecimal("8"))),
+                    shares =
+                        listOf(
+                            BillShareCommand(requireNotNull(context.creator.id), BigDecimal("6.25")),
+                            BillShareCommand(requireNotNull(context.member.id), BigDecimal("6.25")),
+                        ),
+                ),
+            )
+        entityManager.clear()
+
+        val result =
+            billService.getBillDetail(
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(BillCurrency.USD, result.currency)
+        assertEquals(BigDecimal("12.50"), result.totalAmount)
+        assertEquals(listOf(BigDecimal("4.50"), BigDecimal("8.00")), result.items.map { item -> item.amount })
+        assertEquals(listOf(BigDecimal("6.25"), BigDecimal("6.25")), result.shares.map { share -> share.amount })
+    }
+
+    @Test
+    fun `화폐 단위가 허용하지 않는 소수 금액은 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val command =
+            createCommand(
+                context = context,
+                currency = BillCurrency.KRW,
+                totalAmount = BigDecimal("11000.5"),
+                items = listOf(BillItemCommand("아메리카노", BigDecimal("11000.5"))),
+                shares = listOf(BillShareCommand(requireNotNull(context.creator.id), BigDecimal("11000.5"))),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.INVALID_CURRENCY_AMOUNT, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
     fun `결제 항목 합계가 결제 총액과 다르면 등록할 수 없다`() {
         val context = saveMeetingContext()
         val command =
             createCommand(
                 context = context,
-                items = listOf(BillItemCommand("아메리카노", 10_000L)),
+                items = listOf(BillItemCommand("아메리카노", BigDecimal.valueOf(10_000L))),
             )
 
         val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
@@ -315,8 +366,8 @@ class BillServiceTest {
                 context = context,
                 shares =
                     listOf(
-                        BillShareCommand(requireNotNull(context.creator.id), 4_000L),
-                        BillShareCommand(requireNotNull(context.member.id), 6_000L),
+                        BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                        BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(6_000L)),
                     ),
             )
 
@@ -346,7 +397,7 @@ class BillServiceTest {
             createCommand(
                 context = context,
                 payerMemberId = requireNotNull(nonParticipant.id),
-                shares = listOf(BillShareCommand(requireNotNull(context.member.id), 11_000L)),
+                shares = listOf(BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(11_000L))),
             )
 
         val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
@@ -362,7 +413,7 @@ class BillServiceTest {
         val command =
             createCommand(
                 context = context,
-                shares = listOf(BillShareCommand(requireNotNull(nonParticipant.id), 11_000L)),
+                shares = listOf(BillShareCommand(requireNotNull(nonParticipant.id), BigDecimal.valueOf(11_000L))),
             )
 
         val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
@@ -394,16 +445,17 @@ class BillServiceTest {
     private fun createCommand(
         context: MeetingContext,
         payerMemberId: Long = requireNotNull(context.creator.id),
-        totalAmount: Long = 11_000L,
+        currency: BillCurrency = BillCurrency.KRW,
+        totalAmount: BigDecimal = BigDecimal.valueOf(11_000L),
         items: List<BillItemCommand> =
             listOf(
-                BillItemCommand("아메리카노", 4_000L),
-                BillItemCommand("프라푸치노", 7_000L),
+                BillItemCommand("아메리카노", BigDecimal.valueOf(4_000L)),
+                BillItemCommand("프라푸치노", BigDecimal.valueOf(7_000L)),
             ),
         shares: List<BillShareCommand> =
             listOf(
-                BillShareCommand(requireNotNull(context.creator.id), 4_000L),
-                BillShareCommand(requireNotNull(context.member.id), 7_000L),
+                BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(7_000L)),
             ),
     ): RegisterBillCommand =
         RegisterBillCommand(
@@ -411,11 +463,14 @@ class BillServiceTest {
             creatorUserId = requireNotNull(context.creator.user.id),
             title = "아랑이 카페",
             payerMemberId = payerMemberId,
+            currency = currency,
             totalAmount = totalAmount,
             splitType = BillSplitType.EQUAL_SPLIT,
             items = items,
             shares = shares,
         )
+
+    private fun amounts(vararg values: Long): List<BigDecimal> = values.map(BigDecimal::valueOf)
 
     private fun requestedNotificationCommands(type: NotificationType): Set<CreateNotificationCommand> =
         mockingDetails(notificationService)

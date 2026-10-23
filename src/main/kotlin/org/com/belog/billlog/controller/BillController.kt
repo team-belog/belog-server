@@ -106,6 +106,7 @@ class BillController(
             creatorUserId = creatorUserId,
             title = title,
             payerMemberId = payerMemberId,
+            currency = currency,
             totalAmount = totalAmount,
             splitType = splitType,
             items = items.map { item -> BillItemCommand(name = item.name, amount = item.amount) },

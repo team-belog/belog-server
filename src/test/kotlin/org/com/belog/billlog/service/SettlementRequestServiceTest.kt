@@ -3,6 +3,7 @@ package org.com.belog.billlog.service
 import jakarta.persistence.EntityManager
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequest
@@ -47,6 +48,7 @@ import org.springframework.context.annotation.Primary
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.math.BigDecimal
 import java.sql.Timestamp
 import java.time.Clock
 import java.time.Instant
@@ -342,7 +344,8 @@ class SettlementRequestServiceTest {
                     creator = payerMember,
                     payer = payerParticipant,
                     title = "저녁 식사",
-                    totalAmount = 10_000L,
+                    currency = BillCurrency.KRW,
+                    totalAmount = BigDecimal.valueOf(10_000L),
                     splitType = BillSplitType.EQUAL_SPLIT,
                 ),
             )
@@ -351,7 +354,7 @@ class SettlementRequestServiceTest {
                 BillShare.create(
                     bill = bill,
                     participant = settlementTargetParticipant,
-                    amount = 10_000L,
+                    amount = BigDecimal.valueOf(10_000L),
                     allocationOrder = 0,
                 ),
             )

@@ -170,6 +170,8 @@ interface BillSwagger {
         summary = "결제 내역 및 정산 요청 등록",
         description =
             "해당 만남이 속한 그룹의 멤버가 결제 내역을 등록합니다. " +
+                "화폐 단위는 KRW, USD, JPY, EUR 중 하나이며 생략하면 KRW로 등록합니다. " +
+                "KRW와 JPY는 정수, USD와 EUR는 소수점 둘째 자리까지 입력할 수 있습니다. " +
                 "항목 합계와 개인별 부담 금액 합계는 결제 총액과 일치해야 하며, " +
                 "결제자를 제외한 부담자에게 PENDING 정산 요청을 생성합니다.",
     )
@@ -197,6 +199,7 @@ interface BillSwagger {
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "항목 합계 불일치", value = ITEM_TOTAL_MISMATCH_EXAMPLE),
                             ExampleObject(name = "개인별 부담 금액 합계 불일치", value = SHARE_TOTAL_MISMATCH_EXAMPLE),
+                            ExampleObject(name = "화폐 단위 소수점 자릿수 불일치", value = INVALID_CURRENCY_AMOUNT_EXAMPLE),
                             ExampleObject(name = "결제자 참여 권한 없음", value = INVALID_PAYER_EXAMPLE),
                         ],
                     ),
@@ -251,19 +254,22 @@ interface BillSwagger {
 }
 
 private const val REGISTER_BILL_REQUEST_EXAMPLE =
-    """{"title":"아랑이 카페","payerMemberId":10,"totalAmount":11000,"splitType":"EQUAL_SPLIT","items":[{"name":"아메리카노","amount":4000},{"name":"프라푸치노","amount":7000}],"shares":[{"participantMemberId":10,"amount":5500},{"participantMemberId":11,"amount":5500}]}"""
+    """{"title":"아랑이 카페","payerMemberId":10,"currency":"USD","totalAmount":12.50,"splitType":"EQUAL_SPLIT","items":[{"name":"아메리카노","amount":4.50},{"name":"프라푸치노","amount":8.00}],"shares":[{"participantMemberId":10,"amount":6.25},{"participantMemberId":11,"amount":6.25}]}"""
 
 private const val REGISTER_BILL_SUCCESS_EXAMPLE =
     """{"code":"BILL_LOG-S001","message":"결제 내역과 정산 요청이 등록되었습니다.","data":{"billId":1}}"""
 
 private const val GET_BILL_DETAIL_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S002","message":"결제 내역 상세를 조회했습니다.","data":{"billId":45,"dayNumber":1,"paymentDate":"2026-08-06","title":"아랑이 카페","payerNickname":"정바미","settlementMethod":"EQUAL_SPLIT","items":[{"name":"아메리카노","amount":4000}],"totalAmount":11000,"shares":[{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","amount":4000,"payer":true},{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":null,"amount":7000,"payer":false}]}}"""
+    """{"code":"BILL_LOG-S002","message":"결제 내역 상세를 조회했습니다.","data":{"billId":45,"dayNumber":1,"paymentDate":"2026-08-06","title":"아랑이 카페","payerNickname":"정바미","settlementMethod":"EQUAL_SPLIT","currency":"KRW","items":[{"name":"아메리카노","amount":4000}],"totalAmount":11000,"shares":[{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","amount":4000,"payer":true},{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":null,"amount":7000,"payer":false}]}}"""
 
 private const val GET_BILLS_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S005","message":"결제 내역을 조회했습니다.","data":{"days":[{"dayNumber":1,"paymentDate":"2026-08-06","dailyTotalAmount":15000,"bills":[{"billId":45,"title":"아랑이 카페","payerNickname":"정바미","totalAmount":7500},{"billId":44,"title":"점심 식사","payerNickname":"바비","totalAmount":7500}]}],"nextCursorDate":"2026-08-06","hasNext":true}}"""
+    """{"code":"BILL_LOG-S005","message":"결제 내역을 조회했습니다.","data":{"days":[{"dayNumber":1,"paymentDate":"2026-08-06","dailyTotalAmounts":[{"currency":"KRW","amount":7500},{"currency":"USD","amount":12.50}],"bills":[{"billId":45,"title":"아랑이 카페","payerNickname":"정바미","currency":"KRW","totalAmount":7500},{"billId":44,"title":"점심 식사","payerNickname":"바비","currency":"USD","totalAmount":12.50}]}],"nextCursorDate":"2026-08-06","hasNext":true}}"""
 
 private const val ITEM_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E005","message":"결제 항목 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
+
+private const val INVALID_CURRENCY_AMOUNT_EXAMPLE =
+    """{"code":"BILL_LOG-E028","message":"결제 금액의 소수점 자릿수가 화폐 단위와 맞지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
 
 private const val SHARE_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E006","message":"개인별 부담 금액 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""

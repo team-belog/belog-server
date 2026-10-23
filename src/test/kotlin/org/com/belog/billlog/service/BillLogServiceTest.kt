@@ -3,8 +3,10 @@ package org.com.belog.billlog.service
 import jakarta.persistence.EntityManager
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
+import org.com.belog.billlog.domain.CurrencyAmount
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillRepository
@@ -41,6 +43,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.math.BigDecimal
 import java.sql.Timestamp
 import java.time.Instant
 import java.time.LocalDate
@@ -126,9 +129,34 @@ class BillLogServiceTest {
                 userId = requireNotNull(context.firstMember.user.id),
             )
 
-        assertEquals(30_000L, result.totalSpentAmount)
+        assertEquals(listOf(krw(30_000L)), result.totalSpentAmounts)
         assertEquals(2L, result.completedParticipantCount)
         assertEquals(1L, result.pendingParticipantCount)
+    }
+
+    @Test
+    fun `총 지출 금액을 화폐 단위별로 합산한다`() {
+        val context = saveMeetingContext()
+        saveBill(context, context.firstParticipant, "원화 결제", BillCurrency.KRW, BigDecimal("10000"))
+        saveBill(context, context.firstParticipant, "엔화 결제", BillCurrency.JPY, BigDecimal("1500"))
+        saveBill(context, context.firstParticipant, "첫 달러 결제", BillCurrency.USD, BigDecimal("12.50"))
+        saveBill(context, context.firstParticipant, "둘째 달러 결제", BillCurrency.USD, BigDecimal("7.25"))
+        entityManager.clear()
+
+        val result =
+            billLogService.getSummary(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.firstMember.user.id),
+            )
+
+        assertEquals(
+            listOf(
+                CurrencyAmount(BillCurrency.KRW, BigDecimal("10000")),
+                CurrencyAmount(BillCurrency.USD, BigDecimal("19.75")),
+                CurrencyAmount(BillCurrency.JPY, BigDecimal("1500")),
+            ),
+            result.totalSpentAmounts,
+        )
     }
 
     @Test
@@ -273,7 +301,10 @@ class BillLogServiceTest {
             result.days.map { day -> day.paymentDate },
         )
         assertEquals(listOf(3, 2, -1), result.days.map { day -> day.dayNumber })
-        assertEquals(listOf(15_000L, 11_000L, 5_000L), result.days.map { day -> day.dailyTotalAmount })
+        assertEquals(
+            listOf(listOf(krw(15_000L)), listOf(krw(11_000L)), listOf(krw(5_000L))),
+            result.days.map { day -> day.dailyTotalAmounts },
+        )
         assertEquals(
             listOf("저녁", "카페"),
             result.days
@@ -377,6 +408,14 @@ class BillLogServiceTest {
         payer: MeetingParticipant,
         title: String,
         totalAmount: Long,
+    ): Bill = saveBill(context, payer, title, BillCurrency.KRW, BigDecimal.valueOf(totalAmount))
+
+    private fun saveBill(
+        context: MeetingContext,
+        payer: MeetingParticipant,
+        title: String,
+        currency: BillCurrency,
+        totalAmount: BigDecimal,
     ): Bill =
         billRepository.saveAndFlush(
             Bill.create(
@@ -384,10 +423,13 @@ class BillLogServiceTest {
                 creator = context.firstMember,
                 payer = payer,
                 title = title,
+                currency = currency,
                 totalAmount = totalAmount,
                 splitType = BillSplitType.EQUAL_SPLIT,
             ),
         )
+
+    private fun krw(amount: Long): CurrencyAmount = CurrencyAmount(BillCurrency.KRW, BigDecimal.valueOf(amount))
 
     private fun saveSettlementRequest(
         bill: Bill,
@@ -401,7 +443,7 @@ class BillLogServiceTest {
                 BillShare.create(
                     bill = bill,
                     participant = participant,
-                    amount = amount,
+                    amount = BigDecimal.valueOf(amount),
                     allocationOrder = allocationOrder,
                 ),
             )

@@ -1,5 +1,6 @@
 package org.com.belog.postlog.service.result
 
+import org.com.belog.billlog.domain.CurrencyAmount
 import java.time.LocalDate
 
 data class PostLogSummaryResult(
@@ -10,7 +11,7 @@ data class PostLogSummaryResult(
     val endDate: LocalDate?,
     val location: String?,
     val memory: String?,
-    val totalAmount: Long,
+    val totalAmounts: List<CurrencyAmount>,
     val completedParticipantCount: Long,
     val participants: List<PostLogParticipantResult>,
     val ticketCreated: Boolean,

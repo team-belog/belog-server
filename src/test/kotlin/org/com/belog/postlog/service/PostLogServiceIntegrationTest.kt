@@ -1,8 +1,10 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
+import org.com.belog.billlog.domain.CurrencyAmount
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
@@ -56,6 +58,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.math.BigDecimal
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -619,7 +622,8 @@ class PostLogServiceIntegrationTest {
                     creator = context.creator,
                     payer = creatorParticipant,
                     title = "여행 경비",
-                    totalAmount = 30_000L,
+                    currency = BillCurrency.KRW,
+                    totalAmount = BigDecimal.valueOf(30_000L),
                     splitType = BillSplitType.EQUAL_SPLIT,
                 ),
             )
@@ -632,13 +636,13 @@ class PostLogServiceIntegrationTest {
         assertNull(draftMemberResult.ticketId)
         assertEquals("조회자의 초안", draftMemberResult.memory)
         assertFalse(draftMemberResult.ticketCreated)
-        assertEquals(30_000L, draftMemberResult.totalAmount)
+        assertEquals(listOf(CurrencyAmount(BillCurrency.KRW, BigDecimal.valueOf(30_000L))), draftMemberResult.totalAmounts)
         assertEquals(1L, draftMemberResult.completedParticipantCount)
         assertEquals(3, draftMemberResult.participants.size)
         assertNull(observerResult.ticketId)
         assertNull(observerResult.memory)
         assertFalse(observerResult.ticketCreated)
-        assertEquals(30_000L, observerResult.totalAmount)
+        assertEquals(listOf(CurrencyAmount(BillCurrency.KRW, BigDecimal.valueOf(30_000L))), observerResult.totalAmounts)
     }
 
     @Test
@@ -680,7 +684,7 @@ class PostLogServiceIntegrationTest {
                 BillShare.create(
                     bill = bill,
                     participant = participant,
-                    amount = amount,
+                    amount = BigDecimal.valueOf(amount),
                     allocationOrder = allocationOrder,
                 ),
             )

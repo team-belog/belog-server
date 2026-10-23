@@ -16,6 +16,7 @@ import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
 import org.com.belog.meeting.domain.MeetingParticipant
+import java.math.BigDecimal
 import java.time.Duration
 import java.time.Instant
 
@@ -56,8 +57,8 @@ class SettlementRequest protected constructor(
         foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_participant_id"),
     )
     val participant: MeetingParticipant,
-    @Column(nullable = false)
-    val amount: Long,
+    @Column(nullable = false, precision = BillAmount.PRECISION, scale = BillAmount.SCALE)
+    val amount: BigDecimal,
     status: SettlementRequestStatus,
 ) : BaseEntity() {
     @Id

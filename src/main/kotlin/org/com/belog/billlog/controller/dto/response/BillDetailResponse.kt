@@ -2,10 +2,12 @@ package org.com.belog.billlog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.ArraySchema
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.service.result.BillDetailResult
 import org.com.belog.billlog.service.result.BillItemResult
 import org.com.belog.billlog.service.result.BillShareResult
+import java.math.BigDecimal
 import java.time.LocalDate
 
 @Schema(description = "결제 내역 상세 조회 결과")
@@ -29,13 +31,15 @@ data class BillDetailResponse(
         allowableValues = ["EQUAL_SPLIT", "ITEM_TAG", "MANUAL"],
     )
     val settlementMethod: BillSplitType,
+    @field:Schema(description = "결제 화폐 단위", example = "KRW", allowableValues = ["KRW", "USD", "JPY", "EUR"])
+    val currency: BillCurrency,
     @field:ArraySchema(
         arraySchema = Schema(description = "결제 항목 목록"),
         schema = Schema(implementation = BillItemResponse::class),
     )
     val items: List<BillItemResponse>,
     @field:Schema(description = "총 결제 금액", example = "11000")
-    val totalAmount: Long,
+    val totalAmount: BigDecimal,
     @field:ArraySchema(
         arraySchema = Schema(description = "개인별 부담 금액 목록"),
         schema = Schema(implementation = BillShareResponse::class),
@@ -51,6 +55,7 @@ data class BillDetailResponse(
                 title = result.title,
                 payerNickname = result.payerNickname,
                 settlementMethod = result.settlementMethod,
+                currency = result.currency,
                 items = result.items.map(BillItemResponse::from),
                 totalAmount = result.totalAmount,
                 shares = result.shares.map(BillShareResponse::from),
@@ -63,7 +68,7 @@ data class BillItemResponse(
     @field:Schema(description = "결제 항목명", example = "아메리카노")
     val name: String,
     @field:Schema(description = "결제 항목 금액", example = "4000")
-    val amount: Long,
+    val amount: BigDecimal,
 ) {
     companion object {
         fun from(result: BillItemResult): BillItemResponse =
@@ -87,7 +92,7 @@ data class BillShareResponse(
     )
     val profileImageUrl: String?,
     @field:Schema(description = "참여자 부담 금액", example = "4000")
-    val amount: Long,
+    val amount: BigDecimal,
     @field:Schema(description = "결제자 여부", example = "true")
     val payer: Boolean,
 ) {

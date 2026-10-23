@@ -12,8 +12,10 @@ import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import java.math.BigDecimal
+import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ReceiptAnalysisServiceTest {
@@ -45,10 +47,23 @@ class ReceiptAnalysisServiceTest {
     }
 
     @Test
-    fun `항목 합계가 Long 범위를 초과해도 오버플로 없이 비교한다`() {
-        val result = analyze(listOf(Long.MAX_VALUE, Long.MAX_VALUE), Long.MAX_VALUE)
+    fun `저장할 수 없는 큰 금액은 비우고 확인이 필요하다`() {
+        val result = analyze(listOf(Long.MAX_VALUE), Long.MAX_VALUE)
 
+        assertEquals(listOf(null), result.items.map { item -> item.amount })
+        assertNull(result.totalAmount)
         assertTrue(result.requiresConfirmation)
+    }
+
+    @Test
+    fun `소수 금액을 그대로 반환하고 합계를 비교한다`() {
+        givenExtraction(listOf(BigDecimal("4.5"), BigDecimal("8.00")), BigDecimal("12.50"))
+
+        val result = service.analyze(7L, 15L, objectKey)
+
+        assertEquals(listOf(BigDecimal("4.5"), BigDecimal("8")), result.items.map { item -> item.amount })
+        assertEquals(BigDecimal("12.5"), result.totalAmount)
+        assertFalse(result.requiresConfirmation)
     }
 
     @Test
@@ -64,20 +79,20 @@ class ReceiptAnalysisServiceTest {
         amounts: List<Long?>,
         totalAmount: Long,
     ): org.com.belog.billlog.service.result.ReceiptAnalysisResult {
-        givenExtraction(amounts, totalAmount)
+        givenExtraction(amounts.map { amount -> amount?.let(BigDecimal::valueOf) }, BigDecimal.valueOf(totalAmount))
         return service.analyze(7L, 15L, objectKey)
     }
 
     private fun givenExtraction(
-        amounts: List<Long?>,
-        totalAmount: Long,
+        amounts: List<BigDecimal?>,
+        totalAmount: BigDecimal,
     ) {
         val source = ReceiptImageSource(ReceiptImageObjectKey.create(7L, 15L, objectKey), readUrl)
         `when`(imageService.prepareAnalysisSource(7L, 15L, objectKey)).thenReturn(source)
         `when`(extractionClient.extract(readUrl)).thenReturn(
             ReceiptExtraction(
-                items = amounts.map { amount -> ReceiptExtractionItem(amount = amount?.let(BigDecimal::valueOf)) },
-                totalAmount = BigDecimal.valueOf(totalAmount),
+                items = amounts.map { amount -> ReceiptExtractionItem(amount = amount) },
+                totalAmount = totalAmount,
             ),
         )
     }

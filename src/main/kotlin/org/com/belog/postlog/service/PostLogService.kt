@@ -1,5 +1,6 @@
 package org.com.belog.postlog.service
 
+import org.com.belog.billlog.domain.CurrencyAmount
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
@@ -169,7 +170,12 @@ class PostLogService(
             endDate = meeting.endDate,
             location = meeting.location,
             memory = ticket?.memory ?: draftMemory,
-            totalAmount = billRepository.sumTotalAmountByMeetingId(meetingId),
+            totalAmounts =
+                CurrencyAmount.sumByCurrency(
+                    billRepository
+                        .sumTotalAmountsByMeetingIdGroupByCurrency(meetingId)
+                        .map { total -> CurrencyAmount(total.currency, total.totalAmount) },
+                ),
             completedParticipantCount =
                 settlementRequestRepository.countCompletedParticipantsByMeetingId(
                     meetingId = meetingId,

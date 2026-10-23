@@ -3,6 +3,7 @@ package org.com.belog.user.service
 import org.com.belog.auth.repository.RefreshTokenRepository
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequest
@@ -38,6 +39,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -243,13 +245,14 @@ class UserWithdrawalServiceTest {
                     creator = payerMember,
                     payer = payerParticipant,
                     title = "저녁 식사",
-                    totalAmount = 10_000L,
+                    currency = BillCurrency.KRW,
+                    totalAmount = BigDecimal.valueOf(10_000L),
                     splitType = BillSplitType.EQUAL_SPLIT,
                 ),
             )
         val share =
             billShareRepository.saveAndFlush(
-                BillShare.create(bill = bill, participant = senderParticipant, amount = 10_000L, allocationOrder = 0),
+                BillShare.create(bill = bill, participant = senderParticipant, amount = BigDecimal.valueOf(10_000L), allocationOrder = 0),
             )
 
         return BillContext(

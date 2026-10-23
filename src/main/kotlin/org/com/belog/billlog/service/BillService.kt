@@ -2,6 +2,7 @@ package org.com.belog.billlog.service
 
 import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillAmount
 import org.com.belog.billlog.domain.BillItem
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.SettlementRequest
@@ -30,6 +31,7 @@ import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
 
 @Service
 class BillService(
@@ -99,14 +101,15 @@ class BillService(
             title = bill.title,
             payerNickname = payerNickname,
             settlementMethod = bill.splitType,
+            currency = bill.currency,
             items =
                 items.map { item ->
                     BillItemResult(
                         name = item.name,
-                        amount = item.amount,
+                        amount = bill.currency.normalize(item.amount),
                     )
                 },
-            totalAmount = bill.totalAmount,
+            totalAmount = bill.currency.normalize(bill.totalAmount),
             shares =
                 shares.map { share ->
                     val participant = share.participant
@@ -118,7 +121,7 @@ class BillService(
                         meetingParticipantId = participantId,
                         nickname = userService.resolveDisplayNickname(participantUser),
                         profileImageUrl = userService.resolveProfileImageUrl(participantUser),
-                        amount = share.amount,
+                        amount = bill.currency.normalize(share.amount),
                         payer = participantId == payerParticipantId,
                     )
                 },
@@ -132,12 +135,15 @@ class BillService(
         if (command.shares.isEmpty()) {
             throw BusinessException(BillLogErrorCode.EMPTY_BILL_SHARE)
         }
-        if (
-            command.totalAmount <= 0 ||
-            command.items.any { item -> item.amount <= 0 } ||
-            command.shares.any { share -> share.amount <= 0 }
-        ) {
+        val amounts = listOf(command.totalAmount) + command.items.map { item -> item.amount } + command.shares.map { share -> share.amount }
+        if (amounts.any { amount -> amount.signum() <= 0 }) {
             throw BusinessException(BillLogErrorCode.INVALID_AMOUNT)
+        }
+        if (amounts.any { amount -> !command.currency.supports(amount) }) {
+            throw BusinessException(BillLogErrorCode.INVALID_CURRENCY_AMOUNT)
+        }
+        if (!BillAmount.isStorable(command.totalAmount)) {
+            throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
         }
 
         val shareMemberIds = command.shares.map { share -> share.participantMemberId }
@@ -146,22 +152,17 @@ class BillService(
         }
 
         val itemTotal = sumAmounts(command.items.map { item -> item.amount })
-        if (itemTotal != command.totalAmount) {
+        if (itemTotal.compareTo(command.totalAmount) != 0) {
             throw BusinessException(BillLogErrorCode.ITEM_TOTAL_MISMATCH)
         }
 
         val shareTotal = sumAmounts(command.shares.map { share -> share.amount })
-        if (shareTotal != command.totalAmount) {
+        if (shareTotal.compareTo(command.totalAmount) != 0) {
             throw BusinessException(BillLogErrorCode.SHARE_TOTAL_MISMATCH)
         }
     }
 
-    private fun sumAmounts(amounts: List<Long>): Long =
-        try {
-            amounts.fold(0L) { total, amount -> Math.addExact(total, amount) }
-        } catch (_: ArithmeticException) {
-            throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
-        }
+    private fun sumAmounts(amounts: List<BigDecimal>): BigDecimal = amounts.fold(BigDecimal.ZERO, BigDecimal::add)
 
     private fun findMeetingForUpdate(meetingId: Long): Meeting =
         meetingRepository.findByIdWithGroupForUpdate(meetingId)
@@ -205,6 +206,7 @@ class BillService(
                     creator = creator,
                     payer = payer,
                     title = command.title,
+                    currency = command.currency,
                     totalAmount = command.totalAmount,
                     splitType = command.splitType,
                 ),

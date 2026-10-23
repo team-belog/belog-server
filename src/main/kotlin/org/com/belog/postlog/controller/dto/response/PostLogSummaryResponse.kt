@@ -1,6 +1,7 @@
 package org.com.belog.postlog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.billlog.controller.dto.response.CurrencyAmountResponse
 import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
 import java.time.LocalDate
@@ -43,7 +44,7 @@ data class PostLogSummaryResponse(
                 settlement =
                     PostLogSettlementSummaryResponse(
                         completedParticipantCount = result.completedParticipantCount,
-                        totalAmount = result.totalAmount,
+                        totalAmounts = result.totalAmounts.map(CurrencyAmountResponse::from),
                     ),
                 participantCount = result.participants.size,
                 participants = result.participants.map(PostLogParticipantResponse::from),
@@ -56,8 +57,8 @@ data class PostLogSummaryResponse(
 data class PostLogSettlementSummaryResponse(
     @field:Schema(description = "모든 정산 요청을 완료한 참여자 수", example = "1")
     val completedParticipantCount: Long,
-    @field:Schema(description = "전체 결제 금액", example = "11000")
-    val totalAmount: Long,
+    @field:Schema(description = "화폐 단위별 전체 결제 금액. 결제 내역이 없으면 빈 목록. 화폐 단위 순서는 KRW, USD, JPY, EUR")
+    val totalAmounts: List<CurrencyAmountResponse>,
 )
 
 @Schema(description = "Post-log 참여 멤버")
