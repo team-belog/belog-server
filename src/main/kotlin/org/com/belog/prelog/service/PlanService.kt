@@ -1,7 +1,6 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
@@ -29,8 +28,6 @@ import org.com.belog.user.service.UserService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import java.time.Clock
-import java.time.LocalDate
 
 @Service
 class PlanService(
@@ -41,7 +38,6 @@ class PlanService(
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val notificationService: NotificationService,
     private val userService: UserService,
-    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun getPlanDetail(
@@ -177,7 +173,7 @@ class PlanService(
     ) {
         val meeting = findMeeting(meetingId)
         findGroupMember(meeting, userId)
-        validateMeetingNotEnded(meeting, clock.currentBusinessDate())
+        validateMeetingNotEnded(meeting)
     }
 
     @Transactional
@@ -191,8 +187,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = clock.currentBusinessDate()
-        validateMeetingNotEnded(meeting, currentDate)
+        validateMeetingNotEnded(meeting)
 
         return savePlan {
             Plan
@@ -202,7 +197,6 @@ class PlanService(
                     category = category,
                     title = title,
                     url = url,
-                    currentDate = currentDate,
                 ).apply { applyLocationResolution(locationResolution) }
         }.also { plan -> notifyPlanCreated(meetingId, plan, creator) }
     }
@@ -217,8 +211,7 @@ class PlanService(
     ): Plan {
         val meeting = findMeeting(meetingId)
         val creator = findGroupMember(meeting, creatorUserId)
-        val currentDate = clock.currentBusinessDate()
-        validateMeetingNotEnded(meeting, currentDate)
+        validateMeetingNotEnded(meeting)
 
         return savePlan {
             Plan.createMemo(
@@ -227,7 +220,6 @@ class PlanService(
                 category = category,
                 title = title,
                 content = content,
-                currentDate = currentDate,
             )
         }.also { plan -> notifyPlanCreated(meetingId, plan, creator) }
     }
@@ -319,11 +311,8 @@ class PlanService(
         planRepository.findByIdWithMeetingAndCreator(planId)
             ?: throw BusinessException(PreLogErrorCode.PLAN_NOT_FOUND)
 
-    private fun validateMeetingNotEnded(
-        meeting: Meeting,
-        currentDate: LocalDate,
-    ) {
-        if (meeting.isEnded(currentDate)) {
+    private fun validateMeetingNotEnded(meeting: Meeting) {
+        if (meeting.isEnded()) {
             throw BusinessException(PreLogErrorCode.MEETING_ALREADY_ENDED)
         }
     }

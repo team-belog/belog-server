@@ -29,7 +29,6 @@ class PlanTest {
                 category = PlanCategory.RESTAURANT,
                 title = "  광주 맛집  ",
                 url = "  https://example.com/place  ",
-                currentDate = CURRENT_DATE,
             )
 
         assertSame(context.meeting, plan.meeting)
@@ -51,7 +50,6 @@ class PlanTest {
                 category = PlanCategory.RESTAURANT,
                 title = "맛집",
                 url = "https://example.com/place",
-                currentDate = CURRENT_DATE,
             )
 
         assertFailsWith<IllegalArgumentException> {
@@ -76,7 +74,6 @@ class PlanTest {
                 category = PlanCategory.ACTIVITY,
                 title = "  일정 메모  ",
                 content = "  여유롭게 출발하기  ",
-                currentDate = CURRENT_DATE,
             )
 
         assertEquals(PlanType.MEMO, plan.type)
@@ -97,7 +94,6 @@ class PlanTest {
                 category = PlanCategory.CAFE,
                 title = "카페",
                 url = "https://example.com/cafe",
-                currentDate = CURRENT_DATE,
             )
         assertSame(nonParticipant, plan.createdBy)
 
@@ -111,19 +107,14 @@ class PlanTest {
                 category = PlanCategory.CAFE,
                 title = "카페",
                 url = "https://example.com/cafe",
-                currentDate = CURRENT_DATE,
             )
         }
     }
 
     @Test
     fun `종료된 만남에는 계획을 생성할 수 없다`() {
-        val context =
-            createMeetingContext(
-                startDate = CURRENT_DATE.minusDays(2),
-                endDate = CURRENT_DATE.minusDays(1),
-                meetingCreationDate = CURRENT_DATE.minusDays(2),
-            )
+        val context = createMeetingContext()
+        context.meeting.end(endedAt = Instant.parse("2026-09-22T03:00:00Z"), currentDate = CURRENT_DATE)
 
         assertFailsWith<IllegalArgumentException> {
             Plan.createMemo(
@@ -132,7 +123,6 @@ class PlanTest {
                 category = PlanCategory.OTHER,
                 title = "메모",
                 content = "종료된 만남 메모",
-                currentDate = CURRENT_DATE,
             )
         }
     }
@@ -157,7 +147,6 @@ class PlanTest {
                     category = PlanCategory.RESTAURANT,
                     title = "맛집",
                     url = url,
-                    currentDate = CURRENT_DATE,
                 )
             }
         }
@@ -175,7 +164,6 @@ class PlanTest {
                     category = PlanCategory.OTHER,
                     title = title,
                     content = "내용",
-                    currentDate = CURRENT_DATE,
                 )
             }
         }
@@ -193,7 +181,6 @@ class PlanTest {
                     category = PlanCategory.OTHER,
                     title = "메모",
                     content = content,
-                    currentDate = CURRENT_DATE,
                 )
             }
         }

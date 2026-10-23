@@ -360,7 +360,7 @@ interface MeetingSwagger {
     @Operation(
         summary = "만남 상세 조회",
         description =
-            "만남 기본 정보와 로그인 사용자의 수정 권한, " +
+            "만남 기본 정보와 종료 여부, 로그인 사용자의 수정 및 종료 권한, " +
                 "Pre-log, Bill-log, Post-log의 작성 상태를 조회합니다.",
     )
     @ApiResponses(
@@ -493,7 +493,7 @@ private const val END_MEETING_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S012","message":"만남을 종료했습니다.","data":null}"""
 
 private const val MEETING_DETAIL_SUCCESS_EXAMPLE =
-    """{"code":"MEETING-S006","message":"만남 상세 정보를 조회했습니다.","data":{"meetingId":7,"groupId":1,"groupName":"피놀리와 기니휘기","meetingName":"1박 2일 광주 여행","scheduleType":"FIXED","meetingStatus":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","location":"광주광역시 000 000","canEditMeeting":true,"logStatuses":{"preLog":"IN_PROGRESS","billLog":"NOT_STARTED","postLog":"NOT_STARTED"}}}"""
+    """{"code":"MEETING-S006","message":"만남 상세 정보를 조회했습니다.","data":{"meetingId":7,"groupId":1,"groupName":"피놀리와 기니휘기","meetingName":"1박 2일 광주 여행","scheduleType":"FIXED","meetingStatus":"CONFIRMED","startDate":"2026-10-03","endDate":"2026-10-04","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true,"canEndMeeting":false,"logStatuses":{"preLog":"IN_PROGRESS","billLog":"NOT_STARTED","postLog":"NOT_STARTED"}}}"""
 
 private const val INVALID_PARTICIPANT_EXAMPLE =
     """{"code":"MEETING-E001","message":"만남 참여자는 해당 그룹의 멤버여야 합니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

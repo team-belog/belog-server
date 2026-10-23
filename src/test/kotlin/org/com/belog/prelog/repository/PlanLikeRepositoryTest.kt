@@ -105,7 +105,6 @@ class PlanLikeRepositoryTest {
                     category = PlanCategory.RESTAURANT,
                     title = title,
                     content = "계획 내용",
-                    currentDate = currentDate,
                 ),
             )
 

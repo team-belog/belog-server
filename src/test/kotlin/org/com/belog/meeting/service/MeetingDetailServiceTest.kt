@@ -19,7 +19,10 @@ import org.junit.jupiter.params.provider.CsvSource
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
+import java.time.Clock
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -36,6 +39,7 @@ class MeetingDetailServiceTest {
             planRepository = planRepository,
             billRepository = billRepository,
             postLogPhotoRepository = postLogPhotoRepository,
+            clock = Clock.fixed(Instant.parse("2026-10-03T00:00:00Z"), ZoneOffset.UTC),
         )
 
     @ParameterizedTest
@@ -66,6 +70,28 @@ class MeetingDetailServiceTest {
         assertEquals(expectedPostLogStatus, result.postLogStatus)
     }
 
+    @ParameterizedTest
+    @CsvSource(
+        "true, true, true",
+        "false, true, false",
+        "true, false, false",
+    )
+    fun `만남 방장이고 종료 조건을 만족하면 만남을 종료할 수 있다`(
+        isOwner: Boolean,
+        hasAllLogs: Boolean,
+        expectedCanEndMeeting: Boolean,
+    ) {
+        val meeting = stubMeetingDetail(isOwner = isOwner)
+        `when`(meeting.canEnd(LocalDate.of(2026, 10, 3), true)).thenReturn(true)
+        `when`(planRepository.existsByMeetingId(MEETING_ID)).thenReturn(true)
+        `when`(billRepository.existsByMeetingId(MEETING_ID)).thenReturn(true)
+        `when`(postLogPhotoRepository.existsByMeetingId(MEETING_ID)).thenReturn(hasAllLogs)
+
+        val result = meetingDetailService.getMeetingDetail(meetingId = MEETING_ID, userId = USER_ID)
+
+        assertEquals(expectedCanEndMeeting, result.canEndMeeting)
+    }
+
     @Test
     fun `그룹 멤버가 아니면 만남 상세 정보를 조회할 수 없다`() {
         val group = mock(Group::class.java)
@@ -84,7 +110,7 @@ class MeetingDetailServiceTest {
         verifyNoInteractions(planRepository, billRepository, postLogPhotoRepository)
     }
 
-    private fun stubMeetingDetail() {
+    private fun stubMeetingDetail(isOwner: Boolean = false): Meeting {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
         val groupMember = mock(GroupMember::class.java)
@@ -99,9 +125,10 @@ class MeetingDetailServiceTest {
         `when`(meeting.startDate).thenReturn(LocalDate.of(2026, 10, 3))
         `when`(meeting.endDate).thenReturn(LocalDate.of(2026, 10, 4))
         `when`(meeting.location).thenReturn("광주광역시 000 000")
-        `when`(meeting.isOwnedBy(groupMember)).thenReturn(false)
+        `when`(meeting.isOwnedBy(groupMember)).thenReturn(isOwner)
         `when`(meetingRepository.findByIdWithGroupOwnerAndCreator(MEETING_ID)).thenReturn(meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID)).thenReturn(groupMember)
+        return meeting
     }
 
     companion object {

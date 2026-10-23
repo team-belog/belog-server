@@ -19,31 +19,19 @@ import kotlin.test.assertTrue
 
 class MeetingTest {
     @Test
-    fun `종료일이 현재 날짜보다 이전이면 종료된 만남이다`() {
+    fun `종료일이 지나도 종료하지 않으면 종료된 만남이 아니다`() {
         val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 22))
 
-        assertTrue(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        assertFalse(meeting.isEnded())
     }
 
     @Test
-    fun `종료일 당일에는 종료된 만남이 아니다`() {
-        val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 23))
+    fun `시작된 만남은 로그를 모두 작성해야 종료할 수 있다`() {
+        val meeting = createFixedMeeting(startDate = LocalDate.of(2026, 9, 20))
+        val currentDate = LocalDate.of(2026, 9, 20)
 
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
-    }
-
-    @Test
-    fun `종료일 전에는 종료된 만남이 아니다`() {
-        val meeting = createFixedMeeting(endDate = LocalDate.of(2026, 9, 24))
-
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
-    }
-
-    @Test
-    fun `일정 미확정 만남은 종료된 만남이 아니다`() {
-        val meeting = createPollMeeting()
-
-        assertFalse(meeting.isEnded(LocalDate.of(2026, 9, 23)))
+        assertTrue(meeting.canEnd(currentDate = currentDate, hasAllLogs = true))
+        assertFalse(meeting.canEnd(currentDate = currentDate, hasAllLogs = false))
     }
 
     @Test

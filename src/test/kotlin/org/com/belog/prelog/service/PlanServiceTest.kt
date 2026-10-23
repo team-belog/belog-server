@@ -36,10 +36,8 @@ import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.util.ReflectionTestUtils
-import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
@@ -55,7 +53,6 @@ class PlanServiceTest {
     private val meetingParticipantRepository = mock(MeetingParticipantRepository::class.java)
     private val notificationService = mock(NotificationService::class.java)
     private val userService = mock(UserService::class.java)
-    private val clock = Clock.fixed(Instant.parse("2026-09-22T00:00:00Z"), ZoneOffset.UTC)
     private val planService =
         PlanService(
             meetingRepository,
@@ -65,7 +62,6 @@ class PlanServiceTest {
             meetingParticipantRepository,
             notificationService,
             userService,
-            clock,
         )
 
     @ParameterizedTest
@@ -460,7 +456,7 @@ class PlanServiceTest {
 
     @Test
     fun `종료된 만남에는 계획을 생성할 수 없다`() {
-        val context = meetingContext(endDate = LocalDate.of(2026, 9, 21))
+        val context = meetingContext(ended = true)
         val groupMember = mock(GroupMember::class.java)
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
@@ -477,19 +473,20 @@ class PlanServiceTest {
             }
 
         assertEquals(PreLogErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
-        verify(context.meeting).isEnded(LocalDate.of(2026, 9, 22))
         verifyNoInteractions(planRepository)
         verifyNoInteractions(notificationService)
     }
 
-    private fun meetingContext(endDate: LocalDate = LocalDate.of(2026, 9, 23)): MeetingContext {
+    private fun meetingContext(
+        endDate: LocalDate = LocalDate.of(2026, 9, 23),
+        ended: Boolean = false,
+    ): MeetingContext {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
-        val currentDate = LocalDate.of(2026, 9, 22)
         `when`(group.id).thenReturn(3L)
         `when`(meeting.group).thenReturn(group)
         `when`(meeting.endDate).thenReturn(endDate)
-        `when`(meeting.isEnded(currentDate)).thenReturn(endDate.isBefore(currentDate))
+        `when`(meeting.isEnded()).thenReturn(ended)
         return MeetingContext(group, meeting)
     }
 
@@ -582,7 +579,6 @@ class PlanServiceTest {
                 category = PlanCategory.RESTAURANT,
                 title = "맛집",
                 url = "https://example.com/place",
-                currentDate = LocalDate.of(2026, 9, 22),
             )
         ReflectionTestUtils.setField(plan, "id", 20L)
         if (initiallyPinned) {
@@ -619,7 +615,6 @@ class PlanServiceTest {
                         category = PlanCategory.RESTAURANT,
                         title = "맛집",
                         url = "https://example.com/place",
-                        currentDate = LocalDate.of(2026, 9, 22),
                     )
 
                 PlanType.MEMO ->
@@ -629,7 +624,6 @@ class PlanServiceTest {
                         category = PlanCategory.OTHER,
                         title = "준비물",
                         content = "가".repeat(Plan.CONTENT_MAX_LENGTH),
-                        currentDate = LocalDate.of(2026, 9, 22),
                     )
             }
         ReflectionTestUtils.setField(plan, "id", 20L)

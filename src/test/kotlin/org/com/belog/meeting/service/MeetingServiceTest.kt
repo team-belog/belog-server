@@ -44,7 +44,6 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -433,43 +432,17 @@ class MeetingServiceTest {
             )
         val firstConfirmedAt = meeting.confirmedAt
 
-        val changed =
-            meetingService.updateMeetingDate(
-                meetingId = requireNotNull(meeting.id),
-                userId = requireNotNull(creator.user.id),
-                dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
-            )
+        meetingService.updateMeeting(
+            meetingId = requireNotNull(meeting.id),
+            userId = requireNotNull(creator.user.id),
+            name = "광주 여행",
+            location = null,
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
+        )
 
-        assertTrue(changed)
         assertEquals(LocalDate.of(2026, 9, 24), meeting.startDate)
         assertEquals(LocalDate.of(2026, 9, 25), meeting.endDate)
         assertEquals(firstConfirmedAt, meeting.confirmedAt)
-    }
-
-    @Test
-    fun `종료된 만남의 일정은 수정할 수 없다`() {
-        val group = groupRepository.save(createGroup("AB12CD"))
-        val creator = saveGroupMember(group, "creator-subject", "생성자")
-        val meeting =
-            meetingRepository.save(
-                createFixedMeeting(
-                    group = group,
-                    creator = creator,
-                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 19), LocalDate.of(2026, 9, 20)),
-                    currentDate = LocalDate.of(2026, 9, 19),
-                ),
-            )
-
-        val exception =
-            assertFailsWith<BusinessException> {
-                meetingService.updateMeetingDate(
-                    meetingId = requireNotNull(meeting.id),
-                    userId = requireNotNull(creator.user.id),
-                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 24), LocalDate.of(2026, 9, 25)),
-                )
-            }
-
-        assertEquals(MeetingErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
     }
 
     @Test
@@ -486,6 +459,7 @@ class MeetingServiceTest {
                     currentDate = LocalDate.of(2026, 9, 19),
                 ),
             )
+        meeting.end(endedAt = FIXED_INSTANT, currentDate = LocalDate.of(2026, 9, 21))
 
         meetingService.updateMeeting(
             meetingId = requireNotNull(meeting.id),
@@ -514,6 +488,7 @@ class MeetingServiceTest {
                     currentDate = LocalDate.of(2026, 9, 19),
                 ),
             )
+        meeting.end(endedAt = FIXED_INSTANT, currentDate = LocalDate.of(2026, 9, 21))
 
         val exception =
             assertFailsWith<BusinessException> {

@@ -147,17 +147,6 @@ class MeetingService(
     }
 
     @Transactional
-    fun updateMeetingDate(
-        meetingId: Long,
-        userId: Long,
-        dateRange: MeetingDateRange,
-    ): Boolean {
-        val meeting = findMeetingForUpdate(meetingId)
-        validateScheduleManager(meeting, userId)
-        return updateConfirmedDate(meeting, dateRange)
-    }
-
-    @Transactional
     fun updateMeeting(
         meetingId: Long,
         userId: Long,
@@ -242,7 +231,7 @@ class MeetingService(
         }
 
         val currentDate = clock.currentBusinessDate()
-        if (meeting.isEnded(currentDate)) {
+        if (meeting.isEnded()) {
             throw BusinessException(MeetingErrorCode.MEETING_ALREADY_ENDED)
         }
         if (dateRange.endDate.isBefore(currentDate)) {

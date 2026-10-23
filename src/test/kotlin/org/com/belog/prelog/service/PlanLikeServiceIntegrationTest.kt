@@ -227,7 +227,6 @@ class PlanLikeServiceIntegrationTest {
                     category = PlanCategory.RESTAURANT,
                     title = "광주 맛집",
                     url = "https://example.com/place",
-                    currentDate = LocalDate.of(2026, 9, 22),
                 ),
             )
 

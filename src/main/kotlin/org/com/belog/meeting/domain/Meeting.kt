@@ -177,7 +177,7 @@ class Meeting protected constructor(
         owner = newOwner
     }
 
-    fun isEnded(currentDate: LocalDate): Boolean = endDate?.isBefore(currentDate) == true
+    fun isEnded(): Boolean = endedAt != null
 
     fun startsOn(date: LocalDate): Boolean = startDate == date
 
@@ -217,13 +217,18 @@ class Meeting protected constructor(
         endedAt: Instant,
         currentDate: LocalDate,
     ) {
-        check(this.endedAt == null) { "이미 종료된 만남입니다." }
+        check(!isEnded()) { "이미 종료된 만남입니다." }
         check(hasStarted(currentDate)) { "일정이 확정된 만남은 시작일부터 종료할 수 있습니다." }
 
         this.endedAt = endedAt
     }
 
     fun hasStarted(currentDate: LocalDate): Boolean = status == MeetingStatus.CONFIRMED && startDate?.isAfter(currentDate) == false
+
+    fun canEnd(
+        currentDate: LocalDate,
+        hasAllLogs: Boolean,
+    ): Boolean = !isEnded() && hasStarted(currentDate) && hasAllLogs
 
     fun delete(deletedAt: Instant) {
         require(this.deletedAt == null) { "이미 삭제된 만남입니다." }
@@ -276,7 +281,7 @@ class Meeting protected constructor(
             return false
         }
 
-        require(!isEnded(currentDate)) {
+        require(!isEnded()) {
             "종료된 만남의 일정은 변경할 수 없습니다."
         }
         require(!dateRange.endDate.isBefore(currentDate)) {

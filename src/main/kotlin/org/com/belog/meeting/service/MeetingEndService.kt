@@ -31,7 +31,7 @@ class MeetingEndService(
         if (meeting.owner.user.id != userId) {
             throw BusinessException(MeetingErrorCode.NOT_MEETING_OWNER)
         }
-        if (meeting.endedAt != null) {
+        if (meeting.isEnded()) {
             throw BusinessException(MeetingErrorCode.MEETING_END_ALREADY_ENDED)
         }
 
