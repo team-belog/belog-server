@@ -2,6 +2,7 @@ package org.com.belog.user.controller.dto.request
 
 import jakarta.validation.Validation
 import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.User
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -37,17 +38,38 @@ class CompleteOnboardingRequestTest {
     }
 
     @Test
-    fun `사용자 이름이 공백뿐이면 검증에 실패한다`() {
-        val request = validRequest().copy(name = " ")
+    fun `성이 공백뿐이면 검증에 실패한다`() {
+        val request = validRequest().copy(lastName = " ")
 
-        assertInvalidField(request, "name")
+        assertInvalidField(request, "lastName")
     }
 
     @Test
-    fun `사용자 이름이 최대 길이를 초과하면 검증에 실패한다`() {
-        val request = validRequest().copy(name = "가".repeat(51))
+    fun `성이 최대 길이를 초과하면 검증에 실패한다`() {
+        val request = validRequest().copy(lastName = "가".repeat(User.LAST_NAME_MAX_LENGTH + 1))
 
-        assertInvalidField(request, "name")
+        assertInvalidField(request, "lastName")
+    }
+
+    @Test
+    fun `성 앞뒤 공백을 제거한 길이가 최대 길이 이하면 검증에 성공한다`() {
+        val request = validRequest().copy(lastName = " ${"가".repeat(User.LAST_NAME_MAX_LENGTH)} ")
+
+        assertTrue(validator.validate(request).none { violation -> violation.propertyPath.toString() == "lastName" })
+    }
+
+    @Test
+    fun `이름이 공백뿐이면 검증에 실패한다`() {
+        val request = validRequest().copy(firstName = " ")
+
+        assertInvalidField(request, "firstName")
+    }
+
+    @Test
+    fun `이름이 최대 길이를 초과하면 검증에 실패한다`() {
+        val request = validRequest().copy(firstName = "가".repeat(User.FIRST_NAME_MAX_LENGTH + 1))
+
+        assertInvalidField(request, "firstName")
     }
 
     @Test
@@ -71,20 +93,6 @@ class CompleteOnboardingRequestTest {
         assertInvalidField(request, "accountNumber")
     }
 
-    @Test
-    fun `예금주명이 공백뿐이면 검증에 실패한다`() {
-        val request = validRequest().copy(accountHolderName = " ")
-
-        assertInvalidField(request, "accountHolderName")
-    }
-
-    @Test
-    fun `예금주명이 최대 길이를 초과하면 검증에 실패한다`() {
-        val request = validRequest().copy(accountHolderName = "가".repeat(51))
-
-        assertInvalidField(request, "accountHolderName")
-    }
-
     private fun assertInvalidField(
         request: CompleteOnboardingRequest,
         field: String,
@@ -98,9 +106,9 @@ class CompleteOnboardingRequestTest {
         CompleteOnboardingRequest(
             profileImageObjectKey = "users/1/profile/image.webp",
             nickname = "빌로그",
-            name = "홍길동",
+            lastName = "홍",
+            firstName = "길동",
             bankCode = Bank.SHINHAN,
             accountNumber = "110123456789",
-            accountHolderName = "홍길동",
         )
 }

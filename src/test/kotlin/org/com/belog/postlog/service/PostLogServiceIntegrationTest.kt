@@ -769,12 +769,12 @@ class PostLogServiceIntegrationTest {
         user.completeOnboarding(
             profileImageObjectKey = null,
             nickname = userKey,
-            name = userKey,
+            lastName = "홍",
+            firstName = userKey,
             bankAccount =
                 BankAccount.create(
                     bank = Bank.KB_KOOKMIN,
                     accountNumber = "123456789012",
-                    accountHolderName = userKey,
                 ),
             completedAt = Instant.parse("2026-09-20T00:00:00Z"),
         )

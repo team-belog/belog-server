@@ -119,7 +119,7 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
           AND member.withdrawnAt IS NULL
           AND (
               LOCATE(LOWER(:query), LOWER(member.user.nickname)) > 0
-              OR LOCATE(LOWER(:query), LOWER(member.user.name)) > 0
+              OR LOCATE(LOWER(:query), LOWER(CONCAT(member.user.lastName, member.user.firstName))) > 0
           )
         ORDER BY member.role DESC, member.id ASC
         """,

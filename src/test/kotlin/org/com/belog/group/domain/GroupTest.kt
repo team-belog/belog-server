@@ -93,12 +93,12 @@ class GroupTest {
                 completeOnboarding(
                     profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
                     nickname = "빌로그",
-                    name = "홍길동",
+                    lastName = "홍",
+                    firstName = "길동",
                     bankAccount =
                         BankAccount.create(
                             bank = Bank.KB_KOOKMIN,
                             accountNumber = "123456789012",
-                            accountHolderName = "홍길동",
                         ),
                     completedAt = Instant.parse("2026-09-15T00:00:00Z"),
                 )

@@ -125,7 +125,6 @@ class UserController(
                 BankAccount.create(
                     bank = requireNotNull(request.bankCode),
                     accountNumber = request.accountNumber,
-                    accountHolderName = request.accountHolderName,
                 ),
         )
 
@@ -182,12 +181,12 @@ class UserController(
             userId = userId,
             profileImageObjectKey = createProfileImageObjectKey(userId, request.profileImageObjectKey),
             nickname = request.nickname,
-            name = request.name,
+            lastName = request.lastName,
+            firstName = request.firstName,
             bankAccount =
                 BankAccount.create(
                     bank = requireNotNull(request.bankCode),
                     accountNumber = request.accountNumber,
-                    accountHolderName = request.accountHolderName,
                 ),
         )
 

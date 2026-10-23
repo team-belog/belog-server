@@ -36,11 +36,11 @@ const val USER_SOCIAL_IDENTITY_UNIQUE_CONSTRAINT_NAME = "uk_users_provider_provi
             name = "chk_users_onboarding_state",
             constraint =
                 "(" +
-                    "onboarding_completed_at IS NULL AND nickname IS NULL AND name IS NULL AND profile_image_object_key IS NULL " +
-                    "AND bank IS NULL AND encrypted_account_number IS NULL AND account_holder_name IS NULL" +
+                    "onboarding_completed_at IS NULL AND nickname IS NULL AND last_name IS NULL AND first_name IS NULL " +
+                    "AND profile_image_object_key IS NULL AND bank IS NULL AND encrypted_account_number IS NULL" +
                     ") OR (" +
-                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND name IS NOT NULL " +
-                    "AND bank IS NOT NULL AND encrypted_account_number IS NOT NULL AND account_holder_name IS NOT NULL" +
+                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND last_name IS NOT NULL " +
+                    "AND first_name IS NOT NULL AND bank IS NOT NULL AND encrypted_account_number IS NOT NULL" +
                     ")",
         ),
     ],
@@ -63,8 +63,12 @@ class User protected constructor(
     var nickname: String? = null
         protected set
 
-    @Column(length = NAME_MAX_LENGTH)
-    var name: String? = null
+    @Column(name = "last_name", length = LAST_NAME_MAX_LENGTH)
+    var lastName: String? = null
+        protected set
+
+    @Column(name = "first_name", length = FIRST_NAME_MAX_LENGTH)
+    var firstName: String? = null
         protected set
 
     @Column(name = "profile_image_object_key", length = ProfileImageObjectKey.MAX_LENGTH)
@@ -141,17 +145,22 @@ class User protected constructor(
     fun completeOnboarding(
         profileImageObjectKey: ProfileImageObjectKey?,
         nickname: String,
-        name: String,
+        lastName: String,
+        firstName: String,
         bankAccount: BankAccount,
         completedAt: Instant,
     ) {
         check(!isOnboardingCompleted) { "이미 온보딩을 완료한 사용자입니다." }
 
         val normalizedNickname = normalizeNickname(nickname)
-        val normalizedName = name.trim()
+        val normalizedLastName = lastName.trim()
+        val normalizedFirstName = firstName.trim()
 
-        require(normalizedName.isNotEmpty() && normalizedName.length <= NAME_MAX_LENGTH) {
-            "사용자 이름은 비어 있을 수 없으며 ${NAME_MAX_LENGTH}자를 초과할 수 없습니다."
+        require(normalizedLastName.isNotEmpty() && normalizedLastName.length <= LAST_NAME_MAX_LENGTH) {
+            "성은 비어 있을 수 없으며 ${LAST_NAME_MAX_LENGTH}자를 초과할 수 없습니다."
+        }
+        require(normalizedFirstName.isNotEmpty() && normalizedFirstName.length <= FIRST_NAME_MAX_LENGTH) {
+            "이름은 비어 있을 수 없으며 ${FIRST_NAME_MAX_LENGTH}자를 초과할 수 없습니다."
         }
 
         this.profileImageObjectKey = profileImageObjectKey?.value
@@ -162,7 +171,8 @@ class User protected constructor(
                 ProfileImageSource.CUSTOM
             }
         this.nickname = normalizedNickname
-        this.name = normalizedName
+        this.lastName = normalizedLastName
+        this.firstName = normalizedFirstName
         this.bankAccount = bankAccount
         this.onboardingCompletedAt = completedAt
     }
@@ -206,7 +216,8 @@ class User protected constructor(
     companion object {
         const val NICKNAME_MIN_LENGTH = 1
         const val NICKNAME_MAX_LENGTH = 8
-        const val NAME_MAX_LENGTH = 50
+        const val LAST_NAME_MAX_LENGTH = 20
+        const val FIRST_NAME_MAX_LENGTH = 50
         const val SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH = 2048
 
         fun createSocialUser(

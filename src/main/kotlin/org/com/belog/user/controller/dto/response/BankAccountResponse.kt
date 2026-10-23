@@ -6,7 +6,6 @@ data class BankAccountResponse(
     val bankCode: String,
     val bankName: String,
     val accountNumber: String,
-    val accountHolderName: String,
 ) {
     companion object {
         fun from(bankAccount: BankAccount): BankAccountResponse =
@@ -14,7 +13,6 @@ data class BankAccountResponse(
                 bankCode = bankAccount.bank.name,
                 bankName = bankAccount.bank.displayName,
                 accountNumber = bankAccount.accountNumber,
-                accountHolderName = bankAccount.accountHolderName,
             )
     }
 }
