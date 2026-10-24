@@ -38,6 +38,7 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -65,6 +66,9 @@ import kotlin.test.assertTrue
 class PostLogPhotoServiceQueryTest {
     @Autowired
     private lateinit var photoService: PostLogPhotoService
+
+    @Autowired
+    private lateinit var entityManager: TestEntityManager
 
     @Autowired
     private lateinit var photoLikeRepository: PostLogPhotoLikeRepository
@@ -258,6 +262,40 @@ class PostLogPhotoServiceQueryTest {
             }
 
         assertEquals(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED, exception.errorCode)
+    }
+
+    @Test
+    fun `업로더가 아닌 그룹 멤버도 사진을 삭제할 수 있고 좋아요도 함께 삭제된다`() {
+        val context = saveMeetingContext()
+        val otherMember = saveGroupMember(context.group, "other-member")
+        val photo = savePhoto(context, "delete.jpg", "2026-09-28T12:00:00+09:00")
+        val photoId = requireNotNull(photo.id)
+        photoLikeRepository.saveAllAndFlush(
+            listOf(
+                PostLogPhotoLike.create(photo, context.groupMember),
+                PostLogPhotoLike.create(photo, otherMember),
+            ),
+        )
+        entityManager.clear()
+
+        photoService.deletePhoto(photoId = photoId, userId = requireNotNull(otherMember.user.id))
+
+        assertFalse(photoRepository.existsById(photoId))
+        assertEquals(0L, photoLikeRepository.countByPhotoId(photoId))
+    }
+
+    @Test
+    fun `그룹 멤버가 아닌 사용자는 사진을 삭제할 수 없다`() {
+        val context = saveMeetingContext()
+        val photo = savePhoto(context, "delete.jpg", "2026-09-28T12:00:00+09:00")
+        val outsider = saveCompletedUser("outsider")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                photoService.deletePhoto(photoId = requireNotNull(photo.id), userId = requireNotNull(outsider.id))
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
     }
 
     @ParameterizedTest

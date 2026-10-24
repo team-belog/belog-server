@@ -170,6 +170,24 @@ class PostLogPhotoService(
         )
     }
 
+    @Transactional
+    fun deletePhoto(
+        photoId: Long,
+        userId: Long,
+    ) {
+        val photo =
+            photoRepository.findByIdForUpdate(photoId)
+                ?: throw BusinessException(PostLogErrorCode.POST_LOG_PHOTO_NOT_FOUND)
+        val groupId = checkNotNull(photo.meeting.group.id) { "삭제 대상 사진 만남의 그룹 ID가 없습니다." }
+
+        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
+            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        }
+
+        photoLikeRepository.deleteAllByPhotoId(checkNotNull(photo.id) { "삭제 대상 사진의 ID가 없습니다." })
+        photoRepository.delete(photo)
+    }
+
     private fun requireConfirmedStartDate(meeting: Meeting): LocalDate =
         meeting.startDate
             ?: throw BusinessException(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED)

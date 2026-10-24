@@ -81,7 +81,7 @@ class PostLogPhotoLikeService(
     }
 
     private fun findPhoto(photoId: Long): PostLogPhoto =
-        photoRepository.findByIdWithMeeting(photoId)
+        photoRepository.findByIdForShare(photoId)
             ?: throw BusinessException(PostLogErrorCode.POST_LOG_PHOTO_NOT_FOUND)
 
     private fun createResult(

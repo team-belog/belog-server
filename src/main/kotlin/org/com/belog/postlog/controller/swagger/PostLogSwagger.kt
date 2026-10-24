@@ -591,6 +591,49 @@ interface PostLogSwagger {
     ): ResponseEntity<CommonResponse<RegisterPostLogPhotosResponse>>
 
     @Operation(
+        summary = "Post-log 사진 삭제",
+        description =
+            "해당 만남이 속한 그룹의 멤버라면 업로더와 관계없이 사진을 삭제할 수 있습니다. " +
+                "만남 상태와 관계없이 삭제할 수 있으며 사진에 등록된 좋아요도 함께 삭제됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "사진 삭제 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사진을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun deletePhoto(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "사진 ID", example = "31", required = true)
+        @PathVariable
+        photoId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
         summary = "Post-log 사진 좋아요 등록",
         description =
             "해당 만남이 속한 그룹의 멤버가 사진에 좋아요를 등록합니다. " +
