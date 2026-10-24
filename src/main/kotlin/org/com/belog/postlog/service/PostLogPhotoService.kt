@@ -1,7 +1,9 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectDeleter
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
@@ -23,6 +25,7 @@ import org.com.belog.postlog.service.result.PostLogPhotoDayResult
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.postlog.service.result.PostLogPhotoUploadResult
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -41,6 +44,8 @@ class PostLogPhotoService(
     private val photoRepository: PostLogPhotoRepository,
     private val photoLikeRepository: PostLogPhotoLikeRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val deletionService: PostLogPhotoDeletionService,
+    private val objectDeleter: S3ObjectDeleter,
 ) {
     @Transactional(readOnly = true)
     fun getPhotos(
@@ -170,22 +175,25 @@ class PostLogPhotoService(
         )
     }
 
-    @Transactional
     fun deletePhoto(
         photoId: Long,
         userId: Long,
     ) {
-        val photo =
-            photoRepository.findByIdForUpdate(photoId)
-                ?: throw BusinessException(PostLogErrorCode.POST_LOG_PHOTO_NOT_FOUND)
-        val groupId = checkNotNull(photo.meeting.group.id) { "삭제 대상 사진 만남의 그룹 ID가 없습니다." }
-
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val deletion = deletionService.delete(photoId = photoId, userId = userId)
+        if (deletion.usedAsTicketCover) {
+            return
         }
 
-        photoLikeRepository.deleteAllByPhotoId(checkNotNull(photo.id) { "삭제 대상 사진의 ID가 없습니다." })
-        photoRepository.delete(photo)
+        try {
+            objectDeleter.delete(deletion.objectKey)
+        } catch (exception: S3ObjectUnavailableException) {
+            log.warn(
+                "Post-log photo object was not deleted: photoId={}, objectKey={}",
+                photoId,
+                deletion.objectKey,
+                exception,
+            )
+        }
     }
 
     private fun requireConfirmedStartDate(meeting: Meeting): LocalDate =
@@ -291,5 +299,6 @@ class PostLogPhotoService(
         private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
         private const val CURSOR_DELIMITER = "|"
         private const val CURSOR_PART_COUNT = 2
+        private val log = LoggerFactory.getLogger(PostLogPhotoService::class.java)
     }
 }

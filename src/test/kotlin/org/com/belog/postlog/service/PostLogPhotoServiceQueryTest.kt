@@ -2,6 +2,7 @@ package org.com.belog.postlog.service
 
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectDeleter
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
@@ -17,10 +18,12 @@ import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
+import org.com.belog.postlog.domain.PostLogTicket
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoObjectVerifier
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoUploadUrlProvider
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.user.config.AccountNumberEncryptionConfig
@@ -35,6 +38,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -59,6 +64,7 @@ import kotlin.test.assertTrue
 @ActiveProfiles("test")
 @Import(
     PostLogPhotoService::class,
+    PostLogPhotoDeletionService::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
@@ -99,6 +105,12 @@ class PostLogPhotoServiceQueryTest {
 
     @MockitoBean
     private lateinit var objectReadUrlProvider: S3ObjectReadUrlProvider
+
+    @MockitoBean
+    private lateinit var objectDeleter: S3ObjectDeleter
+
+    @Autowired
+    private lateinit var ticketRepository: PostLogTicketRepository
 
     @BeforeEach
     fun setUpReadUrls() {
@@ -282,6 +294,27 @@ class PostLogPhotoServiceQueryTest {
 
         assertFalse(photoRepository.existsById(photoId))
         assertEquals(0L, photoLikeRepository.countByPhotoId(photoId))
+        verify(objectDeleter).delete(photo.objectKey)
+    }
+
+    @Test
+    fun `티켓 커버로 사용 중인 사진을 삭제하면 S3 객체는 유지한다`() {
+        val context = saveMeetingContext()
+        val photo = savePhoto(context, "cover.jpg", "2026-09-28T12:00:00+09:00")
+        ticketRepository.saveAndFlush(
+            PostLogTicket.issue(
+                meeting = context.meeting,
+                creator = context.groupMember,
+                memory = "즐거웠던 여행",
+                coverImageObjectKey = photo.objectKey,
+                issuedAt = Instant.parse("2026-09-29T00:00:00Z"),
+            ),
+        )
+
+        photoService.deletePhoto(photoId = requireNotNull(photo.id), userId = context.userId)
+
+        assertFalse(photoRepository.existsById(requireNotNull(photo.id)))
+        verify(objectDeleter, never()).delete(anyString())
     }
 
     @Test

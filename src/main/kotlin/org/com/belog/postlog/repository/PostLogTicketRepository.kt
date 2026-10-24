@@ -19,6 +19,11 @@ interface PostLogTicketRepository : JpaRepository<PostLogTicket, Long> {
 
     fun findAllBySourceMeetingId(sourceMeetingId: Long): List<PostLogTicket>
 
+    fun existsBySourceMeetingIdAndCoverImageObjectKey(
+        sourceMeetingId: Long,
+        coverImageObjectKey: String,
+    ): Boolean
+
     fun findByIdAndOwnerId(
         id: Long,
         ownerId: Long,
