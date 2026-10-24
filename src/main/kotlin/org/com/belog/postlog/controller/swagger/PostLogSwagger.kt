@@ -366,6 +366,17 @@ interface PostLogSwagger {
                     ),
                 ],
             ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 일정이 확정되지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE)],
+                    ),
+                ],
+            ),
         ],
     )
     fun getPhotos(
@@ -436,6 +447,17 @@ interface PostLogSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 일정이 확정되지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE)],
                     ),
                 ],
             ),
@@ -518,12 +540,15 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "동일한 object key가 다른 메타데이터로 이미 등록됨",
+                description = "동일한 object key가 다른 메타데이터로 이미 등록됨 또는 만남 일정이 확정되지 않음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "object key 충돌", value = PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE),
+                            ExampleObject(name = "일정 미확정", value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -734,6 +759,9 @@ private const val INVALID_PHOTO_CURSOR_EXAMPLE =
 
 private const val TICKET_ALREADY_CREATED_EXAMPLE =
     """{"code":"POST_LOG-E012","message":"해당 만남에 이미 티켓을 생성했습니다.","data":null}"""
+
+private const val MEETING_DATE_NOT_CONFIRMED_EXAMPLE =
+    """{"code":"POST_LOG-E014","message":"만남 일정이 확정되지 않아 사진을 업로드하거나 조회할 수 없습니다.","data":null}"""
 
 private const val TICKET_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E013","message":"생성된 Post-log 티켓을 찾을 수 없습니다.","data":null}"""

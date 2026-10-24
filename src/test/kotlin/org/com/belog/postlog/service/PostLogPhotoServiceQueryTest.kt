@@ -217,6 +217,27 @@ class PostLogPhotoServiceQueryTest {
         assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
     }
 
+    @Test
+    fun `일정 조율 중인 만남의 사진은 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        val meeting =
+            meetingRepository.saveAndFlush(
+                Meeting.createPoll(
+                    group = context.group,
+                    creator = context.groupMember,
+                    name = "일정 조율 여행",
+                    location = null,
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                photoService.getPhotos(meetingId = requireNotNull(meeting.id), userId = context.userId, cursor = null)
+            }
+
+        assertEquals(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED, exception.errorCode)
+    }
+
     @ParameterizedTest
     @MethodSource("invalidCursors")
     fun `올바르지 않은 사진 커서는 거부한다`(cursor: String) {

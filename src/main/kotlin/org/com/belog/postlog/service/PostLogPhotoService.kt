@@ -5,6 +5,7 @@ import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -57,6 +58,7 @@ class PostLogPhotoService(
             groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         val groupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
+        validateDateConfirmed(meeting)
         val decodedCursor = cursor?.let(::decodeCursor)
         val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
         val photos =
@@ -119,6 +121,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
+        validateDateConfirmed(meeting)
 
         return uploadTargets.map { target ->
             PostLogPhotoUploadResult(
@@ -142,6 +145,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
+        validateDateConfirmed(meeting)
 
         objectVerifier.verifyAll(registrationTargets.map { target -> target.objectKey })
 
@@ -150,6 +154,12 @@ class PostLogPhotoService(
             userId = userId,
             targets = registrationTargets,
         )
+    }
+
+    private fun validateDateConfirmed(meeting: Meeting) {
+        if (meeting.startDate == null) {
+            throw BusinessException(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
+        }
     }
 
     private fun validateTargets(targets: List<PostLogPhotoUploadTarget>): List<ValidatedUploadTarget> {
