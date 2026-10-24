@@ -18,4 +18,5 @@ enum class PostLogSuccessCode(
     DRAFT_SAVED(HttpStatus.OK, "POST_LOG-S008", "Post-log 추억 문구가 임시저장되었습니다."),
     TICKET_RETRIEVED(HttpStatus.OK, "POST_LOG-S009", "Post-log 티켓이 조회되었습니다."),
     TICKET_CALENDAR_RETRIEVED(HttpStatus.OK, "POST_LOG-S010", "월별 티켓 달력이 조회되었습니다."),
+    PHOTO_DELETED(HttpStatus.NO_CONTENT, "POST_LOG-S011", "사진이 삭제되었습니다."),
 }

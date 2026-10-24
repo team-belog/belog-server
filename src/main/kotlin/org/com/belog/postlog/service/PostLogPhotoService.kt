@@ -1,10 +1,14 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectDeleter
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
+import org.com.belog.global.storage.S3ObjectUnavailableException
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -17,14 +21,17 @@ import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.service.command.PostLogPhotoRegistrationTarget
 import org.com.belog.postlog.service.command.PostLogPhotoUploadTarget
 import org.com.belog.postlog.service.command.ValidatedPostLogPhotoRegistrationTarget
+import org.com.belog.postlog.service.result.PostLogPhotoDayResult
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.postlog.service.result.PostLogPhotoUploadResult
+import org.slf4j.LoggerFactory
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.LocalDate
 import java.util.Base64
 
 @Service
@@ -37,6 +44,8 @@ class PostLogPhotoService(
     private val photoRepository: PostLogPhotoRepository,
     private val photoLikeRepository: PostLogPhotoLikeRepository,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val deletionService: PostLogPhotoDeletionService,
+    private val objectDeleter: S3ObjectDeleter,
 ) {
     @Transactional(readOnly = true)
     fun getPhotos(
@@ -57,6 +66,7 @@ class PostLogPhotoService(
             groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         val groupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
+        val meetingStartDate = requireConfirmedStartDate(meeting)
         val decodedCursor = cursor?.let(::decodeCursor)
         val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
         val photos =
@@ -65,6 +75,7 @@ class PostLogPhotoService(
             } else {
                 photoRepository.findPageAfter(
                     meetingId = meetingId,
+                    capturedLocalDate = decodedCursor.capturedLocalDate,
                     capturedAt = decodedCursor.capturedAt,
                     photoId = decodedCursor.photoId,
                     pageable = pageable,
@@ -88,18 +99,29 @@ class PostLogPhotoService(
                 photoLikeRepository.findLikedPhotoIds(photoIds, groupMemberId).toSet()
             }
 
+        val items =
+            pagePhotos.mapIndexed { index, photo ->
+                val photoId = photoIds[index]
+                PostLogPhotoListItemResult(
+                    photoId = photoId,
+                    photoUrl = objectReadUrlProvider.generateReadUrl(photo.objectKey),
+                    capturedAt = photo.capturedAtWithOffset(),
+                    likeCount = likeCounts[photoId] ?: 0L,
+                    likedByMe = photoId in likedPhotoIds,
+                )
+            }
+
         return PostLogPhotoListResult(
-            items =
-                pagePhotos.mapIndexed { index, photo ->
-                    val photoId = photoIds[index]
-                    PostLogPhotoListItemResult(
-                        photoId = photoId,
-                        photoUrl = objectReadUrlProvider.generateReadUrl(photo.objectKey),
-                        capturedAt = photo.capturedAtWithOffset(),
-                        likeCount = likeCounts[photoId] ?: 0L,
-                        likedByMe = photoId in likedPhotoIds,
-                    )
-                },
+            days =
+                items
+                    .groupBy { item -> item.capturedAt.toLocalDate() }
+                    .map { (date, dayItems) ->
+                        PostLogPhotoDayResult(
+                            dayNumber = calculateMeetingDayNumber(meetingStartDate, date),
+                            date = date,
+                            photos = dayItems,
+                        )
+                    },
             nextCursor = pagePhotos.lastOrNull()?.takeIf { hasNext }?.let(::encodeCursor),
             hasNext = hasNext,
         )
@@ -119,6 +141,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
+        requireConfirmedStartDate(meeting)
 
         return uploadTargets.map { target ->
             PostLogPhotoUploadResult(
@@ -142,6 +165,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
+        requireConfirmedStartDate(meeting)
 
         objectVerifier.verifyAll(registrationTargets.map { target -> target.objectKey })
 
@@ -151,6 +175,31 @@ class PostLogPhotoService(
             targets = registrationTargets,
         )
     }
+
+    fun deletePhoto(
+        photoId: Long,
+        userId: Long,
+    ) {
+        val deletion = deletionService.delete(photoId = photoId, userId = userId)
+        if (deletion.usedAsTicketCover) {
+            return
+        }
+
+        try {
+            objectDeleter.delete(deletion.objectKey)
+        } catch (exception: S3ObjectUnavailableException) {
+            log.warn(
+                "Post-log photo object was not deleted: photoId={}, objectKey={}",
+                photoId,
+                deletion.objectKey,
+                exception,
+            )
+        }
+    }
+
+    private fun requireConfirmedStartDate(meeting: Meeting): LocalDate =
+        meeting.startDate
+            ?: throw BusinessException(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
 
     private fun validateTargets(targets: List<PostLogPhotoUploadTarget>): List<ValidatedUploadTarget> {
         if (targets.size !in 1..PostLogPhoto.MAX_UPLOAD_COUNT) {
@@ -219,7 +268,7 @@ class PostLogPhotoService(
 
     private fun encodeCursor(photo: PostLogPhoto): String {
         val photoId = checkNotNull(photo.id) { "커서 대상 사진의 ID가 없습니다." }
-        val value = "${photo.capturedAt}$CURSOR_DELIMITER$photoId"
+        val value = listOf(photo.capturedLocalDate, photo.capturedAt, photoId).joinToString(CURSOR_DELIMITER)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))
     }
 
@@ -228,11 +277,12 @@ class PostLogPhotoService(
             val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
             val parts = decoded.split(CURSOR_DELIMITER, limit = CURSOR_PART_COUNT)
             require(parts.size == CURSOR_PART_COUNT)
-            val photoId = parts[1].toLong()
+            val photoId = parts[2].toLong()
             require(photoId > 0)
 
             PhotoCursor(
-                capturedAt = Instant.parse(parts[0]),
+                capturedLocalDate = LocalDate.parse(parts[0]),
+                capturedAt = Instant.parse(parts[1]),
                 photoId = photoId,
             )
         } catch (exception: RuntimeException) {
@@ -240,6 +290,7 @@ class PostLogPhotoService(
         }
 
     private data class PhotoCursor(
+        val capturedLocalDate: LocalDate,
         val capturedAt: Instant,
         val photoId: Long,
     )
@@ -250,6 +301,7 @@ class PostLogPhotoService(
         private const val MIN_PAGE_SIZE = 1
         private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
         private const val CURSOR_DELIMITER = "|"
-        private const val CURSOR_PART_COUNT = 2
+        private const val CURSOR_PART_COUNT = 3
+        private val log = LoggerFactory.getLogger(PostLogPhotoService::class.java)
     }
 }

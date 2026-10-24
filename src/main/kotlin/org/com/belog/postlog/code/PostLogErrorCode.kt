@@ -21,4 +21,5 @@ enum class PostLogErrorCode(
     INVALID_PHOTO_CURSOR(HttpStatus.BAD_REQUEST, "POST_LOG-E011", "사진 목록 커서가 올바르지 않습니다."),
     TICKET_ALREADY_CREATED(HttpStatus.CONFLICT, "POST_LOG-E012", "해당 만남에 이미 티켓을 생성했습니다."),
     TICKET_NOT_FOUND(HttpStatus.NOT_FOUND, "POST_LOG-E013", "생성된 Post-log 티켓을 찾을 수 없습니다."),
+    MEETING_DATE_NOT_CONFIRMED(HttpStatus.CONFLICT, "POST_LOG-E014", "만남 일정이 확정되지 않아 사진을 업로드하거나 조회할 수 없습니다."),
 }

@@ -181,6 +181,18 @@ class PostLogController(
             )
     }
 
+    @DeleteMapping("/api/v1/post-log-photos/{photoId}")
+    override fun deletePhoto(
+        @LoginUserId userId: Long,
+        @PathVariable photoId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        photoService.deletePhoto(photoId = photoId, userId = userId)
+
+        return ResponseEntity
+            .status(PostLogSuccessCode.PHOTO_DELETED.status)
+            .build()
+    }
+
     @PutMapping("/api/v1/post-log-photos/{photoId}/likes/me")
     override fun likePhoto(
         @LoginUserId userId: Long,

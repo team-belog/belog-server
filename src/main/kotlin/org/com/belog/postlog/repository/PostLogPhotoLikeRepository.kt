@@ -51,4 +51,15 @@ interface PostLogPhotoLikeRepository :
         @Param("photoId") photoId: Long,
         @Param("groupMemberId") groupMemberId: Long,
     ): Int
+
+    @Modifying
+    @Query(
+        """
+        DELETE FROM PostLogPhotoLike photoLike
+        WHERE photoLike.photo.id = :photoId
+        """,
+    )
+    fun deleteAllByPhotoId(
+        @Param("photoId") photoId: Long,
+    ): Int
 }

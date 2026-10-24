@@ -7,7 +7,6 @@ import org.com.belog.billlog.domain.BillItem
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
-import org.com.belog.billlog.domain.calculateBillDayNumber
 import org.com.belog.billlog.repository.BillItemRepository
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
@@ -26,6 +25,7 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.notification.service.NotificationService
@@ -104,7 +104,7 @@ class BillService(
 
         return BillDetailResult(
             billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
-            dayNumber = calculateBillDayNumber(meetingStartDate, paymentDate),
+            dayNumber = calculateMeetingDayNumber(meetingStartDate, paymentDate),
             paymentDate = paymentDate,
             title = bill.title,
             payerNickname = payerNickname,

@@ -2,6 +2,7 @@ package org.com.belog.postlog.service
 
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectDeleter
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
@@ -17,10 +18,14 @@ import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoLike
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
+import org.com.belog.postlog.domain.PostLogTicket
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoObjectVerifier
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoUploadUrlProvider
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.postlog.repository.PostLogTicketRepository
+import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
+import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -33,9 +38,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager
 import org.springframework.context.annotation.Import
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -56,6 +64,7 @@ import kotlin.test.assertTrue
 @ActiveProfiles("test")
 @Import(
     PostLogPhotoService::class,
+    PostLogPhotoDeletionService::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
@@ -63,6 +72,9 @@ import kotlin.test.assertTrue
 class PostLogPhotoServiceQueryTest {
     @Autowired
     private lateinit var photoService: PostLogPhotoService
+
+    @Autowired
+    private lateinit var entityManager: TestEntityManager
 
     @Autowired
     private lateinit var photoLikeRepository: PostLogPhotoLikeRepository
@@ -94,6 +106,12 @@ class PostLogPhotoServiceQueryTest {
     @MockitoBean
     private lateinit var objectReadUrlProvider: S3ObjectReadUrlProvider
 
+    @MockitoBean
+    private lateinit var objectDeleter: S3ObjectDeleter
+
+    @Autowired
+    private lateinit var ticketRepository: PostLogTicketRepository
+
     @BeforeEach
     fun setUpReadUrls() {
         `when`(objectReadUrlProvider.generateReadUrl(anyString())).thenAnswer { invocation ->
@@ -112,7 +130,43 @@ class PostLogPhotoServiceQueryTest {
 
         assertEquals(
             listOf(requireNotNull(firstPhoto.id), requireNotNull(secondPhoto.id), requireNotNull(latePhoto.id)),
-            result.items.map { item -> item.photoId },
+            result.photos().map { item -> item.photoId },
+        )
+    }
+
+    @Test
+    fun `사진을 촬영 현지 날짜 기준 만남 일차별로 묶어 조회한다`() {
+        val context = saveMeetingContext()
+        val beforeStartPhoto = savePhoto(context, "before-start.jpg", "2026-09-27T23:00:00+09:00")
+        val firstDayPhoto = savePhoto(context, "first-day.jpg", "2026-09-28T00:30:00+09:00")
+        val secondDayPhoto = savePhoto(context, "second-day.jpg", "2026-09-29T12:00:00+09:00")
+
+        val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
+
+        assertEquals(listOf(-1, 1, 2), result.days.map { day -> day.dayNumber })
+        assertEquals(
+            listOf(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 9, 28), LocalDate.of(2026, 9, 29)),
+            result.days.map { day -> day.date },
+        )
+        assertEquals(
+            listOf(beforeStartPhoto, firstDayPhoto, secondDayPhoto).map { photo -> listOf(requireNotNull(photo.id)) },
+            result.days.map { day -> day.photos.map { item -> item.photoId } },
+        )
+    }
+
+    @Test
+    fun `UTC 촬영 순서와 현지 날짜 순서가 달라도 페이지를 넘어 일차 오름차순으로 조회한다`() {
+        val context = saveMeetingContext()
+        val laterLocalDatePhoto = savePhoto(context, "kiritimati.jpg", "2026-09-28T00:00:00+14:00")
+        val earlierLocalDatePhoto = savePhoto(context, "baker-island.jpg", "2026-09-27T23:00:00-12:00")
+
+        val firstPage = photoService.getPhotos(context.meetingId, context.userId, cursor = null, size = 1)
+        val secondPage = photoService.getPhotos(context.meetingId, context.userId, cursor = firstPage.nextCursor, size = 1)
+
+        assertEquals(listOf(-1, 1), listOf(firstPage, secondPage).flatMap { page -> page.days.map { day -> day.dayNumber } })
+        assertEquals(
+            listOf(requireNotNull(earlierLocalDatePhoto.id), requireNotNull(laterLocalDatePhoto.id)),
+            listOf(firstPage, secondPage).flatMap { page -> page.photos().map { item -> item.photoId } },
         )
     }
 
@@ -129,7 +183,7 @@ class PostLogPhotoServiceQueryTest {
         val thirdPage = photoService.getPhotos(context.meetingId, context.userId, cursor = secondPage.nextCursor, size = 2)
         val actualPhotoIds =
             listOf(firstPage, secondPage, thirdPage)
-                .flatMap { page -> page.items }
+                .flatMap { page -> page.photos() }
                 .map { item -> item.photoId }
 
         assertEquals(photos.map { photo -> requireNotNull(photo.id) }, actualPhotoIds)
@@ -150,7 +204,7 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null, size = 2)
 
-        assertEquals(2, result.items.size)
+        assertEquals(2, result.photos().size)
         assertFalse(result.hasNext)
         assertNull(result.nextCursor)
     }
@@ -161,7 +215,7 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
 
-        assertTrue(result.items.isEmpty())
+        assertTrue(result.photos().isEmpty())
         assertFalse(result.hasNext)
         assertNull(result.nextCursor)
     }
@@ -185,9 +239,9 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
 
-        assertEquals(listOf(3L, 1L, 0L), result.items.map { item -> item.likeCount })
-        assertEquals(listOf(true, false, false), result.items.map { item -> item.likedByMe })
-        assertEquals(requireNotNull(unlikedPhoto.id), result.items.last().photoId)
+        assertEquals(listOf(3L, 1L, 0L), result.photos().map { item -> item.likeCount })
+        assertEquals(listOf(true, false, false), result.photos().map { item -> item.likedByMe })
+        assertEquals(requireNotNull(unlikedPhoto.id), result.photos().last().photoId)
     }
 
     @Test
@@ -215,6 +269,82 @@ class PostLogPhotoServiceQueryTest {
             }
 
         assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `일정 조율 중인 만남의 사진은 조회할 수 없다`() {
+        val context = saveMeetingContext()
+        val meeting =
+            meetingRepository.saveAndFlush(
+                Meeting.createPoll(
+                    group = context.group,
+                    creator = context.groupMember,
+                    name = "일정 조율 여행",
+                    location = null,
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                photoService.getPhotos(meetingId = requireNotNull(meeting.id), userId = context.userId, cursor = null)
+            }
+
+        assertEquals(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED, exception.errorCode)
+    }
+
+    @Test
+    fun `업로더가 아닌 그룹 멤버도 사진을 삭제할 수 있고 좋아요도 함께 삭제된다`() {
+        val context = saveMeetingContext()
+        val otherMember = saveGroupMember(context.group, "other-member")
+        val photo = savePhoto(context, "delete.jpg", "2026-09-28T12:00:00+09:00")
+        val photoId = requireNotNull(photo.id)
+        photoLikeRepository.saveAllAndFlush(
+            listOf(
+                PostLogPhotoLike.create(photo, context.groupMember),
+                PostLogPhotoLike.create(photo, otherMember),
+            ),
+        )
+        entityManager.clear()
+
+        photoService.deletePhoto(photoId = photoId, userId = requireNotNull(otherMember.user.id))
+
+        assertFalse(photoRepository.existsById(photoId))
+        assertEquals(0L, photoLikeRepository.countByPhotoId(photoId))
+        verify(objectDeleter).delete(photo.objectKey)
+    }
+
+    @Test
+    fun `티켓 커버로 사용 중인 사진을 삭제하면 S3 객체는 유지한다`() {
+        val context = saveMeetingContext()
+        val photo = savePhoto(context, "cover.jpg", "2026-09-28T12:00:00+09:00")
+        ticketRepository.saveAndFlush(
+            PostLogTicket.issue(
+                meeting = context.meeting,
+                creator = context.groupMember,
+                memory = "즐거웠던 여행",
+                coverImageObjectKey = photo.objectKey,
+                issuedAt = Instant.parse("2026-09-29T00:00:00Z"),
+            ),
+        )
+
+        photoService.deletePhoto(photoId = requireNotNull(photo.id), userId = context.userId)
+
+        assertFalse(photoRepository.existsById(requireNotNull(photo.id)))
+        verify(objectDeleter, never()).delete(anyString())
+    }
+
+    @Test
+    fun `그룹 멤버가 아닌 사용자는 사진을 삭제할 수 없다`() {
+        val context = saveMeetingContext()
+        val photo = savePhoto(context, "delete.jpg", "2026-09-28T12:00:00+09:00")
+        val outsider = saveCompletedUser("outsider")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                photoService.deletePhoto(photoId = requireNotNull(photo.id), userId = requireNotNull(outsider.id))
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
     }
 
     @ParameterizedTest
@@ -311,6 +441,8 @@ class PostLogPhotoServiceQueryTest {
         return userRepository.saveAndFlush(user)
     }
 
+    private fun PostLogPhotoListResult.photos(): List<PostLogPhotoListItemResult> = days.flatMap { day -> day.photos }
+
     private data class MeetingContext(
         val group: Group,
         val groupMember: GroupMember,
@@ -328,9 +460,11 @@ class PostLogPhotoServiceQueryTest {
             Stream.of(
                 "not-base64!",
                 encodeCursorValue("missing-delimiter"),
-                encodeCursorValue("not-an-instant|1"),
-                encodeCursorValue("2026-09-28T03:00:00Z|not-a-number"),
-                encodeCursorValue("2026-09-28T03:00:00Z|0"),
+                encodeCursorValue("2026-09-28T03:00:00Z|1"),
+                encodeCursorValue("not-a-date|2026-09-28T03:00:00Z|1"),
+                encodeCursorValue("2026-09-28|not-an-instant|1"),
+                encodeCursorValue("2026-09-28|2026-09-28T03:00:00Z|not-a-number"),
+                encodeCursorValue("2026-09-28|2026-09-28T03:00:00Z|0"),
             )
 
         private fun encodeCursorValue(value: String): String =

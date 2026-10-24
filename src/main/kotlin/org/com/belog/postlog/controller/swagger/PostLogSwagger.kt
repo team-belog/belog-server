@@ -309,8 +309,11 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 사진 목록 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 등록된 사진을 촬영 시각과 사진 ID 오름차순으로 조회합니다. " +
+            "해당 만남이 속한 그룹의 멤버가 등록된 사진을 촬영 현지 날짜, 촬영 시각, 사진 ID 오름차순으로 조회하고, " +
+                "사진 촬영 현지 날짜 기준 만남 일차별로 묶어 반환합니다. " +
+                "일차는 만남 시작일이 1일차이며, 시작일 이전 사진은 음수 일차입니다. " +
                 "각 사진의 Presigned GET URL, 좋아요 수와 로그인 사용자의 좋아요 여부를 반환합니다. " +
+                "페이지는 사진 개수 기준으로 나뉘므로 같은 일차의 사진이 다음 페이지에 이어질 수 있습니다. " +
                 "다음 페이지 조회에는 이전 응답의 nextCursor를 그대로 사용합니다.",
     )
     @ApiResponses(
@@ -363,6 +366,17 @@ interface PostLogSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 일정이 확정되지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE)],
                     ),
                 ],
             ),
@@ -436,6 +450,17 @@ interface PostLogSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 일정이 확정되지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE)],
                     ),
                 ],
             ),
@@ -518,12 +543,15 @@ interface PostLogSwagger {
             ),
             ApiResponse(
                 responseCode = "409",
-                description = "동일한 object key가 다른 메타데이터로 이미 등록됨",
+                description = "동일한 object key가 다른 메타데이터로 이미 등록됨 또는 만남 일정이 확정되지 않음",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "object key 충돌", value = PHOTO_OBJECT_KEY_CONFLICT_EXAMPLE),
+                            ExampleObject(name = "일정 미확정", value = MEETING_DATE_NOT_CONFIRMED_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -561,6 +589,49 @@ interface PostLogSwagger {
         @RequestBody
         request: RegisterPostLogPhotosRequest,
     ): ResponseEntity<CommonResponse<RegisterPostLogPhotosResponse>>
+
+    @Operation(
+        summary = "Post-log 사진 삭제",
+        description =
+            "해당 만남이 속한 그룹의 멤버라면 업로더와 관계없이 사진을 삭제할 수 있습니다. " +
+                "만남 상태와 관계없이 삭제할 수 있으며 사진에 등록된 좋아요도 함께 삭제됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "사진 삭제 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "사진을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = POST_LOG_PHOTO_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun deletePhoto(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "사진 ID", example = "31", required = true)
+        @PathVariable
+        photoId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
 
     @Operation(
         summary = "Post-log 사진 좋아요 등록",
@@ -724,16 +795,19 @@ private const val POST_LOG_PHOTO_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E010","message":"사진을 찾을 수 없습니다.","data":null}"""
 
 private const val GET_PHOTOS_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}],"nextCursor":"MjAyNi0wOS0yOFQwMzowMDowMFp8MzE","hasNext":true}}"""
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[{"dayNumber":1,"date":"2026-09-28","photos":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}]},{"dayNumber":2,"date":"2026-09-29","photos":[{"photoId":32,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-2.jpg?...","capturedAt":"2026-09-29T09:30:00+09:00","likeCount":0,"likedByMe":false}]}],"nextCursor":"MjAyNi0wOS0yOXwyMDI2LTA5LTI5VDAwOjMwOjAwWnwzMg","hasNext":true}}"""
 
 private const val GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[],"nextCursor":null,"hasNext":false}}"""
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[],"nextCursor":null,"hasNext":false}}"""
 
 private const val INVALID_PHOTO_CURSOR_EXAMPLE =
     """{"code":"POST_LOG-E011","message":"사진 목록 커서가 올바르지 않습니다.","data":null}"""
 
 private const val TICKET_ALREADY_CREATED_EXAMPLE =
     """{"code":"POST_LOG-E012","message":"해당 만남에 이미 티켓을 생성했습니다.","data":null}"""
+
+private const val MEETING_DATE_NOT_CONFIRMED_EXAMPLE =
+    """{"code":"POST_LOG-E014","message":"만남 일정이 확정되지 않아 사진을 업로드하거나 조회할 수 없습니다.","data":null}"""
 
 private const val TICKET_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E013","message":"생성된 Post-log 티켓을 찾을 수 없습니다.","data":null}"""

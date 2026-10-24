@@ -4,7 +4,6 @@ import org.com.belog.billlog.code.BillLogErrorCode
 import org.com.belog.billlog.domain.CurrencyAmount
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
-import org.com.belog.billlog.domain.calculateBillDayNumber
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.billlog.service.result.BillDayResult
@@ -23,6 +22,7 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.user.domain.User
 import org.com.belog.user.service.UserService
@@ -106,7 +106,7 @@ class BillLogService(
                 pageDates.map { paymentDate ->
                     val bills = billsByDate[paymentDate].orEmpty()
                     BillDayResult(
-                        dayNumber = calculateBillDayNumber(meetingStartDate, paymentDate),
+                        dayNumber = calculateMeetingDayNumber(meetingStartDate, paymentDate),
                         paymentDate = paymentDate,
                         dailyTotalAmounts =
                             CurrencyAmount.sumByCurrency(
