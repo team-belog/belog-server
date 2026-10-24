@@ -352,6 +352,27 @@ class BillServiceTest {
     }
 
     @Test
+    fun `같은 방향 대기 중 정산 금액의 합이 저장 범위를 넘으면 금액 초과 오류로 거부한다`() {
+        val context = saveMeetingContext()
+        val maxDebtAmount = 49_999_999_999_999_999L
+        repeat(2) {
+            billService.registerBill(
+                createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+            )
+        }
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                billService.registerBill(
+                    createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+                )
+            }
+
+        assertEquals(BillLogErrorCode.AMOUNT_OVERFLOW, exception.errorCode)
+        assertEquals(BigDecimal.valueOf(maxDebtAmount * 2), settlementRequestRepository.findAll().single().amount)
+    }
+
+    @Test
     fun `화폐 단위가 다른 결제는 별도의 정산 요청으로 상계한다`() {
         val context = saveMeetingContext()
         billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))

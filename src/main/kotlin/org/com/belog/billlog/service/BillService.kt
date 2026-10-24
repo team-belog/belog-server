@@ -262,6 +262,9 @@ class BillService(
                         otherParticipantId = payerId,
                         pendingStatus = SettlementRequestStatus.PENDING,
                     )
+                if (pendingRequest != null && !pendingRequest.canStoreOffset(participant, payer, share.amount)) {
+                    throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
+                }
                 val settlementRequest =
                     saveDomainEntity {
                         if (pendingRequest == null) {

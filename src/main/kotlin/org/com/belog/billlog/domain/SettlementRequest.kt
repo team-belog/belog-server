@@ -132,12 +132,7 @@ class SettlementRequest protected constructor(
         check(status == SettlementRequestStatus.PENDING) { "완료된 정산 요청에는 결제 내역을 상계할 수 없습니다." }
         validateDebtAmount(currency, debtAmount)
 
-        val netAmount =
-            when {
-                debtor.isSameParticipantAs(sender) && creditor.isSameParticipantAs(receiver) -> amount.add(debtAmount)
-                debtor.isSameParticipantAs(receiver) && creditor.isSameParticipantAs(sender) -> amount.subtract(debtAmount)
-                else -> throw IllegalArgumentException("정산 요청의 두 참여자 사이 결제 내역만 상계할 수 있습니다.")
-            }
+        val netAmount = calculateNetAmount(debtor, creditor, debtAmount)
         require(BillAmount.isStorable(netAmount)) { "상계된 정산 금액이 저장 가능한 범위를 벗어났습니다." }
 
         if (netAmount.signum() < 0) {
@@ -152,6 +147,23 @@ class SettlementRequest protected constructor(
             complete(offsetAt)
         }
     }
+
+    fun canStoreOffset(
+        debtor: MeetingParticipant,
+        creditor: MeetingParticipant,
+        debtAmount: BigDecimal,
+    ): Boolean = BillAmount.isStorable(calculateNetAmount(debtor, creditor, debtAmount))
+
+    private fun calculateNetAmount(
+        debtor: MeetingParticipant,
+        creditor: MeetingParticipant,
+        debtAmount: BigDecimal,
+    ): BigDecimal =
+        when {
+            debtor.isSameParticipantAs(sender) && creditor.isSameParticipantAs(receiver) -> amount.add(debtAmount)
+            debtor.isSameParticipantAs(receiver) && creditor.isSameParticipantAs(sender) -> amount.subtract(debtAmount)
+            else -> throw IllegalArgumentException("정산 요청의 두 참여자 사이 결제 내역만 상계할 수 있습니다.")
+        }
 
     fun covers(
         bill: Bill,
