@@ -264,6 +264,26 @@ class BillLogServiceTest {
     }
 
     @Test
+    fun `상계 결과 0원으로 자동 완료된 정산 요청은 정산 현황에서 제외한다`() {
+        val context = saveMeetingContext()
+        val offsetBill = saveBill(context, context.firstParticipant, "상계된 결제", 10_000L)
+        val remainingBill = saveBill(context, context.firstParticipant, "남은 결제", 20_000L)
+        val offsetRequest = saveSettlementRequest(offsetBill, context.secondParticipant, 5_000L, 0)
+        offsetRequest.offset(
+            debtor = context.firstParticipant,
+            creditor = context.secondParticipant,
+            debtAmount = BigDecimal.valueOf(5_000L),
+            offsetAt = Instant.parse("2026-09-30T00:00:00Z"),
+        )
+        settlementRequestRepository.saveAndFlush(offsetRequest)
+        val remainingRequest = saveSettlementRequest(remainingBill, context.thirdParticipant, 20_000L, 0)
+
+        val result = getSettlementRequestPage(context, cursor = null, size = 10)
+
+        assertEquals(listOf(remainingRequest.id), result.items.map { item -> item.settlementRequestId })
+    }
+
+    @Test
     fun `정산 현황 커서가 올바르지 않으면 입력 오류를 반환한다`() {
         val context = saveMeetingContext()
 
@@ -438,20 +458,28 @@ class BillLogServiceTest {
         allocationOrder: Int,
         completed: Boolean = false,
     ): SettlementRequest {
-        val share =
-            billShareRepository.saveAndFlush(
-                BillShare.create(
-                    bill = bill,
-                    participant = participant,
-                    amount = BigDecimal.valueOf(amount),
-                    allocationOrder = allocationOrder,
-                ),
+        val request =
+            SettlementRequest.create(
+                meeting = bill.meeting,
+                currency = bill.currency,
+                debtor = participant,
+                creditor = bill.payer,
+                debtAmount = BigDecimal.valueOf(amount),
             )
-        val request = SettlementRequest.create(share)
         if (completed) {
             request.complete(Instant.parse("2026-09-30T00:00:00Z"))
         }
-        return settlementRequestRepository.saveAndFlush(request)
+        val savedRequest = settlementRequestRepository.saveAndFlush(request)
+        billShareRepository.saveAndFlush(
+            BillShare.create(
+                bill = bill,
+                participant = participant,
+                amount = BigDecimal.valueOf(amount),
+                allocationOrder = allocationOrder,
+                settlementRequest = savedRequest,
+            ),
+        )
+        return savedRequest
     }
 
     private fun updateBillCreatedAt(

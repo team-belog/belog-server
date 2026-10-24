@@ -1,6 +1,7 @@
 package org.com.belog.billlog.repository
 
 import jakarta.persistence.LockModeType
+import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.SettlementRequest
 import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.springframework.data.domain.Pageable
@@ -14,14 +15,14 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         """
         SELECT settlementRequest
         FROM SettlementRequest settlementRequest
-        JOIN FETCH settlementRequest.bill bill
-        JOIN FETCH bill.payer payer
-        JOIN FETCH payer.groupMember payerMember
-        JOIN FETCH payerMember.user
-        JOIN FETCH settlementRequest.participant participant
-        JOIN FETCH participant.groupMember participantMember
-        JOIN FETCH participantMember.user
-        WHERE bill.meeting.id = :meetingId
+        JOIN FETCH settlementRequest.receiver receiver
+        JOIN FETCH receiver.groupMember receiverMember
+        JOIN FETCH receiverMember.user
+        JOIN FETCH settlementRequest.sender sender
+        JOIN FETCH sender.groupMember senderMember
+        JOIN FETCH senderMember.user
+        WHERE settlementRequest.meeting.id = :meetingId
+          AND settlementRequest.amount > 0
           AND (
               :cursorId IS NULL
               OR (
@@ -53,9 +54,9 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
 
     @Query(
         """
-        SELECT COUNT(DISTINCT settlementRequest.participant.id)
+        SELECT COUNT(DISTINCT settlementRequest.sender.id)
         FROM SettlementRequest settlementRequest
-        WHERE settlementRequest.bill.meeting.id = :meetingId
+        WHERE settlementRequest.meeting.id = :meetingId
           AND settlementRequest.status = :status
         """,
     )
@@ -66,14 +67,14 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
 
     @Query(
         """
-        SELECT COUNT(DISTINCT settlementRequest.participant.id)
+        SELECT COUNT(DISTINCT settlementRequest.sender.id)
         FROM SettlementRequest settlementRequest
-        WHERE settlementRequest.bill.meeting.id = :meetingId
+        WHERE settlementRequest.meeting.id = :meetingId
           AND NOT EXISTS (
               SELECT pendingRequest.id
               FROM SettlementRequest pendingRequest
-              WHERE pendingRequest.bill.meeting.id = :meetingId
-                AND pendingRequest.participant.id = settlementRequest.participant.id
+              WHERE pendingRequest.meeting.id = :meetingId
+                AND pendingRequest.sender.id = settlementRequest.sender.id
                 AND pendingRequest.status = :pendingStatus
           )
         """,
@@ -87,8 +88,7 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         value = """
         SELECT settlement_request.id
         FROM bill_log_settlement_requests settlement_request
-        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
-        WHERE bill.meeting_id = :meetingId
+        WHERE settlement_request.meeting_id = :meetingId
           AND settlement_request.status = :status
         LIMIT 1
         FOR UPDATE
@@ -104,8 +104,7 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         value = """
         SELECT settlement_request.id
         FROM bill_log_settlement_requests settlement_request
-        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
-        JOIN meetings meeting ON meeting.id = bill.meeting_id
+        JOIN meetings meeting ON meeting.id = settlement_request.meeting_id
         WHERE meeting.group_id = :groupId
           AND settlement_request.status = :status
         LIMIT 1
@@ -122,9 +121,8 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         value = """
         SELECT settlement_request.id
         FROM bill_log_settlement_requests settlement_request
-        JOIN bill_log_bills bill ON bill.id = settlement_request.bill_id
-        JOIN meeting_participants sender ON sender.id = settlement_request.meeting_participant_id
-        JOIN meeting_participants receiver ON receiver.id = bill.payer_meeting_participant_id
+        JOIN meeting_participants sender ON sender.id = settlement_request.sender_meeting_participant_id
+        JOIN meeting_participants receiver ON receiver.id = settlement_request.receiver_meeting_participant_id
         JOIN group_members sender_member ON sender_member.id = sender.group_member_id
         JOIN group_members receiver_member ON receiver_member.id = receiver.group_member_id
         WHERE settlement_request.status = :status
@@ -144,14 +142,39 @@ interface SettlementRequestRepository : JpaRepository<SettlementRequest, Long> {
         """
         SELECT settlementRequest
         FROM SettlementRequest settlementRequest
-        JOIN FETCH settlementRequest.bill bill
-        JOIN FETCH settlementRequest.participant participant
-        JOIN FETCH participant.groupMember groupMember
-        JOIN FETCH groupMember.user
+        JOIN FETCH settlementRequest.meeting
+        JOIN FETCH settlementRequest.sender sender
+        JOIN FETCH sender.groupMember senderMember
+        JOIN FETCH senderMember.user
+        JOIN FETCH settlementRequest.receiver receiver
+        JOIN FETCH receiver.groupMember receiverMember
+        JOIN FETCH receiverMember.user
         WHERE settlementRequest.id = :settlementRequestId
         """,
     )
     fun findByIdForUpdate(
         @Param("settlementRequestId") settlementRequestId: Long,
+    ): SettlementRequest?
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT settlementRequest
+        FROM SettlementRequest settlementRequest
+        WHERE settlementRequest.meeting.id = :meetingId
+          AND settlementRequest.currency = :currency
+          AND settlementRequest.status = :pendingStatus
+          AND (
+              (settlementRequest.sender.id = :participantId AND settlementRequest.receiver.id = :otherParticipantId)
+              OR (settlementRequest.sender.id = :otherParticipantId AND settlementRequest.receiver.id = :participantId)
+          )
+        """,
+    )
+    fun findPendingBetweenForUpdate(
+        @Param("meetingId") meetingId: Long,
+        @Param("currency") currency: BillCurrency,
+        @Param("participantId") participantId: Long,
+        @Param("otherParticipantId") otherParticipantId: Long,
+        @Param("pendingStatus") pendingStatus: SettlementRequestStatus,
     ): SettlementRequest?
 }

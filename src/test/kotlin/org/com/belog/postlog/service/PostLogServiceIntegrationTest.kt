@@ -132,8 +132,8 @@ class PostLogServiceIntegrationTest {
     fun cleanUp() {
         notificationOutboxRepository.deleteAllInBatch()
         notificationRepository.deleteAllInBatch()
-        settlementRequestRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
+        settlementRequestRepository.deleteAllInBatch()
         billRepository.deleteAllInBatch()
         photoLikeRepository.deleteAllInBatch()
         photoRepository.deleteAllInBatch()
@@ -679,20 +679,28 @@ class PostLogServiceIntegrationTest {
         allocationOrder: Int,
         completed: Boolean,
     ): SettlementRequest {
-        val share =
-            billShareRepository.saveAndFlush(
-                BillShare.create(
-                    bill = bill,
-                    participant = participant,
-                    amount = BigDecimal.valueOf(amount),
-                    allocationOrder = allocationOrder,
-                ),
+        val settlementRequest =
+            SettlementRequest.create(
+                meeting = bill.meeting,
+                currency = bill.currency,
+                debtor = participant,
+                creditor = bill.payer,
+                debtAmount = BigDecimal.valueOf(amount),
             )
-        val settlementRequest = SettlementRequest.create(share)
         if (completed) {
             settlementRequest.complete(FIXED_INSTANT)
         }
-        return settlementRequestRepository.saveAndFlush(settlementRequest)
+        val savedRequest = settlementRequestRepository.saveAndFlush(settlementRequest)
+        billShareRepository.saveAndFlush(
+            BillShare.create(
+                bill = bill,
+                participant = participant,
+                amount = BigDecimal.valueOf(amount),
+                allocationOrder = allocationOrder,
+                settlementRequest = savedRequest,
+            ),
+        )
+        return savedRequest
     }
 
     private fun findCreatorTicket(context: MeetingContext): PostLogTicket? =

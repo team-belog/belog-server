@@ -172,8 +172,10 @@ interface BillSwagger {
             "해당 만남이 속한 그룹의 멤버가 결제 내역을 등록합니다. " +
                 "화폐 단위는 KRW, USD, JPY, EUR 중 하나이며 생략하면 KRW로 등록합니다. " +
                 "KRW와 JPY는 정수, USD와 EUR는 소수점 둘째 자리까지 입력할 수 있습니다. " +
-                "항목 합계와 개인별 부담 금액 합계는 결제 총액과 일치해야 하며, " +
-                "결제자를 제외한 부담자에게 PENDING 정산 요청을 생성합니다.",
+                "항목 합계와 개인별 부담 금액 합계는 결제 총액과 일치해야 합니다. " +
+                "결제자를 제외한 부담자의 부담 금액은 같은 화폐의 결제자와의 대기 중 정산 요청에 상계하며, " +
+                "대기 중 요청이 없으면 새 PENDING 정산 요청을 생성하고 상계 결과가 0원이면 자동 완료합니다. " +
+                "상계된 정산 금액이 허용 범위를 넘으면 등록할 수 없습니다.",
     )
     @ApiResponses(
         value = [
@@ -200,6 +202,7 @@ interface BillSwagger {
                             ExampleObject(name = "항목 합계 불일치", value = ITEM_TOTAL_MISMATCH_EXAMPLE),
                             ExampleObject(name = "개인별 부담 금액 합계 불일치", value = SHARE_TOTAL_MISMATCH_EXAMPLE),
                             ExampleObject(name = "화폐 단위 소수점 자릿수 불일치", value = INVALID_CURRENCY_AMOUNT_EXAMPLE),
+                            ExampleObject(name = "금액 합계 허용 범위 초과", value = AMOUNT_OVERFLOW_EXAMPLE),
                             ExampleObject(name = "결제자 참여 권한 없음", value = INVALID_PAYER_EXAMPLE),
                         ],
                     ),
@@ -270,6 +273,9 @@ private const val ITEM_TOTAL_MISMATCH_EXAMPLE =
 
 private const val INVALID_CURRENCY_AMOUNT_EXAMPLE =
     """{"code":"BILL_LOG-E028","message":"결제 금액의 소수점 자릿수가 화폐 단위와 맞지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
+
+private const val AMOUNT_OVERFLOW_EXAMPLE =
+    """{"code":"BILL_LOG-E010","message":"결제 금액 합계가 허용 범위를 초과했습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
 
 private const val SHARE_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E006","message":"개인별 부담 금액 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""

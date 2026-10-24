@@ -43,14 +43,18 @@ import org.mockito.Mockito.mockingDetails
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.sql.Timestamp
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
@@ -58,6 +62,7 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     BillService::class,
+    BillServiceTest.FixedClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
@@ -151,7 +156,8 @@ class BillServiceTest {
         assertEquals(listOf(0, 1), shares.map { share -> share.allocationOrder })
 
         val settlementRequest = settlementRequestRepository.findAll().single()
-        assertEquals(context.memberParticipant.id, settlementRequest.participant.id)
+        assertEquals(context.memberParticipant.id, settlementRequest.sender.id)
+        assertEquals(context.payerParticipant.id, settlementRequest.receiver.id)
         assertEquals(BigDecimal.valueOf(7_000L), settlementRequest.amount)
         assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
     }
@@ -243,7 +249,7 @@ class BillServiceTest {
         assertEquals(2, settlementRequests.size)
         assertEquals(
             setOf(context.memberParticipant.id, thirdParticipant.id),
-            settlementRequests.map { request -> request.participant.id }.toSet(),
+            settlementRequests.map { request -> request.sender.id }.toSet(),
         )
     }
 
@@ -262,12 +268,133 @@ class BillServiceTest {
                     type = NotificationType.SETTLEMENT_REQUESTED,
                     message = "참여자 님이 정산을 요청했어요",
                     targetId = context.meeting.id,
-                    deduplicationKey = "SETTLEMENT_REQUESTED:${settlementRequest.id}",
+                    deduplicationKey = "SETTLEMENT_REQUESTED:${settlementRequest.id}:${result.billId}",
                 ),
             )
         assertEquals(expectedCommands, requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED))
         assertEquals(1L, billRepository.count())
         assertEquals(result.billId, billRepository.findAll().single().id)
+    }
+
+    @Test
+    fun `반대 방향 결제를 등록하면 하나의 정산 요청에 상계되어 차액만 남고 방향이 바뀐다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 3_000L))
+
+        billService.registerBill(createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 10_000L))
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        assertEquals(context.payerParticipant.id, settlementRequest.sender.id)
+        assertEquals(context.memberParticipant.id, settlementRequest.receiver.id)
+        assertEquals(BigDecimal.valueOf(7_000L), settlementRequest.amount)
+        assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
+        val debtorShares = billShareRepository.findAll().filter { share -> share.settlementRequest != null }
+        assertEquals(2, debtorShares.size)
+        assertEquals(setOf(settlementRequest.id), debtorShares.map { share -> share.settlementRequest?.id }.toSet())
+    }
+
+    @Test
+    fun `상계로 정산 금액이 바뀌면 바뀐 송금자에게 수취인 이름으로 정산 요청 알림을 다시 보낸다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 3_000L))
+
+        val result =
+            billService.registerBill(
+                createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 10_000L),
+            )
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        val reRequestedCommand =
+            requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED).single { command ->
+                command.deduplicationKey == "SETTLEMENT_REQUESTED:${settlementRequest.id}:${result.billId}"
+            }
+        assertEquals(context.creator.user.id, reRequestedCommand.recipientUserId)
+        assertEquals(context.member.user.id, reRequestedCommand.actorUserId)
+        assertEquals("참여자 님이 정산을 요청했어요", reRequestedCommand.message)
+    }
+
+    @Test
+    fun `상계 결과가 0원이면 정산 요청이 자동 완료되고 정산 요청 알림을 보내지 않는다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+
+        val result =
+            billService.registerBill(
+                createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 5_000L),
+            )
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
+        assertEquals(0, BigDecimal.ZERO.compareTo(settlementRequest.amount))
+        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+        assertEquals(
+            emptyList(),
+            requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED).filter { command ->
+                command.deduplicationKey.endsWith(":${result.billId}")
+            },
+        )
+    }
+
+    @Test
+    fun `완료된 정산 요청 이후 등록한 결제는 0원부터 새 정산 요청으로 시작한다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+        settlementRequestRepository.findAll().single().complete(FIXED_INSTANT)
+
+        billService.registerBill(createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 2_000L))
+
+        val pendingRequest =
+            settlementRequestRepository.findAll().single { request -> request.status == SettlementRequestStatus.PENDING }
+        assertEquals(2L, settlementRequestRepository.count())
+        assertEquals(context.payerParticipant.id, pendingRequest.sender.id)
+        assertEquals(context.memberParticipant.id, pendingRequest.receiver.id)
+        assertEquals(BigDecimal.valueOf(2_000L), pendingRequest.amount)
+    }
+
+    @Test
+    fun `같은 방향 대기 중 정산 금액의 합이 저장 범위를 넘으면 금액 초과 오류로 거부한다`() {
+        val context = saveMeetingContext()
+        val maxDebtAmount = 49_999_999_999_999_999L
+        repeat(2) {
+            billService.registerBill(
+                createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+            )
+        }
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                billService.registerBill(
+                    createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+                )
+            }
+
+        assertEquals(BillLogErrorCode.AMOUNT_OVERFLOW, exception.errorCode)
+        assertEquals(BigDecimal.valueOf(maxDebtAmount * 2), settlementRequestRepository.findAll().single().amount)
+    }
+
+    @Test
+    fun `화폐 단위가 다른 결제는 별도의 정산 요청으로 상계한다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+
+        billService.registerBill(
+            createPairCommand(
+                context,
+                payer = context.member,
+                debtor = context.creator,
+                debtAmount = 5_000L,
+                currency = BillCurrency.JPY,
+            ),
+        )
+
+        val requestsByCurrency = settlementRequestRepository.findAll().associateBy { request -> request.currency }
+        assertEquals(setOf(BillCurrency.KRW, BillCurrency.JPY), requestsByCurrency.keys)
+        assertEquals(context.memberParticipant.id, requestsByCurrency.getValue(BillCurrency.KRW).sender.id)
+        assertEquals(context.payerParticipant.id, requestsByCurrency.getValue(BillCurrency.JPY).sender.id)
+        assertEquals(
+            listOf(SettlementRequestStatus.PENDING, SettlementRequestStatus.PENDING),
+            requestsByCurrency.values.map { request -> request.status },
+        )
     }
 
     @Test
@@ -470,6 +597,28 @@ class BillServiceTest {
             shares = shares,
         )
 
+    private fun createPairCommand(
+        context: MeetingContext,
+        payer: GroupMember,
+        debtor: GroupMember,
+        debtAmount: Long,
+        currency: BillCurrency = BillCurrency.KRW,
+    ): RegisterBillCommand {
+        val totalAmount = BigDecimal.valueOf(debtAmount * 2)
+        return createCommand(
+            context = context,
+            payerMemberId = requireNotNull(payer.id),
+            currency = currency,
+            totalAmount = totalAmount,
+            items = listOf(BillItemCommand("식사", totalAmount)),
+            shares =
+                listOf(
+                    BillShareCommand(requireNotNull(payer.id), BigDecimal.valueOf(debtAmount)),
+                    BillShareCommand(requireNotNull(debtor.id), BigDecimal.valueOf(debtAmount)),
+                ),
+        )
+    }
+
     private fun amounts(vararg values: Long): List<BigDecimal> = values.map(BigDecimal::valueOf)
 
     private fun requestedNotificationCommands(type: NotificationType): Set<CreateNotificationCommand> =
@@ -556,6 +705,16 @@ class BillServiceTest {
             completedAt = Instant.parse("2026-09-20T00:00:00Z"),
         )
         return userRepository.saveAndFlush(user)
+    }
+
+    @TestConfiguration
+    class FixedClockConfig {
+        @Bean
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+    }
+
+    companion object {
+        private val FIXED_INSTANT: Instant = Instant.parse("2026-09-23T03:00:00Z")
     }
 
     private data class MeetingContext(

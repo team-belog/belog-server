@@ -13,17 +13,18 @@ internal object BillLogNotificationCommands {
     fun settlementRequested(
         meetingId: Long,
         settlementRequestId: Long,
+        billId: Long,
         recipientUserId: Long,
-        payerUserId: Long,
-        payerNickname: String,
+        receiverUserId: Long,
+        receiverNickname: String,
     ): CreateNotificationCommand =
         CreateNotificationCommand(
             recipientUserId = recipientUserId,
-            actorUserId = payerUserId,
+            actorUserId = receiverUserId,
             type = NotificationType.SETTLEMENT_REQUESTED,
-            message = payerNickname + SETTLEMENT_REQUESTED_MESSAGE_SUFFIX,
+            message = receiverNickname + SETTLEMENT_REQUESTED_MESSAGE_SUFFIX,
             targetId = meetingId,
-            deduplicationKey = "${NotificationType.SETTLEMENT_REQUESTED}:$settlementRequestId",
+            deduplicationKey = "${NotificationType.SETTLEMENT_REQUESTED}:$settlementRequestId:$billId",
         )
 
     fun billRegistered(
@@ -46,11 +47,11 @@ internal object BillLogNotificationCommands {
         meetingId: Long,
         settlementRequestId: Long,
         recipientUserId: Long,
-        debtorUserId: Long,
+        senderUserId: Long,
     ): CreateNotificationCommand =
         CreateNotificationCommand(
             recipientUserId = recipientUserId,
-            actorUserId = debtorUserId,
+            actorUserId = senderUserId,
             type = NotificationType.SETTLEMENT_COMPLETED,
             message = SETTLEMENT_COMPLETED_MESSAGE,
             targetId = meetingId,
@@ -61,15 +62,15 @@ internal object BillLogNotificationCommands {
         meetingId: Long,
         settlementRequestId: Long,
         recipientUserId: Long,
-        payerUserId: Long,
-        payerNickname: String,
+        receiverUserId: Long,
+        receiverNickname: String,
         remindedAt: Instant,
     ): CreateNotificationCommand =
         CreateNotificationCommand(
             recipientUserId = recipientUserId,
-            actorUserId = payerUserId,
+            actorUserId = receiverUserId,
             type = NotificationType.SETTLEMENT_REMINDER,
-            message = payerNickname + SETTLEMENT_REMINDER_MESSAGE_SUFFIX,
+            message = receiverNickname + SETTLEMENT_REMINDER_MESSAGE_SUFFIX,
             targetId = meetingId,
             deduplicationKey = "${NotificationType.SETTLEMENT_REMINDER}:$settlementRequestId:${remindedAt.toEpochMilli()}",
         )

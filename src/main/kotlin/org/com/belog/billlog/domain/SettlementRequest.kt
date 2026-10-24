@@ -10,11 +10,12 @@ import jakarta.persistence.ForeignKey
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.Index
 import jakarta.persistence.JoinColumn
 import jakarta.persistence.ManyToOne
 import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
 import org.com.belog.global.domain.BaseEntity
+import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import java.math.BigDecimal
 import java.time.Duration
@@ -23,16 +24,20 @@ import java.time.Instant
 @Entity
 @Table(
     name = "bill_log_settlement_requests",
-    uniqueConstraints = [
-        UniqueConstraint(
-            name = "uk_bill_log_settlement_requests_bill_participant",
-            columnNames = ["bill_id", "meeting_participant_id"],
+    indexes = [
+        Index(
+            name = "idx_bill_log_settlement_requests_meeting_status",
+            columnList = "meeting_id, status",
         ),
     ],
     check = [
         CheckConstraint(
             name = "chk_bill_log_settlement_requests_amount",
-            constraint = "amount > 0",
+            constraint = "(status = 'PENDING' AND amount > 0) OR (status = 'COMPLETED' AND amount >= 0)",
+        ),
+        CheckConstraint(
+            name = "chk_bill_log_settlement_requests_participants",
+            constraint = "sender_meeting_participant_id <> receiver_meeting_participant_id",
         ),
         CheckConstraint(
             name = "chk_bill_log_settlement_requests_completion",
@@ -45,30 +50,48 @@ import java.time.Instant
 class SettlementRequest protected constructor(
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-        name = "bill_id",
+        name = "meeting_id",
         nullable = false,
-        foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_bill_id"),
+        foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_meeting_id"),
     )
-    val bill: Bill,
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-        name = "meeting_participant_id",
-        nullable = false,
-        foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_participant_id"),
-    )
-    val participant: MeetingParticipant,
-    @Column(nullable = false, precision = BillAmount.PRECISION, scale = BillAmount.SCALE)
-    val amount: BigDecimal,
-    status: SettlementRequestStatus,
+    val meeting: Meeting,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = BillCurrency.COLUMN_LENGTH)
+    val currency: BillCurrency,
+    sender: MeetingParticipant,
+    receiver: MeetingParticipant,
+    amount: BigDecimal,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     var id: Long? = null
         protected set
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "sender_meeting_participant_id",
+        nullable = false,
+        foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_sender_id"),
+    )
+    var sender: MeetingParticipant = sender
+        protected set
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+        name = "receiver_meeting_participant_id",
+        nullable = false,
+        foreignKey = ForeignKey(name = "fk_bill_log_settlement_requests_receiver_id"),
+    )
+    var receiver: MeetingParticipant = receiver
+        protected set
+
+    @Column(nullable = false, precision = BillAmount.PRECISION, scale = BillAmount.SCALE)
+    var amount: BigDecimal = amount
+        protected set
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    var status: SettlementRequestStatus = status
+    var status: SettlementRequestStatus = SettlementRequestStatus.PENDING
         protected set
 
     @Column(name = "completed_at")
@@ -100,25 +123,97 @@ class SettlementRequest protected constructor(
         this.completedAt = completedAt
     }
 
+    fun offset(
+        debtor: MeetingParticipant,
+        creditor: MeetingParticipant,
+        debtAmount: BigDecimal,
+        offsetAt: Instant,
+    ) {
+        check(status == SettlementRequestStatus.PENDING) { "완료된 정산 요청에는 결제 내역을 상계할 수 없습니다." }
+        validateDebtAmount(currency, debtAmount)
+
+        val netAmount = calculateNetAmount(debtor, creditor, debtAmount)
+        require(BillAmount.isStorable(netAmount)) { "상계된 정산 금액이 저장 가능한 범위를 벗어났습니다." }
+
+        if (netAmount.signum() < 0) {
+            val previousSender = sender
+            sender = receiver
+            receiver = previousSender
+        }
+        amount = currency.normalize(netAmount.abs())
+        lastRemindedAt = null
+
+        if (amount.signum() == 0) {
+            complete(offsetAt)
+        }
+    }
+
+    fun canStoreOffset(
+        debtor: MeetingParticipant,
+        creditor: MeetingParticipant,
+        debtAmount: BigDecimal,
+    ): Boolean = BillAmount.isStorable(calculateNetAmount(debtor, creditor, debtAmount))
+
+    private fun calculateNetAmount(
+        debtor: MeetingParticipant,
+        creditor: MeetingParticipant,
+        debtAmount: BigDecimal,
+    ): BigDecimal =
+        when {
+            debtor.isSameParticipantAs(sender) && creditor.isSameParticipantAs(receiver) -> amount.add(debtAmount)
+            debtor.isSameParticipantAs(receiver) && creditor.isSameParticipantAs(sender) -> amount.subtract(debtAmount)
+            else -> throw IllegalArgumentException("정산 요청의 두 참여자 사이 결제 내역만 상계할 수 있습니다.")
+        }
+
+    fun covers(
+        bill: Bill,
+        debtor: MeetingParticipant,
+    ): Boolean {
+        val creditor = bill.payer
+        val isSamePair =
+            (debtor.isSameParticipantAs(sender) && creditor.isSameParticipantAs(receiver)) ||
+                (debtor.isSameParticipantAs(receiver) && creditor.isSameParticipantAs(sender))
+        return currency == bill.currency && isSamePair
+    }
+
     companion object {
         private val REMINDER_COOLDOWN: Duration = Duration.ofMinutes(1)
 
-        fun create(share: BillShare): SettlementRequest {
-            require(!share.participant.isSameParticipantAs(share.bill.payer)) {
-                "결제자에게는 정산 요청을 생성할 수 없습니다."
+        fun create(
+            meeting: Meeting,
+            currency: BillCurrency,
+            debtor: MeetingParticipant,
+            creditor: MeetingParticipant,
+            debtAmount: BigDecimal,
+        ): SettlementRequest {
+            require(!debtor.isSameParticipantAs(creditor)) { "결제자에게는 정산 요청을 생성할 수 없습니다." }
+            require(debtor.belongsTo(meeting) && creditor.belongsTo(meeting)) {
+                "정산 요청의 송금자와 수취인은 같은 만남의 참여자여야 합니다."
             }
+            validateDebtAmount(currency, debtAmount)
 
             return SettlementRequest(
-                bill = share.bill,
-                participant = share.participant,
-                amount = share.amount,
-                status = SettlementRequestStatus.PENDING,
+                meeting = meeting,
+                currency = currency,
+                sender = debtor,
+                receiver = creditor,
+                amount = currency.normalize(debtAmount),
             )
+        }
+
+        private fun validateDebtAmount(
+            currency: BillCurrency,
+            debtAmount: BigDecimal,
+        ) {
+            require(debtAmount.signum() > 0) { "상계할 부담 금액은 0보다 커야 합니다." }
+            require(currency.supports(debtAmount) && BillAmount.isStorable(debtAmount)) {
+                "상계할 부담 금액이 화폐 단위의 허용 범위를 벗어났습니다."
+            }
         }
     }
 }
 
-private fun MeetingParticipant.isSameParticipantAs(other: MeetingParticipant): Boolean {
+internal fun MeetingParticipant.isSameParticipantAs(other: MeetingParticipant): Boolean {
     if (this === other) {
         return true
     }
