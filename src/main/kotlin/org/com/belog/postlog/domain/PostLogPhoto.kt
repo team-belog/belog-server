@@ -17,6 +17,7 @@ import org.com.belog.global.domain.BaseEntity
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.domain.Meeting
 import java.time.Instant
+import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
@@ -34,8 +35,8 @@ const val POST_LOG_PHOTO_OBJECT_KEY_UNIQUE_CONSTRAINT_NAME = "uk_post_log_photos
     ],
     indexes = [
         Index(
-            name = "idx_post_log_photos_meeting_captured_id",
-            columnList = "meeting_id, captured_at_utc, id",
+            name = "idx_post_log_photos_meeting_local_date_captured_id",
+            columnList = "meeting_id, captured_local_date, captured_at_utc, id",
         ),
     ],
     check = [
@@ -66,6 +67,8 @@ class PostLogPhoto protected constructor(
     val capturedAt: Instant,
     @Column(name = "captured_offset_minutes", nullable = false)
     val capturedOffsetMinutes: Int,
+    @Column(name = "captured_local_date", nullable = false)
+    val capturedLocalDate: LocalDate,
 ) : BaseEntity() {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -100,6 +103,7 @@ class PostLogPhoto protected constructor(
                 objectKey = objectKey.value,
                 capturedAt = capturedAt.toInstant().truncatedTo(ChronoUnit.MICROS),
                 capturedOffsetMinutes = offsetTotalSeconds / SECONDS_PER_MINUTE,
+                capturedLocalDate = capturedAt.toLocalDate(),
             )
         }
 

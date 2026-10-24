@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Lock
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 import java.time.Instant
+import java.time.LocalDate
 
 private const val FIND_ACTIVE_PHOTO_BY_ID_QUERY =
     """
@@ -59,7 +60,7 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
         SELECT photo
         FROM PostLogPhoto photo
         WHERE photo.meeting.id = :meetingId
-        ORDER BY photo.capturedAt ASC, photo.id ASC
+        ORDER BY photo.capturedLocalDate ASC, photo.capturedAt ASC, photo.id ASC
         """,
     )
     fun findPage(
@@ -73,14 +74,20 @@ interface PostLogPhotoRepository : JpaRepository<PostLogPhoto, Long> {
         FROM PostLogPhoto photo
         WHERE photo.meeting.id = :meetingId
           AND (
-            photo.capturedAt > :capturedAt
-            OR (photo.capturedAt = :capturedAt AND photo.id > :photoId)
+            photo.capturedLocalDate > :capturedLocalDate
+            OR (photo.capturedLocalDate = :capturedLocalDate AND photo.capturedAt > :capturedAt)
+            OR (
+              photo.capturedLocalDate = :capturedLocalDate
+              AND photo.capturedAt = :capturedAt
+              AND photo.id > :photoId
+            )
           )
-        ORDER BY photo.capturedAt ASC, photo.id ASC
+        ORDER BY photo.capturedLocalDate ASC, photo.capturedAt ASC, photo.id ASC
         """,
     )
     fun findPageAfter(
         @Param("meetingId") meetingId: Long,
+        @Param("capturedLocalDate") capturedLocalDate: LocalDate,
         @Param("capturedAt") capturedAt: Instant,
         @Param("photoId") photoId: Long,
         pageable: Pageable,

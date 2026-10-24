@@ -155,6 +155,22 @@ class PostLogPhotoServiceQueryTest {
     }
 
     @Test
+    fun `UTC 촬영 순서와 현지 날짜 순서가 달라도 페이지를 넘어 일차 오름차순으로 조회한다`() {
+        val context = saveMeetingContext()
+        val laterLocalDatePhoto = savePhoto(context, "kiritimati.jpg", "2026-09-28T00:00:00+14:00")
+        val earlierLocalDatePhoto = savePhoto(context, "baker-island.jpg", "2026-09-27T23:00:00-12:00")
+
+        val firstPage = photoService.getPhotos(context.meetingId, context.userId, cursor = null, size = 1)
+        val secondPage = photoService.getPhotos(context.meetingId, context.userId, cursor = firstPage.nextCursor, size = 1)
+
+        assertEquals(listOf(-1, 1), listOf(firstPage, secondPage).flatMap { page -> page.days.map { day -> day.dayNumber } })
+        assertEquals(
+            listOf(requireNotNull(earlierLocalDatePhoto.id), requireNotNull(laterLocalDatePhoto.id)),
+            listOf(firstPage, secondPage).flatMap { page -> page.photos().map { item -> item.photoId } },
+        )
+    }
+
+    @Test
     fun `동일한 촬영 시각에서 페이지가 나뉘어도 사진을 누락하거나 중복하지 않는다`() {
         val context = saveMeetingContext()
         val photos =
@@ -444,9 +460,11 @@ class PostLogPhotoServiceQueryTest {
             Stream.of(
                 "not-base64!",
                 encodeCursorValue("missing-delimiter"),
-                encodeCursorValue("not-an-instant|1"),
-                encodeCursorValue("2026-09-28T03:00:00Z|not-a-number"),
-                encodeCursorValue("2026-09-28T03:00:00Z|0"),
+                encodeCursorValue("2026-09-28T03:00:00Z|1"),
+                encodeCursorValue("not-a-date|2026-09-28T03:00:00Z|1"),
+                encodeCursorValue("2026-09-28|not-an-instant|1"),
+                encodeCursorValue("2026-09-28|2026-09-28T03:00:00Z|not-a-number"),
+                encodeCursorValue("2026-09-28|2026-09-28T03:00:00Z|0"),
             )
 
         private fun encodeCursorValue(value: String): String =

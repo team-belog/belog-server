@@ -75,6 +75,7 @@ class PostLogPhotoService(
             } else {
                 photoRepository.findPageAfter(
                     meetingId = meetingId,
+                    capturedLocalDate = decodedCursor.capturedLocalDate,
                     capturedAt = decodedCursor.capturedAt,
                     photoId = decodedCursor.photoId,
                     pageable = pageable,
@@ -120,7 +121,7 @@ class PostLogPhotoService(
                             date = date,
                             photos = dayItems,
                         )
-                    }.sortedBy { day -> day.date },
+                    },
             nextCursor = pagePhotos.lastOrNull()?.takeIf { hasNext }?.let(::encodeCursor),
             hasNext = hasNext,
         )
@@ -267,7 +268,7 @@ class PostLogPhotoService(
 
     private fun encodeCursor(photo: PostLogPhoto): String {
         val photoId = checkNotNull(photo.id) { "커서 대상 사진의 ID가 없습니다." }
-        val value = "${photo.capturedAt}$CURSOR_DELIMITER$photoId"
+        val value = listOf(photo.capturedLocalDate, photo.capturedAt, photoId).joinToString(CURSOR_DELIMITER)
         return Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(StandardCharsets.UTF_8))
     }
 
@@ -276,11 +277,12 @@ class PostLogPhotoService(
             val decoded = String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8)
             val parts = decoded.split(CURSOR_DELIMITER, limit = CURSOR_PART_COUNT)
             require(parts.size == CURSOR_PART_COUNT)
-            val photoId = parts[1].toLong()
+            val photoId = parts[2].toLong()
             require(photoId > 0)
 
             PhotoCursor(
-                capturedAt = Instant.parse(parts[0]),
+                capturedLocalDate = LocalDate.parse(parts[0]),
+                capturedAt = Instant.parse(parts[1]),
                 photoId = photoId,
             )
         } catch (exception: RuntimeException) {
@@ -288,6 +290,7 @@ class PostLogPhotoService(
         }
 
     private data class PhotoCursor(
+        val capturedLocalDate: LocalDate,
         val capturedAt: Instant,
         val photoId: Long,
     )
@@ -298,7 +301,7 @@ class PostLogPhotoService(
         private const val MIN_PAGE_SIZE = 1
         private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
         private const val CURSOR_DELIMITER = "|"
-        private const val CURSOR_PART_COUNT = 2
+        private const val CURSOR_PART_COUNT = 3
         private val log = LoggerFactory.getLogger(PostLogPhotoService::class.java)
     }
 }
