@@ -86,8 +86,8 @@ class UserWithdrawalServiceTest {
 
     @AfterEach
     fun cleanUp() {
-        settlementRequestRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
+        settlementRequestRepository.deleteAllInBatch()
         billRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
@@ -178,7 +178,7 @@ class UserWithdrawalServiceTest {
     fun `보내야 할 정산이 남아있으면 탈퇴가 거부되고 아무 것도 변경되지 않는다`() {
         val context = saveBillContext()
         // sender owes the payer -> sender withdrawal must be blocked
-        settlementRequestRepository.saveAndFlush(SettlementRequest.create(context.share))
+        saveSettlementRequest(context)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -192,7 +192,7 @@ class UserWithdrawalServiceTest {
     @Test
     fun `받아야 할 정산이 남아있으면 탈퇴가 거부되고 아무 것도 변경되지 않는다`() {
         val context = saveBillContext()
-        settlementRequestRepository.saveAndFlush(SettlementRequest.create(context.share))
+        saveSettlementRequest(context)
 
         // payer is the receiver of the pending settlement -> payer withdrawal must be blocked too
         val exception =
@@ -250,16 +250,13 @@ class UserWithdrawalServiceTest {
                     splitType = BillSplitType.EQUAL_SPLIT,
                 ),
             )
-        val share =
-            billShareRepository.saveAndFlush(
-                BillShare.create(bill = bill, participant = senderParticipant, amount = BigDecimal.valueOf(10_000L), allocationOrder = 0),
-            )
 
         return BillContext(
             groupId = requireNotNull(group.id),
             payerMember = payerMember,
             senderMember = senderMember,
-            share = share,
+            bill = bill,
+            senderParticipant = senderParticipant,
         )
     }
 
@@ -313,8 +310,31 @@ class UserWithdrawalServiceTest {
         val groupId: Long,
         val payerMember: GroupMember,
         val senderMember: GroupMember,
-        val share: BillShare,
+        val bill: Bill,
+        val senderParticipant: MeetingParticipant,
     )
+
+    private fun saveSettlementRequest(context: BillContext) {
+        val settlementRequest =
+            settlementRequestRepository.saveAndFlush(
+                SettlementRequest.create(
+                    meeting = context.bill.meeting,
+                    currency = context.bill.currency,
+                    debtor = context.senderParticipant,
+                    creditor = context.bill.payer,
+                    debtAmount = BigDecimal.valueOf(10_000L),
+                ),
+            )
+        billShareRepository.saveAndFlush(
+            BillShare.create(
+                bill = context.bill,
+                participant = context.senderParticipant,
+                amount = BigDecimal.valueOf(10_000L),
+                allocationOrder = 0,
+                settlementRequest = settlementRequest,
+            ),
+        )
+    }
 
     companion object {
         @Container

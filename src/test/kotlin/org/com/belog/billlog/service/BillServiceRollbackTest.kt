@@ -7,6 +7,7 @@ import org.com.belog.billlog.repository.SettlementRequestRepository
 import org.com.belog.billlog.service.command.BillItemCommand
 import org.com.belog.billlog.service.command.BillShareCommand
 import org.com.belog.billlog.service.command.RegisterBillCommand
+import org.com.belog.global.config.ClockConfig
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
@@ -29,7 +30,7 @@ import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.UserService
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.anyList
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.doThrow
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
@@ -49,6 +50,7 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     BillService::class,
+    ClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
@@ -118,7 +120,7 @@ class BillServiceRollbackTest {
         meetingParticipantIds += participants.map { participant -> requireNotNull(participant.id) }
         doThrow(IllegalStateException("정산 요청 저장 실패"))
             .`when`(settlementRequestRepository)
-            .saveAll(anyList<SettlementRequest>())
+            .save(any(SettlementRequest::class.java))
         val command =
             RegisterBillCommand(
                 meetingId = requireNotNull(meeting.id),

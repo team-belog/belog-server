@@ -349,16 +349,25 @@ class SettlementRequestServiceTest {
                     splitType = BillSplitType.EQUAL_SPLIT,
                 ),
             )
-        val share =
-            billShareRepository.saveAndFlush(
-                BillShare.create(
-                    bill = bill,
-                    participant = settlementTargetParticipant,
-                    amount = BigDecimal.valueOf(10_000L),
-                    allocationOrder = 0,
+        val settlementRequest =
+            settlementRequestRepository.saveAndFlush(
+                SettlementRequest.create(
+                    meeting = meeting,
+                    currency = bill.currency,
+                    debtor = settlementTargetParticipant,
+                    creditor = payerParticipant,
+                    debtAmount = BigDecimal.valueOf(10_000L),
                 ),
             )
-        val settlementRequest = settlementRequestRepository.saveAndFlush(SettlementRequest.create(share))
+        billShareRepository.saveAndFlush(
+            BillShare.create(
+                bill = bill,
+                participant = settlementTargetParticipant,
+                amount = BigDecimal.valueOf(10_000L),
+                allocationOrder = 0,
+                settlementRequest = settlementRequest,
+            ),
+        )
 
         return SettlementContext(
             group = group,

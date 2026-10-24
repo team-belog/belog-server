@@ -6,6 +6,7 @@ import org.com.belog.billlog.domain.BillAmount
 import org.com.belog.billlog.domain.BillItem
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.domain.SettlementRequestStatus
 import org.com.belog.billlog.repository.BillItemRepository
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
@@ -32,6 +33,8 @@ import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
+import java.time.Clock
+import java.time.Instant
 
 @Service
 class BillService(
@@ -44,6 +47,7 @@ class BillService(
     private val settlementRequestRepository: SettlementRequestRepository,
     private val userService: UserService,
     private val notificationService: NotificationService,
+    private val clock: Clock,
 ) {
     @Transactional
     fun registerBill(command: RegisterBillCommand): RegisteredBill {
@@ -63,10 +67,14 @@ class BillService(
 
         val bill = saveBill(command, meeting, creator, payer)
         saveItems(command, bill)
-        val shares = saveShares(command, bill, shareParticipants)
-        val settlementRequests = saveSettlementRequests(shares, payer)
-        notifySettlementRequested(meeting, payer, settlementRequests)
-        notifyBillRegistered(meeting, bill, creator, settlementRequests)
+        val settlementRequestsByParticipantId = offsetSettlementRequests(command, bill, shareParticipants)
+        saveShares(command, bill, shareParticipants, settlementRequestsByParticipantId)
+        val requestedSettlements =
+            settlementRequestsByParticipantId.values.filter { settlementRequest ->
+                settlementRequest.status == SettlementRequestStatus.PENDING
+            }
+        notifySettlementRequested(meeting, bill, requestedSettlements)
+        notifyBillRegistered(meeting, bill, creator, requestedSettlements)
 
         return RegisteredBill(
             billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
@@ -231,11 +239,65 @@ class BillService(
         }
     }
 
+    private fun offsetSettlementRequests(
+        command: RegisterBillCommand,
+        bill: Bill,
+        participants: List<MeetingParticipant>,
+    ): Map<Long, SettlementRequest> {
+        val meetingId = checkNotNull(bill.meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val payer = bill.payer
+        val payerId = checkNotNull(payer.id) { "결제자의 만남 참여자 ID가 없습니다." }
+        val offsetAt = Instant.now(clock)
+
+        return command.shares
+            .zip(participants)
+            .filter { (_, participant) -> participant.id != payerId }
+            .associate { (share, participant) ->
+                val participantId = checkNotNull(participant.id) { "부담자의 만남 참여자 ID가 없습니다." }
+                val pendingRequest =
+                    settlementRequestRepository.findPendingBetweenForUpdate(
+                        meetingId = meetingId,
+                        currency = bill.currency,
+                        participantId = participantId,
+                        otherParticipantId = payerId,
+                        pendingStatus = SettlementRequestStatus.PENDING,
+                    )
+                if (pendingRequest != null && !pendingRequest.canStoreOffset(participant, payer, share.amount)) {
+                    throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
+                }
+                val settlementRequest =
+                    saveDomainEntity {
+                        if (pendingRequest == null) {
+                            settlementRequestRepository.save(
+                                SettlementRequest.create(
+                                    meeting = bill.meeting,
+                                    currency = bill.currency,
+                                    debtor = participant,
+                                    creditor = payer,
+                                    debtAmount = share.amount,
+                                ),
+                            )
+                        } else {
+                            pendingRequest.also { request ->
+                                request.offset(
+                                    debtor = participant,
+                                    creditor = payer,
+                                    debtAmount = share.amount,
+                                    offsetAt = offsetAt,
+                                )
+                            }
+                        }
+                    }
+                participantId to settlementRequest
+            }
+    }
+
     private fun saveShares(
         command: RegisterBillCommand,
         bill: Bill,
         participants: List<MeetingParticipant>,
-    ): List<BillShare> =
+        settlementRequestsByParticipantId: Map<Long, SettlementRequest>,
+    ) {
         saveDomainEntity {
             billShareRepository.saveAll(
                 command.shares.zip(participants).mapIndexed { index, (share, participant) ->
@@ -244,45 +306,34 @@ class BillService(
                         participant = participant,
                         amount = share.amount,
                         allocationOrder = index,
+                        settlementRequest = settlementRequestsByParticipantId[participant.id],
                     )
                 },
             )
         }
-
-    private fun saveSettlementRequests(
-        shares: List<BillShare>,
-        payer: MeetingParticipant,
-    ): List<SettlementRequest> {
-        val payerId = checkNotNull(payer.id) { "결제자의 만남 참여자 ID가 없습니다." }
-        val settlementRequests =
-            shares
-                .filter { share -> share.participant.id != payerId }
-                .map(SettlementRequest::create)
-
-        return settlementRequestRepository.saveAll(settlementRequests)
     }
 
     private fun notifySettlementRequested(
         meeting: Meeting,
-        payer: MeetingParticipant,
+        bill: Bill,
         settlementRequests: List<SettlementRequest>,
     ) {
         val meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
-        val payerUser = payer.groupMember.user
-        val payerUserId = checkNotNull(payerUser.id) { "결제자의 사용자 ID가 없습니다." }
-        val payerNickname = userService.resolveDisplayNickname(payerUser)
+        val billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." }
 
         notificationService.createAll(
             settlementRequests.map { settlementRequest ->
+                val receiverUser = settlementRequest.receiver.groupMember.user
                 BillLogNotificationCommands.settlementRequested(
                     meetingId = meetingId,
                     settlementRequestId = checkNotNull(settlementRequest.id) { "저장된 정산 요청의 ID가 없습니다." },
+                    billId = billId,
                     recipientUserId =
-                        checkNotNull(settlementRequest.participant.groupMember.user.id) {
-                            "정산 대상자의 사용자 ID가 없습니다."
+                        checkNotNull(settlementRequest.sender.groupMember.user.id) {
+                            "정산 송금자의 사용자 ID가 없습니다."
                         },
-                    payerUserId = payerUserId,
-                    payerNickname = payerNickname,
+                    receiverUserId = checkNotNull(receiverUser.id) { "정산 수취인의 사용자 ID가 없습니다." },
+                    receiverNickname = userService.resolveDisplayNickname(receiverUser),
                 )
             },
         )
@@ -299,7 +350,7 @@ class BillService(
         val creatorUser = creator.user
         val creatorUserId = checkNotNull(creatorUser.id) { "결제 내역 등록자의 사용자 ID가 없습니다." }
         val creatorNickname = userService.resolveDisplayNickname(creatorUser)
-        val settlementParticipantIds = settlementRequests.map { settlementRequest -> settlementRequest.participant.id }.toSet()
+        val settlementParticipantIds = settlementRequests.map { settlementRequest -> settlementRequest.sender.id }.toSet()
         val recipients =
             meetingParticipantRepository
                 .findAllActiveWithUserByMeetingId(meetingId)

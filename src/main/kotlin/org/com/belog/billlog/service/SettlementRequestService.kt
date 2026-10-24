@@ -29,7 +29,7 @@ class SettlementRequestService(
             settlementRequestRepository.findByIdForUpdate(settlementRequestId)
                 ?: throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND)
 
-        if (settlementRequest.participant.groupMember.user.id != requesterUserId) {
+        if (settlementRequest.sender.groupMember.user.id != requesterUserId) {
             throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_ACCESS_DENIED)
         }
         if (settlementRequest.status == SettlementRequestStatus.COMPLETED) {
@@ -38,13 +38,15 @@ class SettlementRequestService(
 
         settlementRequest.complete(Instant.now(clock))
 
-        val bill = settlementRequest.bill
         notificationService.create(
             BillLogNotificationCommands.settlementCompleted(
-                meetingId = checkNotNull(bill.meeting.id) { "정산 요청 대상 만남의 ID가 없습니다." },
+                meetingId = checkNotNull(settlementRequest.meeting.id) { "정산 요청 대상 만남의 ID가 없습니다." },
                 settlementRequestId = settlementRequestId,
-                recipientUserId = checkNotNull(bill.payer.groupMember.user.id) { "결제자의 사용자 ID가 없습니다." },
-                debtorUserId = requesterUserId,
+                recipientUserId =
+                    checkNotNull(settlementRequest.receiver.groupMember.user.id) {
+                        "정산 수취인의 사용자 ID가 없습니다."
+                    },
+                senderUserId = requesterUserId,
             ),
         )
     }
@@ -57,10 +59,9 @@ class SettlementRequestService(
         val settlementRequest =
             settlementRequestRepository.findByIdForUpdate(settlementRequestId)
                 ?: throw BusinessException(BillLogErrorCode.SETTLEMENT_REQUEST_NOT_FOUND)
-        val bill = settlementRequest.bill
-        val payerUser = bill.payer.groupMember.user
+        val receiverUser = settlementRequest.receiver.groupMember.user
 
-        if (payerUser.id != requesterUserId) {
+        if (receiverUser.id != requesterUserId) {
             throw BusinessException(BillLogErrorCode.SETTLEMENT_REMINDER_ACCESS_DENIED)
         }
         if (settlementRequest.status == SettlementRequestStatus.COMPLETED) {
@@ -75,14 +76,14 @@ class SettlementRequestService(
 
         notificationService.create(
             BillLogNotificationCommands.settlementReminder(
-                meetingId = checkNotNull(bill.meeting.id) { "정산 요청 대상 만남의 ID가 없습니다." },
+                meetingId = checkNotNull(settlementRequest.meeting.id) { "정산 요청 대상 만남의 ID가 없습니다." },
                 settlementRequestId = settlementRequestId,
                 recipientUserId =
-                    checkNotNull(settlementRequest.participant.groupMember.user.id) {
-                        "정산 대상자의 사용자 ID가 없습니다."
+                    checkNotNull(settlementRequest.sender.groupMember.user.id) {
+                        "정산 송금자의 사용자 ID가 없습니다."
                     },
-                payerUserId = requesterUserId,
-                payerNickname = userService.resolveDisplayNickname(payerUser),
+                receiverUserId = requesterUserId,
+                receiverNickname = userService.resolveDisplayNickname(receiverUser),
                 remindedAt = remindedAt,
             ),
         )
