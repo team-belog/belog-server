@@ -6,6 +6,7 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -18,6 +19,7 @@ import org.com.belog.postlog.repository.PostLogPhotoRepository
 import org.com.belog.postlog.service.command.PostLogPhotoRegistrationTarget
 import org.com.belog.postlog.service.command.PostLogPhotoUploadTarget
 import org.com.belog.postlog.service.command.ValidatedPostLogPhotoRegistrationTarget
+import org.com.belog.postlog.service.result.PostLogPhotoDayResult
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.postlog.service.result.PostLogPhotoUploadResult
@@ -26,6 +28,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.nio.charset.StandardCharsets
 import java.time.Instant
+import java.time.LocalDate
 import java.util.Base64
 
 @Service
@@ -58,7 +61,7 @@ class PostLogPhotoService(
             groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
                 ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         val groupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
-        validateDateConfirmed(meeting)
+        val meetingStartDate = requireConfirmedStartDate(meeting)
         val decodedCursor = cursor?.let(::decodeCursor)
         val pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT)
         val photos =
@@ -90,18 +93,29 @@ class PostLogPhotoService(
                 photoLikeRepository.findLikedPhotoIds(photoIds, groupMemberId).toSet()
             }
 
+        val items =
+            pagePhotos.mapIndexed { index, photo ->
+                val photoId = photoIds[index]
+                PostLogPhotoListItemResult(
+                    photoId = photoId,
+                    photoUrl = objectReadUrlProvider.generateReadUrl(photo.objectKey),
+                    capturedAt = photo.capturedAtWithOffset(),
+                    likeCount = likeCounts[photoId] ?: 0L,
+                    likedByMe = photoId in likedPhotoIds,
+                )
+            }
+
         return PostLogPhotoListResult(
-            items =
-                pagePhotos.mapIndexed { index, photo ->
-                    val photoId = photoIds[index]
-                    PostLogPhotoListItemResult(
-                        photoId = photoId,
-                        photoUrl = objectReadUrlProvider.generateReadUrl(photo.objectKey),
-                        capturedAt = photo.capturedAtWithOffset(),
-                        likeCount = likeCounts[photoId] ?: 0L,
-                        likedByMe = photoId in likedPhotoIds,
-                    )
-                },
+            days =
+                items
+                    .groupBy { item -> item.capturedAt.toLocalDate() }
+                    .map { (date, dayItems) ->
+                        PostLogPhotoDayResult(
+                            dayNumber = calculateMeetingDayNumber(meetingStartDate, date),
+                            date = date,
+                            photos = dayItems,
+                        )
+                    }.sortedBy { day -> day.date },
             nextCursor = pagePhotos.lastOrNull()?.takeIf { hasNext }?.let(::encodeCursor),
             hasNext = hasNext,
         )
@@ -121,7 +135,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
-        validateDateConfirmed(meeting)
+        requireConfirmedStartDate(meeting)
 
         return uploadTargets.map { target ->
             PostLogPhotoUploadResult(
@@ -145,7 +159,7 @@ class PostLogPhotoService(
         if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
             throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
         }
-        validateDateConfirmed(meeting)
+        requireConfirmedStartDate(meeting)
 
         objectVerifier.verifyAll(registrationTargets.map { target -> target.objectKey })
 
@@ -156,11 +170,9 @@ class PostLogPhotoService(
         )
     }
 
-    private fun validateDateConfirmed(meeting: Meeting) {
-        if (meeting.startDate == null) {
-            throw BusinessException(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
-        }
-    }
+    private fun requireConfirmedStartDate(meeting: Meeting): LocalDate =
+        meeting.startDate
+            ?: throw BusinessException(PostLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
 
     private fun validateTargets(targets: List<PostLogPhotoUploadTarget>): List<ValidatedUploadTarget> {
         if (targets.size !in 1..PostLogPhoto.MAX_UPLOAD_COUNT) {

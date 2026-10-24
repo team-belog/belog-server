@@ -21,6 +21,8 @@ import org.com.belog.postlog.infrastructure.S3PostLogPhotoObjectVerifier
 import org.com.belog.postlog.infrastructure.S3PostLogPhotoUploadUrlProvider
 import org.com.belog.postlog.repository.PostLogPhotoLikeRepository
 import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
+import org.com.belog.postlog.service.result.PostLogPhotoListResult
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
@@ -112,7 +114,27 @@ class PostLogPhotoServiceQueryTest {
 
         assertEquals(
             listOf(requireNotNull(firstPhoto.id), requireNotNull(secondPhoto.id), requireNotNull(latePhoto.id)),
-            result.items.map { item -> item.photoId },
+            result.photos().map { item -> item.photoId },
+        )
+    }
+
+    @Test
+    fun `사진을 촬영 현지 날짜 기준 만남 일차별로 묶어 조회한다`() {
+        val context = saveMeetingContext()
+        val beforeStartPhoto = savePhoto(context, "before-start.jpg", "2026-09-27T23:00:00+09:00")
+        val firstDayPhoto = savePhoto(context, "first-day.jpg", "2026-09-28T00:30:00+09:00")
+        val secondDayPhoto = savePhoto(context, "second-day.jpg", "2026-09-29T12:00:00+09:00")
+
+        val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
+
+        assertEquals(listOf(-1, 1, 2), result.days.map { day -> day.dayNumber })
+        assertEquals(
+            listOf(LocalDate.of(2026, 9, 27), LocalDate.of(2026, 9, 28), LocalDate.of(2026, 9, 29)),
+            result.days.map { day -> day.date },
+        )
+        assertEquals(
+            listOf(beforeStartPhoto, firstDayPhoto, secondDayPhoto).map { photo -> listOf(requireNotNull(photo.id)) },
+            result.days.map { day -> day.photos.map { item -> item.photoId } },
         )
     }
 
@@ -129,7 +151,7 @@ class PostLogPhotoServiceQueryTest {
         val thirdPage = photoService.getPhotos(context.meetingId, context.userId, cursor = secondPage.nextCursor, size = 2)
         val actualPhotoIds =
             listOf(firstPage, secondPage, thirdPage)
-                .flatMap { page -> page.items }
+                .flatMap { page -> page.photos() }
                 .map { item -> item.photoId }
 
         assertEquals(photos.map { photo -> requireNotNull(photo.id) }, actualPhotoIds)
@@ -150,7 +172,7 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null, size = 2)
 
-        assertEquals(2, result.items.size)
+        assertEquals(2, result.photos().size)
         assertFalse(result.hasNext)
         assertNull(result.nextCursor)
     }
@@ -161,7 +183,7 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
 
-        assertTrue(result.items.isEmpty())
+        assertTrue(result.photos().isEmpty())
         assertFalse(result.hasNext)
         assertNull(result.nextCursor)
     }
@@ -185,9 +207,9 @@ class PostLogPhotoServiceQueryTest {
 
         val result = photoService.getPhotos(context.meetingId, context.userId, cursor = null)
 
-        assertEquals(listOf(3L, 1L, 0L), result.items.map { item -> item.likeCount })
-        assertEquals(listOf(true, false, false), result.items.map { item -> item.likedByMe })
-        assertEquals(requireNotNull(unlikedPhoto.id), result.items.last().photoId)
+        assertEquals(listOf(3L, 1L, 0L), result.photos().map { item -> item.likeCount })
+        assertEquals(listOf(true, false, false), result.photos().map { item -> item.likedByMe })
+        assertEquals(requireNotNull(unlikedPhoto.id), result.photos().last().photoId)
     }
 
     @Test
@@ -331,6 +353,8 @@ class PostLogPhotoServiceQueryTest {
         )
         return userRepository.saveAndFlush(user)
     }
+
+    private fun PostLogPhotoListResult.photos(): List<PostLogPhotoListItemResult> = days.flatMap { day -> day.photos }
 
     private data class MeetingContext(
         val group: Group,

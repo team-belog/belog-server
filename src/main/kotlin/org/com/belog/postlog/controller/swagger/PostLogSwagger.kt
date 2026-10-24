@@ -309,8 +309,11 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 사진 목록 조회",
         description =
-            "해당 만남이 속한 그룹의 멤버가 등록된 사진을 촬영 시각과 사진 ID 오름차순으로 조회합니다. " +
+            "해당 만남이 속한 그룹의 멤버가 등록된 사진을 촬영 시각과 사진 ID 오름차순으로 조회하고, " +
+                "사진 촬영 현지 날짜 기준 만남 일차별로 묶어 반환합니다. " +
+                "일차는 만남 시작일이 1일차이며, 시작일 이전 사진은 음수 일차입니다. " +
                 "각 사진의 Presigned GET URL, 좋아요 수와 로그인 사용자의 좋아요 여부를 반환합니다. " +
+                "페이지는 사진 개수 기준으로 나뉘므로 같은 일차의 사진이 다음 페이지에 이어질 수 있습니다. " +
                 "다음 페이지 조회에는 이전 응답의 nextCursor를 그대로 사용합니다.",
     )
     @ApiResponses(
@@ -749,10 +752,10 @@ private const val POST_LOG_PHOTO_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E010","message":"사진을 찾을 수 없습니다.","data":null}"""
 
 private const val GET_PHOTOS_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}],"nextCursor":"MjAyNi0wOS0yOFQwMzowMDowMFp8MzE","hasNext":true}}"""
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[{"dayNumber":1,"date":"2026-09-28","photos":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}]},{"dayNumber":2,"date":"2026-09-29","photos":[{"photoId":32,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-2.jpg?...","capturedAt":"2026-09-29T09:30:00+09:00","likeCount":0,"likedByMe":false}]}],"nextCursor":"MjAyNi0wOS0yOVQwMDozMDowMFp8MzI","hasNext":true}}"""
 
 private const val GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"items":[],"nextCursor":null,"hasNext":false}}"""
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[],"nextCursor":null,"hasNext":false}}"""
 
 private const val INVALID_PHOTO_CURSOR_EXAMPLE =
     """{"code":"POST_LOG-E011","message":"사진 목록 커서가 올바르지 않습니다.","data":null}"""
