@@ -1,7 +1,5 @@
 package org.com.belog.prelog.service
 
-import org.com.belog.global.error.BusinessException
-import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
@@ -13,10 +11,8 @@ import org.com.belog.prelog.service.result.PlanLocationResolution
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
-import org.mockito.Mockito.verifyNoMoreInteractions
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
 class PlanLocationServiceTest {
@@ -31,23 +27,33 @@ class PlanLocationServiceTest {
         )
 
     @Test
-    fun `일반 URL로 위치 계획을 생성할 수 없다`() {
-        val service = PlanLocationService(planService, mapUrlDetector, emptyList())
+    fun `지도가 아닌 URL은 위치 추출 없이 계획을 생성한다`() {
+        val url = "https://example.com/restaurant"
+        val resolver = mock(PlanLocationResolver::class.java)
+        val plan = mock(Plan::class.java)
+        val service = PlanLocationService(planService, mapUrlDetector, listOf(resolver))
+        `when`(
+            planService.createLocationPlan(
+                meetingId = 1L,
+                creatorUserId = 15L,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = url,
+                locationResolution = PlanLocationResolution.NotApplicable,
+            ),
+        ).thenReturn(plan)
 
-        val exception =
-            assertFailsWith<BusinessException> {
-                service.createLocationPlan(
-                    meetingId = 1L,
-                    creatorUserId = 15L,
-                    category = PlanCategory.RESTAURANT,
-                    title = "맛집",
-                    url = "https://example.com/restaurant",
-                )
-            }
+        val result =
+            service.createLocationPlan(
+                meetingId = 1L,
+                creatorUserId = 15L,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = url,
+            )
 
-        assertEquals(PreLogErrorCode.INVALID_MAP_URL, exception.errorCode)
-        verify(planService).validatePlanCreation(meetingId = 1L, userId = 15L)
-        verifyNoMoreInteractions(planService)
+        assertSame(plan, result)
+        verifyNoInteractions(resolver)
     }
 
     @Test
