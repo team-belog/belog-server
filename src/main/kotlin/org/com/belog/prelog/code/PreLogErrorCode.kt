@@ -13,7 +13,6 @@ enum class PreLogErrorCode(
     PLAN_NOT_FOUND(HttpStatus.NOT_FOUND, "PRE_LOG-E003", "계획을 찾을 수 없습니다."),
     PLAN_UPDATE_FORBIDDEN(HttpStatus.FORBIDDEN, "PRE_LOG-E004", "계획 작성자만 수정할 수 있습니다."),
     PLAN_DELETE_FORBIDDEN(HttpStatus.FORBIDDEN, "PRE_LOG-E005", "계획을 삭제할 권한이 없습니다."),
-    INVALID_MAP_URL(HttpStatus.BAD_REQUEST, "PRE_LOG-E007", "지원하는 지도 링크만 입력할 수 있습니다."),
     PLAN_DETAIL_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "PRE_LOG-E008", "메모 계획만 상세 조회할 수 있습니다."),
     PLAN_UPDATE_NOT_SUPPORTED(HttpStatus.BAD_REQUEST, "PRE_LOG-E006", "메모 계획만 수정할 수 있습니다."),
 }
