@@ -1,7 +1,5 @@
 package org.com.belog.prelog.service
 
-import org.com.belog.global.error.BusinessException
-import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.MapProvider
 import org.com.belog.prelog.domain.Plan
 import org.com.belog.prelog.domain.PlanCategory
@@ -24,8 +22,11 @@ class PlanLocationService(
     ): Plan {
         planService.validatePlanCreation(meetingId = meetingId, userId = creatorUserId)
         val normalizedUrl = url.trim()
-        val provider = detectMapProvider(normalizedUrl)
-        val resolution = resolveLocation(normalizedUrl, provider)
+        val resolution =
+            planMapUrlDetector
+                .detect(normalizedUrl)
+                ?.let { provider -> resolveLocation(normalizedUrl, provider) }
+                ?: PlanLocationResolution.NotApplicable
 
         return planService.createLocationPlan(
             meetingId = meetingId,
@@ -36,9 +37,6 @@ class PlanLocationService(
             locationResolution = resolution,
         )
     }
-
-    private fun detectMapProvider(url: String): MapProvider =
-        planMapUrlDetector.detect(url) ?: throw BusinessException(PreLogErrorCode.INVALID_MAP_URL)
 
     private fun resolveLocation(
         url: String,

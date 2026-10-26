@@ -291,7 +291,8 @@ interface PreLogSwagger {
         summary = "Pre-log 계획 생성",
         description =
             "해당 만남이 속한 그룹의 멤버가 위치 또는 메모 계획을 생성합니다. " +
-                "LOCATION은 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
+                "LOCATION은 HTTP 또는 HTTPS URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다. " +
+                "LOCATION URL이 Google Maps, Kakao Map URL이면 위치 정보를 추출하고, 그 외 URL은 위치 정보 없이 저장합니다.",
     )
     @ApiResponses(
         value = [
@@ -319,7 +320,6 @@ interface PreLogSwagger {
                         examples = [
                             ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
                             ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
-                            ExampleObject(name = "지원하지 않는 지도 링크", value = INVALID_MAP_URL_EXAMPLE),
                         ],
                     ),
                 ],
@@ -752,9 +752,6 @@ private const val UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE =
 
 private const val INVALID_PLAN_EXAMPLE =
     """{"code":"PRE_LOG-E001","message":"계획 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
-
-private const val INVALID_MAP_URL_EXAMPLE =
-    """{"code":"PRE_LOG-E007","message":"지원하는 지도 링크만 입력할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
