@@ -4,16 +4,17 @@ import java.time.LocalDate
 
 data class PostLogTicketResult(
     val ticketId: Long,
+    val meetingId: Long,
     val meetingName: String,
     val memory: String,
     val coverPhotoUrl: String?,
     val startDate: LocalDate?,
     val endDate: LocalDate?,
     val location: String?,
-    val members: List<PostLogTicketMemberResult>,
+    val participants: List<PostLogTicketParticipantResult>,
 )
 
-data class PostLogTicketMemberResult(
+data class PostLogTicketParticipantResult(
     val groupMemberId: Long,
     val nickname: String,
 )

@@ -181,7 +181,7 @@ interface HomeSwagger {
             """{"code":"HOME-S002","message":"진행 중인 만남 목록을 조회했습니다.","data":{"items":[{"meetingId":10,"name":"제주 여행","startDate":null,"endDate":null,"groupName":"피놀리와 기니휘기","progressStatus":"SCHEDULING","participantCount":3,"previewParticipants":[{"groupMemberId":21,"nickname":"이정원","profileImageUrl":null}]},{"meetingId":11,"name":"1박 2일 광주 여행","startDate":"2026-08-20","endDate":"2026-08-21","groupName":"피놀리와 기니휘기","progressStatus":"UPCOMING","participantCount":3,"previewParticipants":[]}],"nextCursor":null,"hasNext":false}}"""
 
         private const val TICKETS_SUCCESS_EXAMPLE =
-            """{"code":"HOME-S003","message":"티켓 목록을 조회했습니다.","data":{"items":[{"ticketId":31,"name":"1박 2일 광주 여행","memory":"친구들과 다녀온 첫 여행","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-07-17","endDate":"2026-07-18","location":"광주","participantCount":2,"participants":[{"groupMemberId":21,"nickname":"이정원"},{"groupMemberId":22,"nickname":"김민지"}]}],"nextCursor":null,"hasNext":false}}"""
+            """{"code":"HOME-S003","message":"티켓 목록을 조회했습니다.","data":{"items":[{"ticketId":31,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"친구들과 다녀온 첫 여행","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-07-17","endDate":"2026-07-18","location":"광주","participants":[{"groupMemberId":21,"nickname":"이정원"},{"groupMemberId":22,"nickname":"김민지"}]}],"nextCursor":null,"hasNext":false}}"""
 
         private const val INVALID_CURSOR_EXAMPLE =
             """{"code":"HOME-E001","message":"홈 만남 목록 커서가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-10-01T00:00:00Z"}}"""
