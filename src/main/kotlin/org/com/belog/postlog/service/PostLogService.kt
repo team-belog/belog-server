@@ -23,7 +23,7 @@ import org.com.belog.postlog.repository.PostLogTicketRepository
 import org.com.belog.postlog.service.command.PostLogNotificationCommands
 import org.com.belog.postlog.service.result.PostLogParticipantResult
 import org.com.belog.postlog.service.result.PostLogSummaryResult
-import org.com.belog.postlog.service.result.PostLogTicketMemberResult
+import org.com.belog.postlog.service.result.PostLogTicketParticipantResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
 import org.com.belog.user.service.UserService
 import org.hibernate.exception.ConstraintViolationException
@@ -224,12 +224,12 @@ class PostLogService(
             .firstOrNull()
 
     private fun toTicketResult(ticket: PostLogTicket): PostLogTicketResult {
-        val members =
+        val participants =
             meetingParticipantRepository
                 .findAllWithUserByMeetingIdIn(listOf(ticket.sourceMeetingId))
                 .map { participant ->
                     val groupMember = participant.groupMember
-                    PostLogTicketMemberResult(
+                    PostLogTicketParticipantResult(
                         groupMemberId = checkNotNull(groupMember.id) { "조회된 그룹 멤버의 ID가 없습니다." },
                         nickname = userService.resolveDisplayNickname(groupMember.user),
                     )
@@ -244,7 +244,7 @@ class PostLogService(
             startDate = ticket.meetingStartDate,
             endDate = ticket.meetingEndDate,
             location = ticket.meetingLocation,
-            members = members,
+            participants = participants,
         )
     }
 

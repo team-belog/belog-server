@@ -744,10 +744,10 @@ private const val CREATE_POST_LOG_TICKET_REQUEST_EXAMPLE =
     """{"memory":"함께한 광주 여행을 오래 기억하자"}"""
 
 private const val CREATE_POST_LOG_TICKET_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S007","message":"Post-log 티켓이 생성되었습니다.","data":{"ticketId":11,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","members":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
+    """{"code":"POST_LOG-S007","message":"Post-log 티켓이 생성되었습니다.","data":{"ticketId":11,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","participants":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
 
 private const val GET_POST_LOG_TICKET_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S009","message":"Post-log 티켓이 조회되었습니다.","data":{"ticketId":11,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","members":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
+    """{"code":"POST_LOG-S009","message":"Post-log 티켓이 조회되었습니다.","data":{"ticketId":11,"meetingId":7,"meetingName":"1박 2일 광주 여행","memory":"함께한 광주 여행을 오래 기억하자","coverPhotoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","startDate":"2026-08-17","endDate":"2026-08-18","location":"대한민국 광주","participants":[{"groupMemberId":21,"nickname":"thisgarten"},{"groupMemberId":22,"nickname":"domiin_"}]}}"""
 
 private const val SAVE_POST_LOG_DRAFT_REQUEST_EXAMPLE =
     """{"memory":"함께한 광주 여행을 오래 기억하자"}"""

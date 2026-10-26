@@ -477,7 +477,7 @@ class PostLogServiceIntegrationTest {
         assertEquals(context.meetingId, result.meetingId)
         assertEquals("광주 여행", result.meetingName)
         assertEquals("함께한 광주 여행", result.memory)
-        assertEquals(createdTicket.members, result.members)
+        assertEquals(createdTicket.participants, result.participants)
     }
 
     @Test
@@ -593,9 +593,9 @@ class PostLogServiceIntegrationTest {
 
         assertEquals(
             listOf(checkNotNull(context.creator.id), checkNotNull(participant.id)),
-            result.members.map { member -> member.groupMemberId },
+            result.participants.map { participant -> participant.groupMemberId },
         )
-        assertEquals(listOf("creator", "member2"), result.members.map { member -> member.nickname })
+        assertEquals(listOf("creator", "member2"), result.participants.map { participant -> participant.nickname })
     }
 
     @Test

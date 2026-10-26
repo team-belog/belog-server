@@ -1,7 +1,7 @@
 package org.com.belog.postlog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
-import org.com.belog.postlog.service.result.PostLogTicketMemberResult
+import org.com.belog.postlog.service.result.PostLogTicketParticipantResult
 import org.com.belog.postlog.service.result.PostLogTicketResult
 import java.time.LocalDate
 
@@ -23,8 +23,8 @@ data class PostLogTicketResponse(
     val endDate: LocalDate?,
     @field:Schema(description = "만남 장소", example = "대한민국 광주", nullable = true)
     val location: String?,
-    @field:Schema(description = "만남 참여 멤버")
-    val members: List<PostLogTicketMemberResponse>,
+    @field:Schema(description = "만남 참여자 목록")
+    val participants: List<PostLogTicketParticipantResponse>,
 ) {
     companion object {
         fun from(result: PostLogTicketResult): PostLogTicketResponse =
@@ -37,21 +37,21 @@ data class PostLogTicketResponse(
                 startDate = result.startDate,
                 endDate = result.endDate,
                 location = result.location,
-                members = result.members.map(PostLogTicketMemberResponse::from),
+                participants = result.participants.map(PostLogTicketParticipantResponse::from),
             )
     }
 }
 
-@Schema(description = "Post-log 티켓 참여 멤버")
-data class PostLogTicketMemberResponse(
+@Schema(description = "Post-log 티켓 만남의 참여자")
+data class PostLogTicketParticipantResponse(
     @field:Schema(description = "그룹 멤버 ID", example = "21")
     val groupMemberId: Long,
     @field:Schema(description = "닉네임", example = "thisgarten")
     val nickname: String,
 ) {
     companion object {
-        fun from(result: PostLogTicketMemberResult): PostLogTicketMemberResponse =
-            PostLogTicketMemberResponse(
+        fun from(result: PostLogTicketParticipantResult): PostLogTicketParticipantResponse =
+            PostLogTicketParticipantResponse(
                 groupMemberId = result.groupMemberId,
                 nickname = result.nickname,
             )

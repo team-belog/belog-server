@@ -15,12 +15,12 @@ import org.com.belog.home.service.result.ActiveMeetingResult
 import org.com.belog.home.service.result.HomeCalendarMeetingResult
 import org.com.belog.home.service.result.HomeCalendarResult
 import org.com.belog.home.service.result.TicketListResult
-import org.com.belog.home.service.result.TicketParticipantResult
-import org.com.belog.home.service.result.TicketResult
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.notification.service.NotificationQueryService
 import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.service.result.PostLogTicketParticipantResult
+import org.com.belog.postlog.service.result.PostLogTicketResult
 import org.com.belog.user.service.UserService
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
@@ -207,20 +207,19 @@ class HomeService(
                 pageItems.map { ticket ->
                     val participants = participantsByMeetingId[ticket.sourceMeetingId].orEmpty()
 
-                    TicketResult(
+                    PostLogTicketResult(
                         ticketId = requireNotNull(ticket.id),
                         meetingId = ticket.sourceMeetingId,
-                        name = ticket.meetingName,
+                        meetingName = ticket.meetingName,
                         memory = ticket.memory,
                         coverPhotoUrl = ticket.coverImageObjectKey?.let(objectReadUrlProvider::generateReadUrl),
-                        startDate = requireNotNull(ticket.meetingStartDate),
-                        endDate = requireNotNull(ticket.meetingEndDate),
+                        startDate = ticket.meetingStartDate,
+                        endDate = ticket.meetingEndDate,
                         location = ticket.meetingLocation,
-                        participantCount = participants.size,
                         participants =
                             participants.map { participant ->
                                 val groupMember = participant.groupMember
-                                TicketParticipantResult(
+                                PostLogTicketParticipantResult(
                                     groupMemberId = requireNotNull(groupMember.id),
                                     nickname = userService.resolveDisplayNickname(groupMember.user),
                                 )

@@ -11,10 +11,10 @@ data class PostLogTicketResult(
     val startDate: LocalDate?,
     val endDate: LocalDate?,
     val location: String?,
-    val members: List<PostLogTicketMemberResult>,
+    val participants: List<PostLogTicketParticipantResult>,
 )
 
-data class PostLogTicketMemberResult(
+data class PostLogTicketParticipantResult(
     val groupMemberId: Long,
     val nickname: String,
 )
