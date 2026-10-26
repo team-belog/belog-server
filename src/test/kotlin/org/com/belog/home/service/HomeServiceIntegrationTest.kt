@@ -204,6 +204,10 @@ class HomeServiceIntegrationTest {
             listOf(notEndedMeetingTicket.id, endedMeetingTicket.id, deletedMeetingTicket.id),
             result.items.map { item -> item.ticketId },
         )
+        assertEquals(
+            listOf(notEndedMeeting.id, endedMeeting.id, deletedMeeting.id),
+            result.items.map { item -> item.meetingId },
+        )
     }
 
     @Test

@@ -209,6 +209,7 @@ class HomeService(
 
                     TicketResult(
                         ticketId = requireNotNull(ticket.id),
+                        meetingId = ticket.sourceMeetingId,
                         name = ticket.meetingName,
                         memory = ticket.memory,
                         coverPhotoUrl = ticket.coverImageObjectKey?.let(objectReadUrlProvider::generateReadUrl),

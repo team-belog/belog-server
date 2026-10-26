@@ -30,6 +30,8 @@ data class TicketListResponse(
 data class TicketResponse(
     @field:Schema(description = "개인 Post-log 티켓 ID", example = "31")
     val ticketId: Long,
+    @field:Schema(description = "티켓을 발급한 만남 ID. 만남이 삭제되어도 유지된다", example = "7")
+    val meetingId: Long,
     @field:Schema(description = "만남명", example = "1박 2일 광주 여행")
     val name: String,
     @field:Schema(description = "추억 문구", example = "친구들과 다녀온 첫 여행")
@@ -51,6 +53,7 @@ data class TicketResponse(
         fun from(result: TicketResult): TicketResponse =
             TicketResponse(
                 ticketId = result.ticketId,
+                meetingId = result.meetingId,
                 name = result.name,
                 memory = result.memory,
                 coverPhotoUrl = result.coverPhotoUrl,

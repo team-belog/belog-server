@@ -4,6 +4,7 @@ import java.time.LocalDate
 
 data class PostLogTicketResult(
     val ticketId: Long,
+    val meetingId: Long,
     val meetingName: String,
     val memory: String,
     val coverPhotoUrl: String?,

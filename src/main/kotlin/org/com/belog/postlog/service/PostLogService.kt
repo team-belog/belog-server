@@ -237,6 +237,7 @@ class PostLogService(
 
         return PostLogTicketResult(
             ticketId = checkNotNull(ticket.id) { "Post-log 티켓의 ID가 없습니다." },
+            meetingId = ticket.sourceMeetingId,
             meetingName = ticket.meetingName,
             memory = ticket.memory,
             coverPhotoUrl = ticket.coverImageObjectKey?.let(objectReadUrlProvider::generateReadUrl),

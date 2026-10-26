@@ -11,6 +11,7 @@ data class TicketListResult(
 
 data class TicketResult(
     val ticketId: Long,
+    val meetingId: Long,
     val name: String,
     val memory: String,
     val coverPhotoUrl: String?,

@@ -457,6 +457,7 @@ class PostLogServiceIntegrationTest {
         val result = postLogService.getTicket(createdTicket.ticketId, context.creatorUserId)
 
         assertEquals(createdTicket.ticketId, result.ticketId)
+        assertEquals(context.meetingId, result.meetingId)
         assertEquals("광주 여행", result.meetingName)
         assertEquals("함께한 광주 여행", result.memory)
         assertEquals(LocalDate.of(2026, 9, 28), result.startDate)
@@ -473,6 +474,7 @@ class PostLogServiceIntegrationTest {
 
         val result = postLogService.getTicket(createdTicket.ticketId, context.creatorUserId)
 
+        assertEquals(context.meetingId, result.meetingId)
         assertEquals("광주 여행", result.meetingName)
         assertEquals("함께한 광주 여행", result.memory)
         assertEquals(createdTicket.members, result.members)
