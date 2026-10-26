@@ -291,7 +291,8 @@ interface PreLogSwagger {
         summary = "Pre-log 계획 생성",
         description =
             "해당 만남이 속한 그룹의 멤버가 위치 또는 메모 계획을 생성합니다. " +
-                "LOCATION은 지원하는 지도 URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다.",
+                "LOCATION은 HTTP 또는 HTTPS URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다. " +
+                "LOCATION URL이 Google Maps, Kakao Map URL이면 위치 정보를 추출하고, 그 외 URL은 위치 정보 없이 저장합니다.",
     )
     @ApiResponses(
         value = [

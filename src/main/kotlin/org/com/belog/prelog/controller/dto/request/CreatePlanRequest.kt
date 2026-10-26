@@ -49,7 +49,9 @@ data class CreatePlanRequest(
     )
     val title: String,
     @field:Schema(
-        description = "LOCATION 유형에서 사용하는 Google Maps, Kakao Map 또는 Naver Map URL",
+        description =
+            "LOCATION 유형에서 사용하는 HTTP 또는 HTTPS URL. " +
+                "Google Maps, Kakao Map URL이면 위치 정보를 추출합니다.",
         example = "https://place.map.kakao.com/123456",
         maxLength = Plan.URL_MAX_LENGTH,
         requiredMode = Schema.RequiredMode.NOT_REQUIRED,
