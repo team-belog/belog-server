@@ -32,9 +32,7 @@ class KakaoMapLocationResolver(
             return PlanLocationResolution.NotApplicable
         }
 
-        val placeId =
-            PLACE_PATH_REGEX.matchEntire(uri.path.orEmpty())?.groupValues?.get(1)
-                ?: return PlanLocationResolution.ProviderFailed(MapProvider.KAKAO)
+        val placeId = resolvePlaceId(uri) ?: return PlanLocationResolution.ProviderFailed(MapProvider.KAKAO)
         val failed = PlanLocationResolution.ProviderFailed(MapProvider.KAKAO, placeId)
         val placeUri = URI.create("https://${KakaoMapUrlDetector.PLACE_HOST}/$placeId")
         val html = fetchPlacePage(placeUri) ?: return failed
@@ -63,6 +61,55 @@ class KakaoMapLocationResolver(
             )
         } catch (exception: IllegalArgumentException) {
             partial
+        }
+    }
+
+    private fun resolvePlaceId(uri: URI): String? {
+        var currentUri = uri
+        repeat(MAX_REDIRECTS) {
+            if (!urlDetector.isShortUrl(currentUri)) {
+                return extractPlaceId(currentUri)
+            }
+            currentUri = redirectTarget(currentUri) ?: return null
+        }
+
+        return extractPlaceId(currentUri)
+    }
+
+    private fun extractPlaceId(uri: URI): String? =
+        when {
+            urlDetector.isPlaceUrl(uri) -> PLACE_PATH_REGEX.matchEntire(uri.path.orEmpty())?.groupValues?.get(1)
+            urlDetector.isAppLinkUrl(uri) && uri.path == APP_LINK_PLACE_PATH ->
+                uri.rawQuery
+                    ?.split("&")
+                    ?.firstNotNullOfOrNull { parameter ->
+                        parameter.removePrefix("$APP_LINK_PLACE_ID_PARAMETER=").takeIf { it != parameter }
+                    }?.takeIf(PLACE_ID_REGEX::matches)
+            else -> null
+        }
+
+    private fun redirectTarget(uri: URI): URI? {
+        val request =
+            HttpRequest
+                .newBuilder(uri)
+                .timeout(properties.readTimeout)
+                .GET()
+                .build()
+
+        return try {
+            val response = httpClient.send(request, HttpResponse.BodyHandlers.discarding())
+            if (response.statusCode() !in REDIRECT_STATUS_CODES) {
+                return null
+            }
+            val location = response.headers().firstValue("Location").orElse(null) ?: return null
+            runCatching { uri.resolve(location) }.getOrNull()
+        } catch (exception: InterruptedException) {
+            Thread.currentThread().interrupt()
+            null
+        } catch (exception: IOException) {
+            null
+        } catch (exception: IllegalArgumentException) {
+            null
         }
     }
 
@@ -153,6 +200,11 @@ class KakaoMapLocationResolver(
         private const val STATIC_MAP_HOST = "staticmap.kakao.com"
         private const val STATIC_MAP_PATH = "/staticmap/og"
         private const val MAX_HTML_BYTES = 65_536
+        private const val MAX_REDIRECTS = 3
+        private const val APP_LINK_PLACE_PATH = "/place"
+        private const val APP_LINK_PLACE_ID_PARAMETER = "id"
+        private val REDIRECT_STATUS_CODES = setOf(301, 302, 303, 307, 308)
+        private val PLACE_ID_REGEX = Regex("[1-9]\\d{0,19}")
         private val PLACE_PATH_REGEX = Regex("^/([1-9]\\d{0,19})/?$")
         private val META_TAG_REGEX = Regex("<meta\\b[^>]*>", RegexOption.IGNORE_CASE)
         private val ATTRIBUTE_REGEX = Regex("([\\w:-]+)\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')")
