@@ -30,6 +30,7 @@ class PlanMapUrlDetectorTest {
     @Test
     fun `Kakao 지도 URL의 제공자를 판별한다`() {
         assertEquals(MapProvider.KAKAO, detector.detect("https://place.map.kakao.com/123456"))
+        assertEquals(MapProvider.KAKAO, detector.detect("https://kko.to/KA9fPih8Vp"))
     }
 
     @Test
