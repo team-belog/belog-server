@@ -7,6 +7,8 @@ import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
 import org.com.belog.postlog.repository.PostLogPhotoRepository
@@ -49,6 +51,9 @@ class PostLogPhotoRegistrationConcurrencyTest {
     private lateinit var meetingRepository: MeetingRepository
 
     @Autowired
+    private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
     private lateinit var groupMemberRepository: GroupMemberRepository
 
     @Autowired
@@ -60,6 +65,7 @@ class PostLogPhotoRegistrationConcurrencyTest {
     @AfterEach
     fun cleanUp() {
         photoRepository.deleteAll()
+        meetingParticipantRepository.deleteAll()
         meetingRepository.deleteAll()
         groupMemberRepository.deleteAll()
         groupRepository.deleteAll()
@@ -71,6 +77,7 @@ class PostLogPhotoRegistrationConcurrencyTest {
         val group = groupRepository.save(createGroup())
         val member = saveGroupMember(group)
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, member))
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
         val meetingId = requireNotNull(meeting.id)
         val userId = requireNotNull(member.user.id)
         val targets =

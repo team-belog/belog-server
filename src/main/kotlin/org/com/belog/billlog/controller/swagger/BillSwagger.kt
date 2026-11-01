@@ -169,7 +169,7 @@ interface BillSwagger {
     @Operation(
         summary = "결제 내역 및 정산 요청 등록",
         description =
-            "해당 만남이 속한 그룹의 멤버가 결제 내역을 등록합니다. " +
+            "해당 만남의 참여자가 결제 내역을 등록합니다. " +
                 "화폐 단위는 KRW, USD, JPY, EUR 중 하나이며 생략하면 KRW로 등록합니다. " +
                 "KRW와 JPY는 정수, USD와 EUR는 소수점 둘째 자리까지 입력할 수 있습니다. " +
                 "항목 합계와 개인별 부담 금액 합계는 결제 총액과 일치해야 합니다. " +
@@ -211,12 +211,15 @@ interface BillSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -285,6 +288,9 @@ private const val INVALID_PAYER_EXAMPLE =
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""
+
+private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""

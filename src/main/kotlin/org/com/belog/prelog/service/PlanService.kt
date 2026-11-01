@@ -8,6 +8,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
@@ -36,6 +37,7 @@ class PlanService(
     private val planRepository: PlanRepository,
     private val planLikeRepository: PlanLikeRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingParticipantFinder: MeetingParticipantFinder,
     private val notificationService: NotificationService,
     private val userService: UserService,
 ) {
@@ -172,7 +174,7 @@ class PlanService(
         userId: Long,
     ) {
         val meeting = findMeeting(meetingId)
-        findGroupMember(meeting, userId)
+        meetingParticipantFinder.findParticipatingMember(meeting, userId)
         validateMeetingNotEnded(meeting)
     }
 
@@ -186,7 +188,7 @@ class PlanService(
         locationResolution: PlanLocationResolution = PlanLocationResolution.NotApplicable,
     ): Plan {
         val meeting = findMeeting(meetingId)
-        val creator = findGroupMember(meeting, creatorUserId)
+        val creator = meetingParticipantFinder.findParticipatingMember(meeting, creatorUserId)
         validateMeetingNotEnded(meeting)
 
         return savePlan {
@@ -210,7 +212,7 @@ class PlanService(
         content: String,
     ): Plan {
         val meeting = findMeeting(meetingId)
-        val creator = findGroupMember(meeting, creatorUserId)
+        val creator = meetingParticipantFinder.findParticipatingMember(meeting, creatorUserId)
         validateMeetingNotEnded(meeting)
 
         return savePlan {

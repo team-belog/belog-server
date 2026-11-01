@@ -19,6 +19,7 @@ import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.config.AccountNumberEncryptionConfig
 import org.com.belog.user.domain.Bank
@@ -50,6 +51,7 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     BillService::class,
+    MeetingParticipantFinder::class,
     ClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,

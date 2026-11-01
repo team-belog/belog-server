@@ -290,7 +290,7 @@ interface PreLogSwagger {
     @Operation(
         summary = "Pre-log 계획 생성",
         description =
-            "해당 만남이 속한 그룹의 멤버가 위치 또는 메모 계획을 생성합니다. " +
+            "해당 만남의 참여자가 위치 또는 메모 계획을 생성합니다. " +
                 "LOCATION은 HTTP 또는 HTTPS URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다. " +
                 "LOCATION URL이 Google Maps, Kakao Map URL이면 위치 정보를 추출하고, 그 외 URL은 위치 정보 없이 저장합니다.",
     )
@@ -327,12 +327,15 @@ interface PreLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -755,6 +758,9 @@ private const val INVALID_PLAN_EXAMPLE =
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

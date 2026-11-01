@@ -81,7 +81,7 @@ interface BillLogSwagger {
     @Operation(
         summary = "영수증 이미지 업로드 URL 발급",
         description =
-            "해당 만남이 속한 그룹의 멤버에게 영수증 이미지의 S3 Presigned PUT URL을 발급합니다. " +
+            "해당 만남의 참여자에게 영수증 이미지의 S3 Presigned PUT URL을 발급합니다. " +
                 "지원 형식은 JPEG와 PNG이며 최대 크기는 10MB입니다.",
     )
     @ApiResponses(
@@ -114,12 +114,15 @@ interface BillLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -161,7 +164,7 @@ interface BillLogSwagger {
     @Operation(
         summary = "영수증 이미지 분석",
         description =
-            "그룹 멤버가 직접 업로드한 영수증 이미지를 분석하여 수정 가능한 결제 정보를 반환합니다. " +
+            "만남 참여자가 직접 업로드한 영수증 이미지를 분석하여 수정 가능한 결제 정보를 반환합니다. " +
                 "이 단계에서는 Bill을 저장하지 않습니다.",
     )
     @ApiResponses(
@@ -194,12 +197,15 @@ interface BillLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -280,6 +286,9 @@ private const val GET_BILL_LOG_SUMMARY_SUCCESS_EXAMPLE =
 
 private const val NOT_GROUP_MEMBER_EXAMPLE =
     """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
+
+private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
 
 private const val MEETING_NOT_FOUND_EXAMPLE =
     """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""

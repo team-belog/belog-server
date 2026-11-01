@@ -402,7 +402,7 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 사진 업로드 URL 일괄 발급",
         description =
-            "해당 만남이 속한 그룹의 멤버에게 최대 100개 사진의 S3 Presigned PUT URL을 발급합니다. " +
+            "해당 만남의 참여자에게 최대 100개 사진의 S3 Presigned PUT URL을 발급합니다. " +
                 "지원 형식은 JPEG, PNG, WebP이며 사진 한 장당 최대 크기는 5MB입니다. " +
                 "clientPhotoId는 클라이언트가 생성하는 임시 식별자로, 서버는 저장하지 않고 응답에 그대로 반환합니다.",
     )
@@ -433,12 +433,15 @@ interface PostLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),
@@ -491,7 +494,7 @@ interface PostLogSwagger {
     @Operation(
         summary = "Post-log 사진 메타데이터 일괄 등록",
         description =
-            "S3 업로드가 완료된 최대 100개 사진의 object key와 촬영 시각을 등록합니다. " +
+            "만남 참여자가 S3 업로드가 완료된 최대 100개 사진의 object key와 촬영 시각을 등록합니다. " +
                 "동일한 메타데이터의 재요청은 기존 등록 결과를 반환합니다.",
     )
     @ApiResponses(
@@ -521,12 +524,15 @@ interface PostLogSwagger {
             ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
             ApiResponse(
                 responseCode = "403",
-                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
                 content = [
                     Content(
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
-                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
                     ),
                 ],
             ),

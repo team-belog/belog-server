@@ -20,11 +20,13 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
@@ -62,6 +64,7 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     BillService::class,
+    MeetingParticipantFinder::class,
     BillServiceTest.FixedClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
@@ -513,6 +516,18 @@ class BillServiceTest {
         val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
 
         assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `만남 참여자가 아닌 그룹 멤버는 결제 내역을 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val nonParticipant = saveGroupMember(context.group, "non-participant-subject", "비참여자")
+        val command = createCommand(context).copy(creatorUserId = requireNotNull(nonParticipant.user.id))
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
         assertBillDataIsEmpty()
     }
 

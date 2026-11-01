@@ -11,6 +11,7 @@ import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
@@ -59,6 +60,7 @@ class PlanServiceTest {
             planRepository,
             planLikeRepository,
             meetingParticipantRepository,
+            MeetingParticipantFinder(groupMemberRepository, meetingParticipantRepository),
             notificationService,
             userService,
         )
@@ -406,21 +408,24 @@ class PlanServiceTest {
     }
 
     @Test
-    fun `약속에 참여하지 않은 그룹 멤버도 계획을 생성할 수 있다`() {
+    fun `만남 참여자가 아닌 그룹 멤버는 계획을 생성할 수 없다`() {
         val context = meetingContext()
-        val groupMember = stubPlanCreator(context)
+        stubPlanCreator(context, participating = false)
 
-        val plan =
-            planService.createMemoPlan(
-                meetingId = 1L,
-                creatorUserId = 15L,
-                category = PlanCategory.OTHER,
-                title = "메모",
-                content = "내용",
-            )
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.createMemoPlan(
+                    meetingId = 1L,
+                    creatorUserId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "메모",
+                    content = "내용",
+                )
+            }
 
-        assertSame(context.meeting, plan.meeting)
-        assertSame(groupMember, plan.createdBy)
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        verifyNoInteractions(planRepository)
+        verifyNoInteractions(notificationService)
     }
 
     @Test
@@ -457,8 +462,10 @@ class PlanServiceTest {
     fun `종료된 만남에는 계획을 생성할 수 없다`() {
         val context = meetingContext(ended = true)
         val groupMember = mock(GroupMember::class.java)
+        `when`(groupMember.id).thenReturn(CREATOR_GROUP_MEMBER_ID)
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
+        `when`(meetingParticipantRepository.existsByMeetingIdAndGroupMemberId(1L, CREATOR_GROUP_MEMBER_ID)).thenReturn(true)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -480,21 +487,28 @@ class PlanServiceTest {
         val group = mock(Group::class.java)
         val meeting = mock(Meeting::class.java)
         `when`(group.id).thenReturn(3L)
+        `when`(meeting.id).thenReturn(1L)
         `when`(meeting.group).thenReturn(group)
         `when`(meeting.isEnded()).thenReturn(ended)
         return MeetingContext(group, meeting)
     }
 
-    private fun stubPlanCreator(context: MeetingContext): GroupMember {
+    private fun stubPlanCreator(
+        context: MeetingContext,
+        participating: Boolean = true,
+    ): GroupMember {
         val creatorUser = mock(User::class.java)
         val creator = mock(GroupMember::class.java)
         `when`(creatorUser.id).thenReturn(15L)
+        `when`(creator.id).thenReturn(CREATOR_GROUP_MEMBER_ID)
         `when`(creator.user).thenReturn(creatorUser)
         `when`(creator.group).thenReturn(context.group)
         `when`(creator.belongsTo(context.group)).thenCallRealMethod()
         `when`(userService.resolveDisplayNickname(creatorUser)).thenReturn("등록자")
         `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
         `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(creator)
+        `when`(meetingParticipantRepository.existsByMeetingIdAndGroupMemberId(1L, CREATOR_GROUP_MEMBER_ID))
+            .thenReturn(participating)
         `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation ->
             invocation.getArgument<Plan>(0).also { plan -> ReflectionTestUtils.setField(plan, "id", 20L) }
         }
@@ -647,4 +661,8 @@ class PlanServiceTest {
     private data class PlanActionTarget(
         val plan: Plan,
     )
+
+    companion object {
+        private const val CREATOR_GROUP_MEMBER_ID = 30L
+    }
 }
