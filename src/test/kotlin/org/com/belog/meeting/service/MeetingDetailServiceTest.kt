@@ -6,6 +6,7 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingLogStatus
 import org.com.belog.meeting.domain.MeetingScheduleType
@@ -35,7 +36,7 @@ class MeetingDetailServiceTest {
     private val meetingDetailService =
         MeetingDetailService(
             meetingRepository = meetingRepository,
-            groupMemberRepository = groupMemberRepository,
+            groupMemberFinder = GroupMemberFinder(groupMemberRepository),
             planRepository = planRepository,
             billRepository = billRepository,
             postLogPhotoRepository = postLogPhotoRepository,

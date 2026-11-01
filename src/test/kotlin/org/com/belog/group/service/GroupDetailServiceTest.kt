@@ -43,6 +43,7 @@ class GroupDetailServiceTest {
             groupCoverImageObjectVerifier = dependency(),
             groupRepository = groupRepository,
             groupMemberRepository = groupMemberRepository,
+            groupMemberFinder = GroupMemberFinder(groupMemberRepository),
             meetingRepository = meetingRepository,
             meetingParticipantRepository = participantRepository,
             meetingScheduleResponseRepository = responseRepository,

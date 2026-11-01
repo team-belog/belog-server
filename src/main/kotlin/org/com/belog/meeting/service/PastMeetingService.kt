@@ -2,8 +2,8 @@ package org.com.belog.meeting.service
 
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.result.PastMeetingListResult
@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class PastMeetingService(
     private val groupRepository: GroupRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val meetingRepository: MeetingRepository,
 ) {
     @Transactional(readOnly = true)
@@ -62,9 +62,7 @@ class PastMeetingService(
         if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        groupMemberFinder.findActiveMember(groupId, userId)
     }
 
     companion object {

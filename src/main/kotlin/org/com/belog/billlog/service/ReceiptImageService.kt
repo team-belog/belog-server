@@ -11,13 +11,13 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.springframework.stereotype.Service
 
 @Service
 class ReceiptImageService(
     private val meetingRepository: MeetingRepository,
-    private val meetingParticipantFinder: MeetingParticipantFinder,
+    private val meetingAccessChecker: MeetingAccessChecker,
     private val uploadUrlProvider: S3ReceiptImageUploadUrlProvider,
     private val objectVerifier: S3ReceiptImageObjectVerifier,
     private val objectReadUrlProvider: S3ObjectReadUrlProvider,
@@ -79,6 +79,6 @@ class ReceiptImageService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        meetingParticipantFinder.findParticipatingMember(meeting, userId)
+        meetingAccessChecker.requireParticipant(meeting, userId)
     }
 }

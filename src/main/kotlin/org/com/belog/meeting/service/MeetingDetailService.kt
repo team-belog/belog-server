@@ -3,8 +3,7 @@ package org.com.belog.meeting.service
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.time.currentBusinessDate
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.MeetingLogStatus
 import org.com.belog.meeting.repository.MeetingRepository
@@ -18,7 +17,7 @@ import java.time.Clock
 @Service
 class MeetingDetailService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val planRepository: PlanRepository,
     private val billRepository: BillRepository,
     private val postLogPhotoRepository: PostLogPhotoRepository,
@@ -32,10 +31,7 @@ class MeetingDetailService(
         val meeting =
             meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "조회된 만남의 그룹 ID가 없습니다." }
-        val groupMember =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
         val preLogStatus = toLogStatus(planRepository.existsByMeetingId(meetingId))
         val billLogStatus = toLogStatus(billRepository.existsByMeetingId(meetingId))
         val postLogStatus = toLogStatus(postLogPhotoRepository.existsByMeetingId(meetingId))
@@ -44,7 +40,7 @@ class MeetingDetailService(
 
         return MeetingDetailResult(
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
-            groupId = groupId,
+            groupId = checkNotNull(meeting.group.id) { "조회된 만남의 그룹 ID가 없습니다." },
             groupName = meeting.group.name,
             meetingName = meeting.name,
             scheduleType = meeting.scheduleType,

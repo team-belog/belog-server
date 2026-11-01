@@ -17,8 +17,7 @@ import org.com.belog.billlog.service.result.SettlementRequestListResult
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.time.atStartOfBusinessDay
 import org.com.belog.global.time.toBusinessDate
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
@@ -36,7 +35,7 @@ import java.util.Base64
 @Service
 class BillLogService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val billRepository: BillRepository,
     private val settlementRequestRepository: SettlementRequestRepository,
     private val userService: UserService,
@@ -167,10 +166,7 @@ class BillLogService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Bill-log 대상 만남의 그룹 ID가 없습니다." }
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        groupMemberFinder.findActiveMember(meeting.group, userId)
         return meeting
     }
 

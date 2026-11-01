@@ -1,8 +1,7 @@
 package org.com.belog.meeting.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
@@ -14,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class MeetingMemberService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val userService: UserService,
 ) {
@@ -26,10 +25,7 @@ class MeetingMemberService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "조회된 만남의 그룹 ID가 없습니다." }
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        groupMemberFinder.findActiveMember(meeting.group, userId)
 
         return meetingParticipantRepository
             .findAllActiveWithUserByMeetingId(meetingId)

@@ -5,6 +5,7 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
@@ -25,7 +26,12 @@ class MeetingMemberServiceTest {
     private val meetingParticipantRepository = mock(MeetingParticipantRepository::class.java)
     private val userService = mock(UserService::class.java)
     private val meetingMemberService =
-        MeetingMemberService(meetingRepository, groupMemberRepository, meetingParticipantRepository, userService)
+        MeetingMemberService(
+            meetingRepository,
+            GroupMemberFinder(groupMemberRepository),
+            meetingParticipantRepository,
+            userService,
+        )
 
     @Test
     fun `요청자를 먼저 반환하고 나머지는 그룹 멤버 ID 순으로 정렬한다`() {
@@ -80,8 +86,8 @@ class MeetingMemberServiceTest {
     @Test
     fun `활성 그룹 멤버가 아니면 만남 멤버를 조회할 수 없다`() {
         stubAccessibleMeeting()
-        `when`(groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID))
-            .thenReturn(false)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID))
+            .thenReturn(null)
 
         val exception =
             assertFailsWith<BusinessException> {
@@ -97,8 +103,8 @@ class MeetingMemberServiceTest {
         `when`(group.id).thenReturn(GROUP_ID)
         `when`(meeting.group).thenReturn(group)
         `when`(meetingRepository.findByIdWithGroup(MEETING_ID)).thenReturn(meeting)
-        `when`(groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID))
-            .thenReturn(true)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(GROUP_ID, USER_ID))
+            .thenReturn(mock(GroupMember::class.java))
     }
 
     private fun stubParticipant(

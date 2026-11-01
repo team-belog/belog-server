@@ -8,13 +8,14 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
@@ -48,13 +49,14 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     PostLogPhotoRegistrationService::class,
-    MeetingParticipantFinder::class,
+    MeetingAccessChecker::class,
     NotificationService::class,
     UserService::class,
     ClockConfig::class,
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
+    GroupMemberFinder::class,
 )
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class PostLogPhotoRegistrationServiceTest {

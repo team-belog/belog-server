@@ -36,7 +36,7 @@ class GroupCoverImageServiceTest {
             userRepository,
             groupCoverImageUploadUrlProvider,
             groupRepository,
-            groupMemberRepository,
+            GroupMemberFinder(groupMemberRepository),
             groupCoverImageObjectVerifier,
             groupCoverImageUpdateService,
         )

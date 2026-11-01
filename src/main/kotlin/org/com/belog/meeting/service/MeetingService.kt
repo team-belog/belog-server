@@ -8,6 +8,7 @@ import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingCandidateDateRange
@@ -32,6 +33,7 @@ import java.time.LocalDate
 class MeetingService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository,
@@ -273,8 +275,7 @@ class MeetingService(
         groupRepository.findActiveByIdForShare(groupId)
             ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
 
-        return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, creatorUserId)
-            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        return groupMemberFinder.findActiveMember(groupId, creatorUserId)
     }
 
     private fun findParticipants(

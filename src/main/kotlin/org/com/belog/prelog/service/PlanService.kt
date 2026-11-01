@@ -1,14 +1,13 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.prelog.code.PreLogErrorCode
 import org.com.belog.prelog.domain.LocationResolutionStatus
@@ -33,11 +32,11 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class PlanService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
     private val planRepository: PlanRepository,
     private val planLikeRepository: PlanLikeRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
-    private val meetingParticipantFinder: MeetingParticipantFinder,
+    private val meetingAccessChecker: MeetingAccessChecker,
+    private val groupMemberFinder: GroupMemberFinder,
     private val notificationService: NotificationService,
     private val userService: UserService,
 ) {
@@ -47,7 +46,7 @@ class PlanService(
         userId: Long,
     ): PlanDetailResult {
         val plan = findPlan(planId)
-        val groupMember = findGroupMember(plan.meeting, userId)
+        val groupMember = groupMemberFinder.findActiveMember(plan.meeting.group, userId)
         if (plan.type != PlanType.MEMO) {
             throw BusinessException(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED)
         }
@@ -73,7 +72,7 @@ class PlanService(
         require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
 
         val meeting = findMeeting(meetingId)
-        val groupMember = findGroupMember(meeting, userId)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
 
         val plans =
             planRepository.findPageWithCreator(
@@ -138,7 +137,7 @@ class PlanService(
         require(size in 1..MAX_PAGE_SIZE) { "조회 개수는 1개 이상 ${MAX_PAGE_SIZE}개 이하여야 합니다." }
 
         val meeting = findMeeting(meetingId)
-        findGroupMember(meeting, userId)
+        groupMemberFinder.findActiveMember(meeting.group, userId)
 
         val plans =
             planRepository.findMapPage(
@@ -174,7 +173,7 @@ class PlanService(
         userId: Long,
     ) {
         val meeting = findMeeting(meetingId)
-        meetingParticipantFinder.findParticipatingMember(meeting, userId)
+        meetingAccessChecker.requireParticipant(meeting, userId)
         validateMeetingNotEnded(meeting)
     }
 
@@ -188,7 +187,7 @@ class PlanService(
         locationResolution: PlanLocationResolution = PlanLocationResolution.NotApplicable,
     ): Plan {
         val meeting = findMeeting(meetingId)
-        val creator = meetingParticipantFinder.findParticipatingMember(meeting, creatorUserId)
+        val creator = meetingAccessChecker.requireParticipant(meeting, creatorUserId)
         validateMeetingNotEnded(meeting)
 
         return savePlan {
@@ -212,7 +211,7 @@ class PlanService(
         content: String,
     ): Plan {
         val meeting = findMeeting(meetingId)
-        val creator = meetingParticipantFinder.findParticipatingMember(meeting, creatorUserId)
+        val creator = meetingAccessChecker.requireParticipant(meeting, creatorUserId)
         validateMeetingNotEnded(meeting)
 
         return savePlan {
@@ -235,7 +234,7 @@ class PlanService(
         content: String,
     ): Plan {
         val plan = findPlan(planId)
-        val groupMember = findGroupMember(plan.meeting, userId)
+        val groupMember = groupMemberFinder.findActiveMember(plan.meeting.group, userId)
         if (!plan.isCreatedBy(groupMember)) {
             throw BusinessException(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN)
         }
@@ -259,7 +258,7 @@ class PlanService(
     ) {
         val plan = findPlan(planId)
         val meeting = plan.meeting
-        val groupMember = findGroupMember(meeting, userId)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
 
         if (!plan.isCreatedBy(groupMember) && !meeting.isCreatedBy(groupMember)) {
             throw BusinessException(PreLogErrorCode.PLAN_DELETE_FORBIDDEN)
@@ -289,22 +288,13 @@ class PlanService(
         meetingRepository.findActiveById(meetingId)
             ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
 
-    private fun findGroupMember(
-        meeting: Meeting,
-        userId: Long,
-    ): GroupMember {
-        val groupId = checkNotNull(meeting.group.id) { "계획 대상 만남의 그룹 ID가 없습니다." }
-        return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-    }
-
     private fun findPinTarget(
         planId: Long,
         userId: Long,
     ): Plan {
         val plan = findPlan(planId)
         val meeting = plan.meeting
-        findGroupMember(meeting, userId)
+        groupMemberFinder.findActiveMember(meeting.group, userId)
 
         return plan
     }

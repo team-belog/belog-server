@@ -3,6 +3,7 @@ package org.com.belog.prelog.service
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingStatus
 import org.com.belog.meeting.repository.MeetingRepository
@@ -17,7 +18,11 @@ import kotlin.test.assertTrue
 class PreLogServiceTest {
     private val meetingRepository = mock(MeetingRepository::class.java)
     private val groupMemberRepository = mock(GroupMemberRepository::class.java)
-    private val preLogService = PreLogService(meetingRepository, groupMemberRepository)
+    private val preLogService =
+        PreLogService(
+            meetingRepository,
+            GroupMemberFinder(groupMemberRepository),
+        )
 
     @Test
     fun `만남 참여자가 아니어도 해당 그룹의 멤버라면 Pre-log 메인 정보를 조회할 수 있다`() {

@@ -9,11 +9,12 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verifyNoInteractions
@@ -31,7 +32,7 @@ class ReceiptImageServiceTest {
     private val service =
         ReceiptImageService(
             meetingRepository,
-            MeetingParticipantFinder(groupMemberRepository, meetingParticipantRepository),
+            MeetingAccessChecker(GroupMemberFinder(groupMemberRepository), meetingParticipantRepository),
             uploadUrlProvider,
             objectVerifier,
             readUrlProvider,

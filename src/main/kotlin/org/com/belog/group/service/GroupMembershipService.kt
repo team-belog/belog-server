@@ -25,6 +25,7 @@ class GroupMembershipService(
     private val groupRepository: GroupRepository,
     private val userRepository: UserRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val userService: UserService,
     private val notificationService: NotificationService,
 ) {
@@ -134,9 +135,7 @@ class GroupMembershipService(
         if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
             throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         }
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
+        groupMemberFinder.findActiveMember(groupId, userId)
     }
 
     private fun createInviteCode(value: String): InviteCode =

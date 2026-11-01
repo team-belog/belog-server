@@ -47,6 +47,7 @@ class GroupService(
     private val groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
     private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
@@ -141,7 +142,7 @@ class GroupService(
         userId: Long,
     ) {
         findGroup(groupId)
-        findCurrentMember(groupId, userId).pin()
+        groupMemberFinder.findActiveMember(groupId, userId).pin()
     }
 
     @Transactional
@@ -150,7 +151,7 @@ class GroupService(
         userId: Long,
     ) {
         findGroup(groupId)
-        findCurrentMember(groupId, userId).unpin()
+        groupMemberFinder.findActiveMember(groupId, userId).unpin()
     }
 
     @Transactional
@@ -161,7 +162,7 @@ class GroupService(
         val group =
             groupRepository.findActiveByIdForUpdate(groupId)
                 ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-        val owner = findCurrentMember(groupId, userId)
+        val owner = groupMemberFinder.findActiveMember(groupId, userId)
         if (owner.role != GroupRole.OWNER) {
             throw BusinessException(GroupErrorCode.GROUP_DELETE_OWNER_REQUIRED)
         }
@@ -181,8 +182,7 @@ class GroupService(
             groupRepository.findActiveByIdForUpdate(groupId)
                 ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
         val departingOwner =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+            groupMemberFinder.findActiveMember(groupId, userId)
 
         if (departingOwner.role != GroupRole.OWNER) {
             return
@@ -244,7 +244,7 @@ class GroupService(
         userId: Long,
     ): GroupDetailResult {
         val group = findGroup(groupId)
-        val currentMember = findCurrentMember(groupId, userId)
+        val currentMember = groupMemberFinder.findActiveMember(groupId, userId)
         val schedulingMeetings = meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING)
         val activeMeetings = meetingRepository.findActiveMeetings(groupId, MeetingStatus.CONFIRMED)
         val participantsByMeetingId = createMeetingParticipantResults(schedulingMeetings + activeMeetings)
@@ -289,13 +289,6 @@ class GroupService(
     private fun findGroup(groupId: Long): Group =
         groupRepository.findActiveById(groupId)
             ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
-
-    private fun findCurrentMember(
-        groupId: Long,
-        userId: Long,
-    ): GroupMember =
-        groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
 
     private fun findMembersByGroupId(memberships: List<GroupMember>): Map<Long, List<GroupMember>> {
         if (memberships.isEmpty()) {

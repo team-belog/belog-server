@@ -5,6 +5,7 @@ import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
@@ -34,7 +35,7 @@ class PlanLikeServiceTest {
     private val userService = mock(UserService::class.java)
     private val planLikeService =
         PlanLikeService(
-            groupMemberRepository = groupMemberRepository,
+            groupMemberFinder = GroupMemberFinder(groupMemberRepository),
             planRepository = planRepository,
             planLikeRepository = planLikeRepository,
             notificationService = notificationService,
