@@ -471,7 +471,7 @@ interface MeetingSwagger {
     @Operation(
         summary = "만남 참여자 선택 목록 조회",
         description =
-            "만남 방장이 참여자 편집 화면에서 사용할 그룹 멤버 목록을 조회합니다.\n\n" +
+            "만남 방장이 참여자 편집 화면에서 사용할 그룹 멤버 목록을 조회합니다. 종료된 만남은 조회할 수 없습니다.\n\n" +
                 "- isParticipant: 현재 만남 참여 여부. true이면 체크된 상태로 표시합니다.\n" +
                 "- isRemovable: 만남에서 제외할 수 있는지 여부. 방장, 만남 생성자, " +
                 "Bill-log 결제·분담·정산 기록이 있는 참여자와 미참여자는 false입니다.",
@@ -509,6 +509,17 @@ interface MeetingSwagger {
                         mediaType = MediaType.APPLICATION_JSON_VALUE,
                         schema = Schema(implementation = CommonResponse::class),
                         examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "종료된 만남이라 참여자를 수정할 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ENDED_MEETING_MEMBERS_NOT_EDITABLE_EXAMPLE)],
                     ),
                 ],
             ),
@@ -608,3 +619,6 @@ private const val MEETING_END_NOT_STARTED_EXAMPLE =
 
 private const val MEETING_END_LOGS_INCOMPLETE_EXAMPLE =
     """{"code":"MEETING-E028","message":"Pre-log, Bill-log, Post-log를 모두 작성해야 만남을 종료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val ENDED_MEETING_MEMBERS_NOT_EDITABLE_EXAMPLE =
+    """{"code":"MEETING-E030","message":"종료된 만남의 참여자는 수정할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

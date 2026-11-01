@@ -407,6 +407,32 @@ class MeetingRepositoryTest {
     }
 
     @Test
+    fun `제외할 참여자의 일정 응답과 가능 날짜를 삭제하면 다른 참여자의 응답은 남고 참여자를 삭제할 수 있다`() {
+        val context = savePollResponseContext()
+        val otherMember = saveGroupMember(context.meeting.group, "other-subject", "다른참여자")
+        val otherParticipant = meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, otherMember))
+        val candidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(context.meeting, LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
+            )
+        val response = saveScheduleResponse(context)
+        val otherResponse = saveScheduleResponse(PollResponseContext(context.meeting, otherParticipant))
+        meetingAvailableDateRepository.saveAllAndFlush(
+            listOf(MeetingAvailableDate.create(response, candidate), MeetingAvailableDate.create(otherResponse, candidate)),
+        )
+        val participantIds = listOf(requireNotNull(context.participant.id))
+
+        meetingAvailableDateRepository.deleteAllByResponseParticipantIdIn(participantIds)
+        meetingScheduleResponseRepository.deleteAllByParticipantIdIn(participantIds)
+        meetingParticipantRepository.deleteAllInBatch(listOf(context.participant))
+        entityManager.clear()
+
+        assertEquals(listOf(otherResponse.id), meetingScheduleResponseRepository.findAll().map { it.id })
+        assertEquals(1L, meetingAvailableDateRepository.count())
+        assertFalse(meetingParticipantRepository.existsById(participantIds.single()))
+    }
+
+    @Test
     fun `Bill-log 연결 참여자 조회는 결제 기록이 있는 참여자의 그룹 멤버 ID만 반환한다`() {
         val group = groupRepository.save(createGroup("AB12CD"))
         val creator = saveGroupMember(group, "creator", "생성자")

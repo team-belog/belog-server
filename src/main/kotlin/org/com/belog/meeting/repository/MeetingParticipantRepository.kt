@@ -151,6 +151,18 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         """
         SELECT participant
         FROM MeetingParticipant participant
+        WHERE participant.meeting.id = :meetingId
+        """,
+    )
+    fun findAllByMeetingIdForUpdate(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
         JOIN FETCH participant.meeting meeting
         JOIN FETCH participant.groupMember groupMember
         JOIN FETCH groupMember.user
