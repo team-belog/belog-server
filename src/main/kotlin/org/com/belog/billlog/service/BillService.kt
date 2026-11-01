@@ -28,6 +28,7 @@ import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
@@ -41,6 +42,7 @@ class BillService(
     private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingParticipantFinder: MeetingParticipantFinder,
     private val billRepository: BillRepository,
     private val billItemRepository: BillItemRepository,
     private val billShareRepository: BillShareRepository,
@@ -54,7 +56,7 @@ class BillService(
         validateCommand(command)
 
         val meeting = findMeetingForUpdate(command.meetingId)
-        val creator = findGroupMember(meeting, command.creatorUserId)
+        val creator = meetingParticipantFinder.findParticipatingMember(meeting, command.creatorUserId)
         val participantsByMemberId = findParticipantsByMemberId(meeting, command)
         val payer =
             participantsByMemberId[command.payerMemberId]

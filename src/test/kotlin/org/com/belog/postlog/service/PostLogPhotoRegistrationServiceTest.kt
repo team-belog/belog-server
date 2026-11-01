@@ -8,9 +8,13 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhotoObjectKey
@@ -44,6 +48,7 @@ import kotlin.test.assertFailsWith
 @ActiveProfiles("test")
 @Import(
     PostLogPhotoRegistrationService::class,
+    MeetingParticipantFinder::class,
     NotificationService::class,
     UserService::class,
     ClockConfig::class,
@@ -63,6 +68,9 @@ class PostLogPhotoRegistrationServiceTest {
     private lateinit var meetingRepository: MeetingRepository
 
     @Autowired
+    private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
     private lateinit var groupMemberRepository: GroupMemberRepository
 
     @Autowired
@@ -77,6 +85,7 @@ class PostLogPhotoRegistrationServiceTest {
     @AfterEach
     fun cleanUp() {
         photoRepository.deleteAllInBatch()
+        meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
         groupMemberRepository.deleteAllInBatch()
         groupRepository.deleteAllInBatch()
@@ -153,10 +162,27 @@ class PostLogPhotoRegistrationServiceTest {
         assertEquals(listOf(existingTarget.objectKey.value), photoRepository.findAll().map { it.objectKey })
     }
 
-    private fun saveMeetingContext(): MeetingContext {
+    @Test
+    fun `만남 참여자가 아닌 그룹 멤버는 사진을 등록할 수 없다`() {
+        val context = saveMeetingContext(participating = false)
+        val targets = listOf(target(context.meetingId, "first.jpg", "2026-09-28T14:37:21+09:00"))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                registrationService.register(context.meetingId, context.userId, targets)
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        assertEquals(0L, photoRepository.count())
+    }
+
+    private fun saveMeetingContext(participating: Boolean = true): MeetingContext {
         val group = groupRepository.save(createGroup())
         val member = saveGroupMember(group)
         val meeting = meetingRepository.saveAndFlush(createMeeting(group, member))
+        if (participating) {
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
+        }
         return MeetingContext(
             meetingId = requireNotNull(meeting.id),
             userId = requireNotNull(member.user.id),

@@ -1,12 +1,11 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
-import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -21,9 +20,9 @@ import java.time.temporal.ChronoUnit
 @Service
 class PostLogPhotoRegistrationService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
     private val photoRepository: PostLogPhotoRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingParticipantFinder: MeetingParticipantFinder,
     private val notificationService: NotificationService,
     private val userService: UserService,
 ) {
@@ -36,10 +35,7 @@ class PostLogPhotoRegistrationService(
         val meeting =
             meetingRepository.findByIdWithGroupForUpdate(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-        val uploader =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val uploader = meetingParticipantFinder.findParticipatingMember(meeting, userId)
         val existingPhotosByObjectKey =
             photoRepository
                 .findAllByObjectKeyIn(targets.map { target -> target.objectKey.value })

@@ -10,6 +10,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingParticipantFinder
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoFormat
@@ -38,6 +39,7 @@ import java.util.Base64
 class PostLogPhotoService(
     private val meetingRepository: MeetingRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val meetingParticipantFinder: MeetingParticipantFinder,
     private val uploadUrlProvider: S3PostLogPhotoUploadUrlProvider,
     private val objectVerifier: S3PostLogPhotoObjectVerifier,
     private val registrationService: PostLogPhotoRegistrationService,
@@ -133,15 +135,7 @@ class PostLogPhotoService(
         targets: List<PostLogPhotoUploadTarget>,
     ): List<PostLogPhotoUploadResult> {
         val uploadTargets = validateTargets(targets)
-        val meeting =
-            meetingRepository.findByIdWithGroup(meetingId)
-                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
-        requireConfirmedStartDate(meeting)
+        validatePhotoWritable(meetingId, userId)
 
         return uploadTargets.map { target ->
             PostLogPhotoUploadResult(
@@ -157,15 +151,7 @@ class PostLogPhotoService(
         targets: List<PostLogPhotoRegistrationTarget>,
     ): List<PostLogPhoto> {
         val registrationTargets = validateRegistrationTargets(meetingId, targets)
-        val meeting =
-            meetingRepository.findByIdWithGroup(meetingId)
-                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-
-        if (!groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
-            throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-        }
-        requireConfirmedStartDate(meeting)
+        validatePhotoWritable(meetingId, userId)
 
         objectVerifier.verifyAll(registrationTargets.map { target -> target.objectKey })
 
@@ -195,6 +181,17 @@ class PostLogPhotoService(
                 exception,
             )
         }
+    }
+
+    private fun validatePhotoWritable(
+        meetingId: Long,
+        userId: Long,
+    ) {
+        val meeting =
+            meetingRepository.findByIdWithGroup(meetingId)
+                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+        meetingParticipantFinder.findParticipatingMember(meeting, userId)
+        requireConfirmedStartDate(meeting)
     }
 
     private fun requireConfirmedStartDate(meeting: Meeting): LocalDate =
