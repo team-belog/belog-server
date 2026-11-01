@@ -4,13 +4,12 @@ import org.com.belog.global.error.BusinessException
 import org.com.belog.global.storage.S3ObjectDeleter
 import org.com.belog.global.storage.S3ObjectReadUrlProvider
 import org.com.belog.global.storage.S3ObjectUnavailableException
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
 import org.com.belog.postlog.domain.PostLogPhotoFormat
@@ -38,8 +37,8 @@ import java.util.Base64
 @Service
 class PostLogPhotoService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
-    private val meetingParticipantFinder: MeetingParticipantFinder,
+    private val meetingAccessChecker: MeetingAccessChecker,
+    private val groupMemberFinder: GroupMemberFinder,
     private val uploadUrlProvider: S3PostLogPhotoUploadUrlProvider,
     private val objectVerifier: S3PostLogPhotoObjectVerifier,
     private val registrationService: PostLogPhotoRegistrationService,
@@ -63,10 +62,7 @@ class PostLogPhotoService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Post-log 대상 만남의 그룹 ID가 없습니다." }
-        val groupMember =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
         val groupMemberId = checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
         val meetingStartDate = requireConfirmedStartDate(meeting)
         val decodedCursor = cursor?.let(::decodeCursor)
@@ -190,7 +186,7 @@ class PostLogPhotoService(
         val meeting =
             meetingRepository.findByIdWithGroup(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        meetingParticipantFinder.findParticipatingMember(meeting, userId)
+        meetingAccessChecker.requireParticipant(meeting, userId)
         requireConfirmedStartDate(meeting)
     }
 

@@ -1,8 +1,7 @@
 package org.com.belog.postlog.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -14,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class PostLogPhotoLikeService(
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val photoRepository: PostLogPhotoRepository,
     private val photoLikeRepository: PostLogPhotoLikeRepository,
 ) {
@@ -72,10 +71,7 @@ class PostLogPhotoLikeService(
         meeting: Meeting,
         userId: Long,
     ): Long {
-        val groupId = checkNotNull(meeting.group.id) { "좋아요 대상 만남의 그룹 ID가 없습니다." }
-        val groupMember =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
 
         return checkNotNull(groupMember.id) { "로그인 사용자의 그룹 멤버 ID가 없습니다." }
     }

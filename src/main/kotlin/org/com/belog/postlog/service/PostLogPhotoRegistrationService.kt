@@ -5,7 +5,7 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.postlog.code.PostLogErrorCode
 import org.com.belog.postlog.domain.PostLogPhoto
@@ -22,7 +22,7 @@ class PostLogPhotoRegistrationService(
     private val meetingRepository: MeetingRepository,
     private val photoRepository: PostLogPhotoRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
-    private val meetingParticipantFinder: MeetingParticipantFinder,
+    private val meetingAccessChecker: MeetingAccessChecker,
     private val notificationService: NotificationService,
     private val userService: UserService,
 ) {
@@ -35,7 +35,7 @@ class PostLogPhotoRegistrationService(
         val meeting =
             meetingRepository.findByIdWithGroupForUpdate(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val uploader = meetingParticipantFinder.findParticipatingMember(meeting, userId)
+        val uploader = meetingAccessChecker.requireParticipant(meeting, userId)
         val existingPhotosByObjectKey =
             photoRepository
                 .findAllByObjectKeyIn(targets.map { target -> target.objectKey.value })

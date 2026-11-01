@@ -8,7 +8,6 @@ import org.com.belog.group.domain.GroupCoverImageUpload
 import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
 import org.com.belog.group.infrastructure.S3GroupCoverImageUploadUrlProvider
-import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.user.code.UserErrorCode
 import org.com.belog.user.repository.UserRepository
@@ -19,7 +18,7 @@ class GroupCoverImageService(
     private val userRepository: UserRepository,
     private val groupCoverImageUploadUrlProvider: S3GroupCoverImageUploadUrlProvider,
     private val groupRepository: GroupRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
     private val groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier,
     private val groupCoverImageUpdateService: GroupCoverImageUpdateService,
 ) {
@@ -58,8 +57,7 @@ class GroupCoverImageService(
         }
 
         val currentMember =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+            groupMemberFinder.findActiveMember(groupId, userId)
 
         if (currentMember.role != GroupRole.OWNER) {
             throw BusinessException(GroupErrorCode.GROUP_OWNER_REQUIRED)

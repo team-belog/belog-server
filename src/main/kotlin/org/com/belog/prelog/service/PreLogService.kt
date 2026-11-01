@@ -1,8 +1,7 @@
 package org.com.belog.prelog.service
 
 import org.com.belog.global.error.BusinessException
-import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.prelog.service.result.PreLogMainResult
@@ -12,7 +11,7 @@ import org.springframework.transaction.annotation.Transactional
 @Service
 class PreLogService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
 ) {
     @Transactional(readOnly = true)
     fun getPreLogMain(
@@ -22,15 +21,12 @@ class PreLogService(
         val meeting =
             meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
                 ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-        val groupId = checkNotNull(meeting.group.id) { "Pre-log 대상 만남의 그룹 ID가 없습니다." }
-        val groupMember =
-            groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-                ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
 
         return PreLogMainResult(
             meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
             meetingName = meeting.name,
-            groupId = groupId,
+            groupId = checkNotNull(meeting.group.id) { "Pre-log 대상 만남의 그룹 ID가 없습니다." },
             groupName = meeting.group.name,
             meetingStatus = meeting.status,
             startDate = meeting.startDate,

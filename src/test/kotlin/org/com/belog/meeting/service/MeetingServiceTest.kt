@@ -9,6 +9,7 @@ import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.InviteCode
 import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingDateRange
@@ -56,6 +57,7 @@ import kotlin.test.assertFailsWith
     JpaAuditingConfig::class,
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
+    GroupMemberFinder::class,
 )
 class MeetingServiceTest {
     @Autowired

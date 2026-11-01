@@ -6,12 +6,13 @@ import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
 import org.com.belog.group.domain.GroupRole
 import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.domain.NotificationType
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.notification.service.command.CreateNotificationCommand
@@ -53,14 +54,15 @@ class PlanServiceTest {
     private val meetingParticipantRepository = mock(MeetingParticipantRepository::class.java)
     private val notificationService = mock(NotificationService::class.java)
     private val userService = mock(UserService::class.java)
+    private val groupMemberFinder = GroupMemberFinder(groupMemberRepository)
     private val planService =
         PlanService(
             meetingRepository,
-            groupMemberRepository,
             planRepository,
             planLikeRepository,
             meetingParticipantRepository,
-            MeetingParticipantFinder(groupMemberRepository, meetingParticipantRepository),
+            MeetingAccessChecker(groupMemberFinder, meetingParticipantRepository),
+            groupMemberFinder,
             notificationService,
             userService,
         )

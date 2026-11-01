@@ -19,16 +19,15 @@ import org.com.belog.billlog.service.result.BillShareResult
 import org.com.belog.billlog.service.result.RegisteredBill
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.time.toBusinessDate
-import org.com.belog.group.code.GroupErrorCode
 import org.com.belog.group.domain.GroupMember
-import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.domain.Meeting
 import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.domain.calculateMeetingDayNumber
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
-import org.com.belog.meeting.service.MeetingParticipantFinder
+import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.service.NotificationService
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
@@ -40,9 +39,9 @@ import java.time.Instant
 @Service
 class BillService(
     private val meetingRepository: MeetingRepository,
-    private val groupMemberRepository: GroupMemberRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
-    private val meetingParticipantFinder: MeetingParticipantFinder,
+    private val meetingAccessChecker: MeetingAccessChecker,
+    private val groupMemberFinder: GroupMemberFinder,
     private val billRepository: BillRepository,
     private val billItemRepository: BillItemRepository,
     private val billShareRepository: BillShareRepository,
@@ -56,7 +55,7 @@ class BillService(
         validateCommand(command)
 
         val meeting = findMeetingForUpdate(command.meetingId)
-        val creator = meetingParticipantFinder.findParticipatingMember(meeting, command.creatorUserId)
+        val creator = meetingAccessChecker.requireParticipant(meeting, command.creatorUserId)
         val participantsByMemberId = findParticipantsByMemberId(meeting, command)
         val payer =
             participantsByMemberId[command.payerMemberId]
@@ -92,7 +91,7 @@ class BillService(
             billRepository.findByIdWithMeetingAndPayer(billId)
                 ?: throw BusinessException(BillLogErrorCode.BILL_NOT_FOUND)
         val meeting = bill.meeting
-        findGroupMember(meeting, userId)
+        groupMemberFinder.findActiveMember(meeting.group, userId)
         val items = billItemRepository.findAllByBillIdOrderByItemOrderAsc(billId)
         val shares = billShareRepository.findAllWithParticipantAndUserByBillId(billId)
         val paymentDate =
@@ -177,15 +176,6 @@ class BillService(
     private fun findMeetingForUpdate(meetingId: Long): Meeting =
         meetingRepository.findByIdWithGroupForUpdate(meetingId)
             ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
-
-    private fun findGroupMember(
-        meeting: Meeting,
-        userId: Long,
-    ): GroupMember {
-        val groupId = checkNotNull(meeting.group.id) { "결제 내역 대상 만남의 그룹 ID가 없습니다." }
-        return groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)
-            ?: throw BusinessException(GroupErrorCode.NOT_GROUP_MEMBER)
-    }
 
     private fun findParticipantsByMemberId(
         meeting: Meeting,
