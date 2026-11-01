@@ -49,16 +49,17 @@ class AuthController(
     override fun reissueTokens(
         @CookieValue(REFRESH_TOKEN_COOKIE_NAME) refreshToken: String,
     ): ResponseEntity<CommonResponse<TokenReissueResponse>> {
-        val tokens = authService.reissueTokens(refreshToken)
+        val result = authService.reissueTokens(refreshToken)
         val response =
             TokenReissueResponse(
-                accessToken = tokens.accessToken,
-                expiresIn = tokens.accessTokenExpiration.seconds,
+                accessToken = result.tokens.accessToken,
+                expiresIn = result.tokens.accessTokenExpiration.seconds,
+                onboardingRequired = result.onboardingRequired,
             )
 
         return ResponseEntity
             .status(AuthSuccessCode.TOKEN_REISSUE_SUCCESS.status)
-            .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(tokens).toString())
+            .header(HttpHeaders.SET_COOKIE, createRefreshTokenCookie(result.tokens).toString())
             .body(CommonResponse.success(AuthSuccessCode.TOKEN_REISSUE_SUCCESS, response))
     }
 

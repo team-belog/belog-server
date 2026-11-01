@@ -6,6 +6,7 @@ import org.com.belog.auth.config.JwtProperties
 import org.com.belog.auth.config.RefreshTokenOriginInterceptor
 import org.com.belog.auth.domain.AuthTokens
 import org.com.belog.auth.domain.GoogleLoginResult
+import org.com.belog.auth.domain.TokenReissueResult
 import org.com.belog.auth.service.AuthService
 import org.com.belog.global.config.WebConfig
 import org.com.belog.global.error.BusinessException
@@ -104,11 +105,15 @@ class AuthControllerTest {
         `when`(jwtProperties.refreshCookieSameSite).thenReturn("Lax")
         `when`(authService.reissueTokens("current-refresh-token"))
             .thenReturn(
-                AuthTokens(
-                    accessToken = "new-access-token",
-                    refreshToken = "new-refresh-token",
-                    accessTokenExpiration = Duration.ofMinutes(30),
-                    refreshTokenExpiration = Duration.ofDays(14),
+                TokenReissueResult(
+                    tokens =
+                        AuthTokens(
+                            accessToken = "new-access-token",
+                            refreshToken = "new-refresh-token",
+                            accessTokenExpiration = Duration.ofMinutes(30),
+                            refreshTokenExpiration = Duration.ofDays(14),
+                        ),
+                    onboardingRequired = true,
                 ),
             )
 

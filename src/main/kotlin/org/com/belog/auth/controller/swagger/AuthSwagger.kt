@@ -219,7 +219,7 @@ private const val EXPIRED_REFRESH_COOKIE_EXAMPLE =
     "refresh_token=; Path=/api/v1/auth; Max-Age=0; Secure; HttpOnly; SameSite=None"
 
 private const val TOKEN_REISSUE_SUCCESS_EXAMPLE =
-    """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800}}"""
+    """{"code":"AUTH-S002","message":"토큰 재발급에 성공했습니다.","data":{"accessToken":"eyJhbGciOiJIUzI1NiJ9...","expiresIn":1800,"onboardingRequired":false}}"""
 
 private const val INVALID_REFRESH_TOKEN_EXAMPLE =
     """{"code":"AUTH-E005","message":"유효하지 않거나 만료된 Refresh Token입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-11T08:00:00Z"}}"""

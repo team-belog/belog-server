@@ -4,6 +4,7 @@ import org.com.belog.auth.code.AuthErrorCode
 import org.com.belog.auth.domain.RefreshToken
 import org.com.belog.auth.repository.RefreshTokenRepository
 import org.com.belog.global.error.BusinessException
+import org.com.belog.user.domain.User
 import org.com.belog.user.repository.UserRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -54,7 +55,7 @@ class RefreshTokenService(
         currentRefreshToken: String,
         newRefreshToken: String,
         expiration: Duration,
-    ) {
+    ): User {
         val savedToken =
             refreshTokenRepository.findByUserIdForUpdate(userId)
                 ?: throw BusinessException(AuthErrorCode.INVALID_REFRESH_TOKEN)
@@ -71,6 +72,8 @@ class RefreshTokenService(
             tokenHash = hash(newRefreshToken),
             expiresAt = now.plus(expiration),
         )
+
+        return savedToken.user
     }
 
     @Transactional
