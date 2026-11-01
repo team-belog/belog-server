@@ -263,10 +263,10 @@ private const val REGISTER_BILL_SUCCESS_EXAMPLE =
     """{"code":"BILL_LOG-S001","message":"결제 내역과 정산 요청이 등록되었습니다.","data":{"billId":1}}"""
 
 private const val GET_BILL_DETAIL_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S002","message":"결제 내역 상세를 조회했습니다.","data":{"billId":45,"dayNumber":1,"paymentDate":"2026-08-06","title":"아랑이 카페","payerNickname":"정바미","settlementMethod":"EQUAL_SPLIT","currency":"KRW","items":[{"name":"아메리카노","amount":4000}],"totalAmount":11000,"shares":[{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","amount":4000,"payer":true},{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":null,"amount":7000,"payer":false}]}}"""
+    """{"code":"BILL_LOG-S002","message":"결제 내역 상세를 조회했습니다.","data":{"billId":45,"dayNumber":"+1","paymentDate":"2026-08-06","title":"아랑이 카페","payerNickname":"정바미","settlementMethod":"EQUAL_SPLIT","currency":"KRW","items":[{"name":"아메리카노","amount":4000}],"totalAmount":11000,"shares":[{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/users/15/profile/image.webp?...","amount":4000,"payer":true},{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":null,"amount":7000,"payer":false}]}}"""
 
 private const val GET_BILLS_SUCCESS_EXAMPLE =
-    """{"code":"BILL_LOG-S005","message":"결제 내역을 조회했습니다.","data":{"days":[{"dayNumber":1,"paymentDate":"2026-08-06","dailyTotalAmounts":[{"currency":"KRW","amount":7500},{"currency":"USD","amount":12.50}],"bills":[{"billId":45,"title":"아랑이 카페","payerNickname":"정바미","currency":"KRW","totalAmount":7500},{"billId":44,"title":"점심 식사","payerNickname":"바비","currency":"USD","totalAmount":12.50}]}],"nextCursorDate":"2026-08-06","hasNext":true}}"""
+    """{"code":"BILL_LOG-S005","message":"결제 내역을 조회했습니다.","data":{"days":[{"dayNumber":"+1","paymentDate":"2026-08-06","dailyTotalAmounts":[{"currency":"KRW","amount":7500},{"currency":"USD","amount":12.50}],"bills":[{"billId":45,"title":"아랑이 카페","payerNickname":"정바미","currency":"KRW","totalAmount":7500},{"billId":44,"title":"점심 식사","payerNickname":"바비","currency":"USD","totalAmount":12.50}]}],"nextCursorDate":"2026-08-06","hasNext":true}}"""
 
 private const val ITEM_TOTAL_MISMATCH_EXAMPLE =
     """{"code":"BILL_LOG-E005","message":"결제 항목 합계가 결제 총액과 일치하지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-23T00:00:00Z"}}"""

@@ -1,6 +1,7 @@
 package org.com.belog.postlog.controller.dto.response
 
 import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.meeting.domain.formatSignedMeetingDayNumber
 import org.com.belog.postlog.service.result.PostLogPhotoDayResult
 import org.com.belog.postlog.service.result.PostLogPhotoListItemResult
 import org.com.belog.postlog.service.result.PostLogPhotoListResult
@@ -28,8 +29,8 @@ data class PostLogPhotoListResponse(
 
 @Schema(description = "Post-log 일차별 사진 목록")
 data class PostLogPhotoDayResponse(
-    @field:Schema(description = "만남 시작일 기준 일차. 시작일 이전은 음수", example = "1")
-    val dayNumber: Int,
+    @field:Schema(description = "만남 시작일을 +1일 차로 계산한 부호 포함 일차. 시작일 이전은 -1, -2 순으로 계산", example = "+1")
+    val dayNumber: String,
     @field:Schema(description = "사진 촬영 현지 날짜", example = "2026-09-28")
     val date: LocalDate,
     @field:Schema(description = "촬영 시각과 사진 ID 오름차순 사진 목록")
@@ -38,7 +39,7 @@ data class PostLogPhotoDayResponse(
     companion object {
         fun from(result: PostLogPhotoDayResult): PostLogPhotoDayResponse =
             PostLogPhotoDayResponse(
-                dayNumber = result.dayNumber,
+                dayNumber = formatSignedMeetingDayNumber(result.dayNumber),
                 date = result.date,
                 photos = result.photos.map(PostLogPhotoListItemResponse::from),
             )
