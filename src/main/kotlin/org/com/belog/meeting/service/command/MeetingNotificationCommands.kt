@@ -11,6 +11,8 @@ internal object MeetingNotificationCommands {
     private const val DATE_POLL_STARTED_MESSAGE = "새로운 일정 조율이 시작됐어요, 되는 날짜를 체크해주세요"
     private const val DATE_POLL_RESPONDED_MESSAGE_SUFFIX = " 님이 일정 조율에 응답했어요"
     private const val DATE_POLL_REMINDER_MESSAGE = "아직 응답 안 하셨어요, 되는 날짜를 체크해주세요"
+    private const val MEETING_INVITED_MESSAGE_SUFFIX = " 만남에 초대됐어요"
+    private const val MEETING_EXCLUDED_MESSAGE_SUFFIX = " 만남에서 제외됐어요"
     private const val MEETING_D7_REMINDER_MESSAGE_SUFFIX = " 모임이 일주일 남았어요, 일정과 장소를 확인해보세요"
 
     fun datePollStarted(
@@ -73,6 +75,43 @@ internal object MeetingNotificationCommands {
             message = "일정이 ${formatDateRange(confirmedDateRange)}로 확정됐어요",
             targetId = meetingId,
             deduplicationKey = "${NotificationType.MEETING_DATE_CONFIRMED}:$meetingId:$recipientUserId",
+        )
+
+    fun meetingInvited(
+        meetingId: Long,
+        meetingName: String,
+        recipientUserId: Long,
+        ownerUserId: Long,
+        changedAt: Instant,
+        changeId: UUID,
+    ): CreateNotificationCommand =
+        CreateNotificationCommand(
+            recipientUserId = recipientUserId,
+            actorUserId = ownerUserId,
+            type = NotificationType.MEETING_INVITED,
+            message = meetingName + MEETING_INVITED_MESSAGE_SUFFIX,
+            targetId = meetingId,
+            deduplicationKey =
+                "${NotificationType.MEETING_INVITED}:$meetingId:${changedAt.toEpochMilli()}:$changeId:$recipientUserId",
+        )
+
+    fun meetingExcluded(
+        meetingId: Long,
+        meetingName: String,
+        groupId: Long,
+        recipientUserId: Long,
+        ownerUserId: Long,
+        changedAt: Instant,
+        changeId: UUID,
+    ): CreateNotificationCommand =
+        CreateNotificationCommand(
+            recipientUserId = recipientUserId,
+            actorUserId = ownerUserId,
+            type = NotificationType.MEETING_EXCLUDED,
+            message = meetingName + MEETING_EXCLUDED_MESSAGE_SUFFIX,
+            targetId = groupId,
+            deduplicationKey =
+                "${NotificationType.MEETING_EXCLUDED}:$meetingId:${changedAt.toEpochMilli()}:$changeId:$recipientUserId",
         )
 
     fun meetingD7Reminder(

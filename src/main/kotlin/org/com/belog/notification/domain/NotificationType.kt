@@ -10,6 +10,8 @@ enum class NotificationType(
     DATE_POLL_RESPONDED(NotificationTargetType.DATE_POLL_STATUS),
     DATE_POLL_REMINDER(NotificationTargetType.DATE_POLL_RESPONSE),
     MEETING_DATE_CONFIRMED(NotificationTargetType.MEETING_DETAIL),
+    MEETING_INVITED(NotificationTargetType.MEETING_DETAIL),
+    MEETING_EXCLUDED(NotificationTargetType.GROUP_HOME),
     PRE_LOG_PLAN_CREATED(NotificationTargetType.PRE_LOG),
     PRE_LOG_PLAN_LIKED(NotificationTargetType.PRE_LOG),
     SETTLEMENT_REQUESTED(NotificationTargetType.BILL_LOG),
