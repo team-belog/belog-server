@@ -1,7 +1,7 @@
 package org.com.belog.auth.service
 
-import org.com.belog.auth.domain.AuthTokens
 import org.com.belog.auth.domain.GoogleLoginResult
+import org.com.belog.auth.domain.TokenReissueResult
 import org.com.belog.auth.infrastructure.GoogleAuthorizationCodeClient
 import org.com.belog.auth.infrastructure.GoogleIdTokenVerifier
 import org.com.belog.auth.infrastructure.JwtTokenProvider
@@ -27,17 +27,21 @@ class AuthService(
     }
 
     @Transactional
-    fun reissueTokens(refreshToken: String): AuthTokens {
+    fun reissueTokens(refreshToken: String): TokenReissueResult {
         val userId = jwtTokenProvider.extractUserIdFromRefreshToken(refreshToken)
         val tokens = jwtTokenProvider.createTokens(userId)
-        refreshTokenService.validateAndRotate(
-            userId = userId,
-            currentRefreshToken = refreshToken,
-            newRefreshToken = tokens.refreshToken,
-            expiration = tokens.refreshTokenExpiration,
-        )
+        val user =
+            refreshTokenService.validateAndRotate(
+                userId = userId,
+                currentRefreshToken = refreshToken,
+                newRefreshToken = tokens.refreshToken,
+                expiration = tokens.refreshTokenExpiration,
+            )
 
-        return tokens
+        return TokenReissueResult(
+            tokens = tokens,
+            onboardingRequired = !user.isOnboardingCompleted,
+        )
     }
 
     @Transactional

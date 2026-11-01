@@ -6,6 +6,7 @@ import org.com.belog.auth.domain.GoogleUserInfo
 import org.com.belog.auth.infrastructure.GoogleAuthorizationCodeClient
 import org.com.belog.auth.infrastructure.GoogleIdTokenVerifier
 import org.com.belog.auth.infrastructure.JwtTokenProvider
+import org.com.belog.user.domain.User
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
@@ -76,16 +77,18 @@ class AuthServiceTest {
             )
         `when`(jwtTokenProvider.extractUserIdFromRefreshToken("current-refresh-token")).thenReturn(1L)
         `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
+        `when`(
+            refreshTokenService.validateAndRotate(
+                userId = 1L,
+                currentRefreshToken = "current-refresh-token",
+                newRefreshToken = "new-refresh-token",
+                expiration = Duration.ofDays(14),
+            ),
+        ).thenReturn(mock(User::class.java))
 
         val result = authService.reissueTokens("current-refresh-token")
 
-        assertEquals(tokens, result)
-        verify(refreshTokenService).validateAndRotate(
-            userId = 1L,
-            currentRefreshToken = "current-refresh-token",
-            newRefreshToken = "new-refresh-token",
-            expiration = Duration.ofDays(14),
-        )
+        assertEquals(tokens, result.tokens)
     }
 
     @Test

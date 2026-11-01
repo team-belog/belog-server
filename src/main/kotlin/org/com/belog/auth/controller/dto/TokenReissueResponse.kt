@@ -8,4 +8,6 @@ data class TokenReissueResponse(
     val accessToken: String,
     @field:Schema(description = "Access Token 만료까지 남은 시간(초)", example = "1800")
     val expiresIn: Long,
+    @field:Schema(description = "온보딩 필요 여부", example = "false")
+    val onboardingRequired: Boolean,
 )
