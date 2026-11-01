@@ -21,4 +21,5 @@ enum class MeetingSuccessCode(
     MEETING_MEMBERS_RETRIEVED(HttpStatus.OK, "MEETING-S011", "만남 멤버 목록을 조회했습니다."),
     MEETING_ENDED(HttpStatus.OK, "MEETING-S012", "만남을 종료했습니다."),
     MEETING_MEMBER_OPTIONS_RETRIEVED(HttpStatus.OK, "MEETING-S013", "만남 참여자 선택 목록을 조회했습니다."),
+    MEETING_MEMBERS_UPDATED(HttpStatus.OK, "MEETING-S014", "만남 참여자를 수정했습니다."),
 }

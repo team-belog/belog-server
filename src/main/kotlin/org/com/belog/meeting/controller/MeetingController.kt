@@ -8,6 +8,7 @@ import org.com.belog.meeting.code.MeetingErrorCode
 import org.com.belog.meeting.code.MeetingSuccessCode
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
+import org.com.belog.meeting.controller.dto.request.UpdateMeetingMembersRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
@@ -170,6 +171,23 @@ class MeetingController(
                     MeetingMemberOptionsResponse.from(members),
                 ),
             )
+    }
+
+    @PutMapping("/api/v1/meetings/{meetingId}/members")
+    override fun updateMeetingMembers(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+        @Valid @RequestBody request: UpdateMeetingMembersRequest,
+    ): ResponseEntity<CommonResponse<Nothing>> {
+        meetingMemberService.updateMeetingMembers(
+            meetingId = meetingId,
+            userId = userId,
+            participantMemberIds = request.participantMemberIds,
+        )
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_MEMBERS_UPDATED.status)
+            .body(CommonResponse.success(MeetingSuccessCode.MEETING_MEMBERS_UPDATED))
     }
 
     private fun MeetingDateRangeRequest.toDomain(): MeetingDateRange =

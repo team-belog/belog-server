@@ -14,7 +14,7 @@ data class MeetingMemberOptionsResponse(
 }
 
 data class MeetingMemberOptionResponse(
-    @field:Schema(description = "그룹 멤버 ID. 참여자 수정 요청의 groupMemberIds에 사용하는 ID", example = "21")
+    @field:Schema(description = "그룹 멤버 ID. 참여자 수정 요청의 participantMemberIds에 사용하는 ID", example = "21")
     val groupMemberId: Long,
     @field:Schema(description = "멤버 닉네임", example = "빌로그")
     val nickname: String,

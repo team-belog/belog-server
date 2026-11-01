@@ -27,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -136,6 +137,22 @@ class MeetingControllerTest {
             .andExpect(jsonPath("$.data.items[0].isRemovable").value(false))
             .andExpect(jsonPath("$.data.items[1].groupMemberId").value(23))
             .andExpect(jsonPath("$.data.items[1].isParticipant").value(false))
+    }
+
+    @Test
+    fun `만남 참여자 수정 인원이 최대 인원을 초과하면 거절한다`() {
+        val participantIds = (1L..15L).joinToString(",")
+
+        mockMvc
+            .perform(
+                put("/api/v1/meetings/7/members")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"participantMemberIds":[$participantIds]}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(meetingMemberService)
     }
 
     @Test
