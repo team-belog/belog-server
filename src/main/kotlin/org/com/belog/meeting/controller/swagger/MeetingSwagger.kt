@@ -17,6 +17,7 @@ import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
+import org.com.belog.meeting.controller.dto.response.MeetingMemberOptionsResponse
 import org.com.belog.meeting.controller.dto.response.MeetingMembersResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -466,10 +467,69 @@ interface MeetingSwagger {
         @PathVariable
         meetingId: Long,
     ): ResponseEntity<CommonResponse<MeetingMembersResponse>>
+
+    @Operation(
+        summary = "만남 참여자 선택 목록 조회",
+        description =
+            "만남 방장이 참여자 편집 화면에서 사용할 그룹 멤버 목록을 조회합니다.\n\n" +
+                "- isParticipant: 현재 만남 참여 여부. true이면 체크된 상태로 표시합니다.\n" +
+                "- isRemovable: 만남에서 제외할 수 있는지 여부. 방장, 만남 생성자, " +
+                "Bill-log 결제·분담·정산 기록이 있는 참여자와 미참여자는 false입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 참여자 선택 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = MEETING_MEMBER_OPTIONS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 방장이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun getMeetingMemberOptions(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingMemberOptionsResponse>>
 }
 
 private const val MEETING_MEMBERS_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S011","message":"만남 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":22,"nickname":"요청자","profileImageUrl":null,"isMe":true},{"groupMemberId":21,"nickname":"참여자","profileImageUrl":"https://example.com/profile","isMe":false}]}}"""
+
+private const val MEETING_MEMBER_OPTIONS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S013","message":"만남 참여자 선택 목록을 조회했습니다.","data":{"items":[{"groupMemberId":22,"nickname":"방장","profileImageUrl":null,"isMe":true,"isParticipant":true,"isRemovable":false},{"groupMemberId":21,"nickname":"참여자","profileImageUrl":"https://example.com/profile","isMe":false,"isParticipant":true,"isRemovable":true},{"groupMemberId":23,"nickname":"미참여자","profileImageUrl":null,"isMe":false,"isParticipant":false,"isRemovable":false}]}}"""
 
 private const val CREATE_FIXED_MEETING_REQUEST_EXAMPLE =
     """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}"""

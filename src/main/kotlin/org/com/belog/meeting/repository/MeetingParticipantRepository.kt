@@ -117,6 +117,35 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
         @Param("meetingId") meetingId: Long,
     ): List<MeetingParticipant>
 
+    @Query(
+        """
+        SELECT participant.groupMember.id
+        FROM MeetingParticipant participant
+        WHERE participant.meeting.id = :meetingId
+          AND (
+              EXISTS (
+                  SELECT bill.id
+                  FROM Bill bill
+                  WHERE bill.payer = participant
+              )
+              OR EXISTS (
+                  SELECT share.id
+                  FROM BillShare share
+                  WHERE share.participant = participant
+              )
+              OR EXISTS (
+                  SELECT settlementRequest.id
+                  FROM SettlementRequest settlementRequest
+                  WHERE settlementRequest.sender = participant
+                     OR settlementRequest.receiver = participant
+              )
+          )
+        """,
+    )
+    fun findAllBillLogLinkedGroupMemberIds(
+        @Param("meetingId") meetingId: Long,
+    ): List<Long>
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
         """

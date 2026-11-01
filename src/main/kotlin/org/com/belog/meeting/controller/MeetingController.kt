@@ -11,6 +11,7 @@ import org.com.belog.meeting.controller.dto.request.MeetingDateRangeRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
+import org.com.belog.meeting.controller.dto.response.MeetingMemberOptionsResponse
 import org.com.belog.meeting.controller.dto.response.MeetingMembersResponse
 import org.com.belog.meeting.controller.swagger.MeetingSwagger
 import org.com.belog.meeting.domain.MeetingDateRange
@@ -150,6 +151,23 @@ class MeetingController(
                 CommonResponse.success(
                     MeetingSuccessCode.MEETING_MEMBERS_RETRIEVED,
                     MeetingMembersResponse.from(members),
+                ),
+            )
+    }
+
+    @GetMapping("/api/v1/meetings/{meetingId}/member-options")
+    override fun getMeetingMemberOptions(
+        @LoginUserId userId: Long,
+        @PathVariable meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingMemberOptionsResponse>> {
+        val members = meetingMemberService.getMeetingMemberOptions(meetingId = meetingId, userId = userId)
+
+        return ResponseEntity
+            .status(MeetingSuccessCode.MEETING_MEMBER_OPTIONS_RETRIEVED.status)
+            .body(
+                CommonResponse.success(
+                    MeetingSuccessCode.MEETING_MEMBER_OPTIONS_RETRIEVED,
+                    MeetingMemberOptionsResponse.from(members),
                 ),
             )
     }
