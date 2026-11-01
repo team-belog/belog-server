@@ -795,7 +795,7 @@ private const val POST_LOG_PHOTO_NOT_FOUND_EXAMPLE =
     """{"code":"POST_LOG-E010","message":"사진을 찾을 수 없습니다.","data":null}"""
 
 private const val GET_PHOTOS_SUCCESS_EXAMPLE =
-    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[{"dayNumber":1,"date":"2026-09-28","photos":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}]},{"dayNumber":2,"date":"2026-09-29","photos":[{"photoId":32,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-2.jpg?...","capturedAt":"2026-09-29T09:30:00+09:00","likeCount":0,"likedByMe":false}]}],"nextCursor":"MjAyNi0wOS0yOXwyMDI2LTA5LTI5VDAwOjMwOjAwWnwzMg","hasNext":true}}"""
+    """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[{"dayNumber":"+1","date":"2026-09-28","photos":[{"photoId":31,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-1.jpg?...","capturedAt":"2026-09-28T12:00:00+09:00","likeCount":3,"likedByMe":true}]},{"dayNumber":"+2","date":"2026-09-29","photos":[{"photoId":32,"photoUrl":"https://belog-storage.s3.ap-northeast-2.amazonaws.com/post-logs/7/photos/photo-2.jpg?...","capturedAt":"2026-09-29T09:30:00+09:00","likeCount":0,"likedByMe":false}]}],"nextCursor":"MjAyNi0wOS0yOXwyMDI2LTA5LTI5VDAwOjMwOjAwWnwzMg","hasNext":true}}"""
 
 private const val GET_EMPTY_PHOTOS_SUCCESS_EXAMPLE =
     """{"code":"POST_LOG-S005","message":"사진 목록이 조회되었습니다.","data":{"days":[],"nextCursor":null,"hasNext":false}}"""

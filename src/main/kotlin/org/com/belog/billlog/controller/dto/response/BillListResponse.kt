@@ -5,6 +5,7 @@ import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.service.result.BillDayResult
 import org.com.belog.billlog.service.result.BillListItemResult
 import org.com.belog.billlog.service.result.BillListResult
+import org.com.belog.meeting.domain.formatSignedMeetingDayNumber
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -30,10 +31,10 @@ data class BillListResponse(
 @Schema(description = "결제일별 결제 내역")
 data class BillDayResponse(
     @field:Schema(
-        description = "만남 시작일을 1일 차로 계산한 일차. 시작일 이전은 -1, -2 순으로 계산",
-        example = "1",
+        description = "만남 시작일을 +1일 차로 계산한 부호 포함 일차. 시작일 이전은 -1, -2 순으로 계산",
+        example = "+1",
     )
-    val dayNumber: Int,
+    val dayNumber: String,
     @field:Schema(description = "결제일", example = "2026-08-06")
     val paymentDate: LocalDate,
     @field:Schema(description = "해당 날짜의 화폐 단위별 총 결제 금액. 화폐 단위 순서는 KRW, USD, JPY, EUR")
@@ -44,7 +45,7 @@ data class BillDayResponse(
     companion object {
         fun from(result: BillDayResult): BillDayResponse =
             BillDayResponse(
-                dayNumber = result.dayNumber,
+                dayNumber = formatSignedMeetingDayNumber(result.dayNumber),
                 paymentDate = result.paymentDate,
                 dailyTotalAmounts = result.dailyTotalAmounts.map(CurrencyAmountResponse::from),
                 bills = result.bills.map(BillListItemResponse::from),

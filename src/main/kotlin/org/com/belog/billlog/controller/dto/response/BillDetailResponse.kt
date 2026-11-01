@@ -7,6 +7,7 @@ import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.service.result.BillDetailResult
 import org.com.belog.billlog.service.result.BillItemResult
 import org.com.belog.billlog.service.result.BillShareResult
+import org.com.belog.meeting.domain.formatSignedMeetingDayNumber
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -15,10 +16,10 @@ data class BillDetailResponse(
     @field:Schema(description = "결제 내역 ID", example = "45")
     val billId: Long,
     @field:Schema(
-        description = "만남 시작일을 1일 차로 계산한 결제 회차. 시작일 이전은 -1, -2 순으로 계산",
-        example = "1",
+        description = "만남 시작일을 +1일 차로 계산한 부호 포함 결제 회차. 시작일 이전은 -1, -2 순으로 계산",
+        example = "+1",
     )
-    val dayNumber: Int,
+    val dayNumber: String,
     @field:Schema(description = "결제 내역 등록일", example = "2026-08-06")
     val paymentDate: LocalDate,
     @field:Schema(description = "결제 내역 제목", example = "아랑이 카페")
@@ -50,7 +51,7 @@ data class BillDetailResponse(
         fun from(result: BillDetailResult): BillDetailResponse =
             BillDetailResponse(
                 billId = result.billId,
-                dayNumber = result.dayNumber,
+                dayNumber = formatSignedMeetingDayNumber(result.dayNumber),
                 paymentDate = result.paymentDate,
                 title = result.title,
                 payerNickname = result.payerNickname,

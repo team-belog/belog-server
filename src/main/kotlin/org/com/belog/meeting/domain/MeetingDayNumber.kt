@@ -11,3 +11,5 @@ fun calculateMeetingDayNumber(
     val dayNumber = if (daysFromMeetingStart < 0) daysFromMeetingStart else daysFromMeetingStart + 1
     return Math.toIntExact(dayNumber)
 }
+
+fun formatSignedMeetingDayNumber(dayNumber: Int): String = if (dayNumber > 0) "+$dayNumber" else dayNumber.toString()
