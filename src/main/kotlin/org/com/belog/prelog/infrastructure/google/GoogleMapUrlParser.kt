@@ -72,7 +72,9 @@ class GoogleMapUrlParser(
         return plusCodeDecoder.decode(decode(encodedPlusCode))
     }
 
-    private fun parsePlaceName(uri: URI): String? {
+    private fun parsePlaceName(uri: URI): String? = parsePathPlaceName(uri) ?: parseQueryPlaceName(uri)
+
+    private fun parsePathPlaceName(uri: URI): String? {
         val segments = uri.rawPath.orEmpty().split("/")
         val placeSegmentIndex = segments.indexOf("place")
         if (placeSegmentIndex < 0) {
@@ -85,6 +87,13 @@ class GoogleMapUrlParser(
             ?.trim()
             ?.takeIf(String::isNotEmpty)
     }
+
+    private fun parseQueryPlaceName(uri: URI): String? =
+        PLACE_NAME_QUERY_NAMES
+            .asSequence()
+            .mapNotNull { name -> queryParameter(uri, name) }
+            .map(String::trim)
+            .firstOrNull { value -> value.isNotEmpty() && parseCoordinates(value) == null }
 
     private fun coordinates(
         latitude: String,
@@ -101,6 +110,7 @@ class GoogleMapUrlParser(
 
     companion object {
         private val COORDINATE_QUERY_NAMES = listOf("query", "q", "ll", "center")
+        private val PLACE_NAME_QUERY_NAMES = listOf("query", "q")
         private val COORDINATE_QUERY_REGEX = Regex("^(-?\\d+(?:\\.\\d+)?),\\s*(-?\\d+(?:\\.\\d+)?)$")
         private val EMBEDDED_COORDINATE_REGEX = Regex("!3d(-?\\d+(?:\\.\\d+)?)!4d(-?\\d+(?:\\.\\d+)?)")
         private val PATH_COORDINATE_REGEX = Regex("/@(-?\\d+(?:\\.\\d+)?),(-?\\d+(?:\\.\\d+)?)")
