@@ -2,6 +2,7 @@ package org.com.belog.prelog.infrastructure.google
 
 import org.com.belog.prelog.config.GoogleMapsProperties
 import org.com.belog.prelog.domain.MapProvider
+import org.com.belog.prelog.domain.PlanLocation
 import org.com.belog.prelog.service.result.PlanLocationResolution
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
@@ -90,6 +91,22 @@ class GoogleMapLocationResolverTest {
         assertEquals(MapProvider.GOOGLE, result.location.provider)
         assertNull(result.location.externalPlaceId)
         assertNull(result.location.address)
+        assertEquals(BigDecimal("37.5700000"), result.location.latitude)
+        assertEquals(BigDecimal("126.9800000"), result.location.longitude)
+    }
+
+    @Test
+    fun `장소명 제한을 넘는 q가 있어도 Places 조회가 불가능하면 URL 좌표로 해결한다`() {
+        val placesClient = GooglePlacesClient(RestClient.builder().build(), properties(""))
+        val resolver = resolver(placesClient)
+        val longQuery = "가".repeat(PlanLocation.PLACE_NAME_MAX_LENGTH + 1)
+
+        val result =
+            assertIs<PlanLocationResolution.Resolved>(
+                resolver.resolve("https://maps.google.com/?q=$longQuery&ll=37.57,126.98"),
+            )
+
+        assertNull(result.location.placeName)
         assertEquals(BigDecimal("37.5700000"), result.location.latitude)
         assertEquals(BigDecimal("126.9800000"), result.location.longitude)
     }

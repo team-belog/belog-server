@@ -68,7 +68,7 @@ class GoogleMapLocationResolver(
     ): PlanLocationResolution =
         createResolvedLocation(
             externalPlaceId = placeId,
-            placeName = placeName,
+            placeName = placeName?.takeIf { it.trim().length <= PlanLocation.PLACE_NAME_MAX_LENGTH },
             address = null,
             latitude = coordinates.latitude,
             longitude = coordinates.longitude,
