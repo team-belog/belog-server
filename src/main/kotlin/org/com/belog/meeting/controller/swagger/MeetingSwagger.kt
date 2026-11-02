@@ -14,9 +14,11 @@ import org.com.belog.global.openapi.CommonOpenApiExample
 import org.com.belog.global.openapi.CommonOpenApiResponse
 import org.com.belog.global.response.CommonResponse
 import org.com.belog.meeting.controller.dto.request.CreateMeetingRequest
+import org.com.belog.meeting.controller.dto.request.UpdateMeetingMembersRequest
 import org.com.belog.meeting.controller.dto.request.UpdateMeetingRequest
 import org.com.belog.meeting.controller.dto.response.CreateMeetingResponse
 import org.com.belog.meeting.controller.dto.response.MeetingDetailResponse
+import org.com.belog.meeting.controller.dto.response.MeetingMemberOptionsResponse
 import org.com.belog.meeting.controller.dto.response.MeetingMembersResponse
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
@@ -466,10 +468,186 @@ interface MeetingSwagger {
         @PathVariable
         meetingId: Long,
     ): ResponseEntity<CommonResponse<MeetingMembersResponse>>
+
+    @Operation(
+        summary = "만남 참여자 선택 목록 조회",
+        description =
+            "만남 방장이 참여자 편집 화면에서 사용할 그룹 멤버 목록을 조회합니다. 종료된 만남은 조회할 수 없습니다.\n\n" +
+                "- isParticipant: 현재 만남 참여 여부. true이면 체크된 상태로 표시합니다.\n" +
+                "- isRemovable: 만남에서 제외할 수 있는지 여부. 방장, 만남 생성자, " +
+                "Bill-log 결제·분담·정산 기록이 있는 참여자와 미참여자는 false입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 참여자 선택 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = MEETING_MEMBER_OPTIONS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 방장이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "종료된 만남이라 참여자를 수정할 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ENDED_MEETING_MEMBERS_NOT_EDITABLE_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun getMeetingMemberOptions(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<MeetingMemberOptionsResponse>>
+
+    @Operation(
+        summary = "만남 참여자 수정",
+        description =
+            "만남 방장이 수정 후의 참여자 전체 목록을 전달해 참여자를 일괄 수정합니다.\n\n" +
+                "- 기존 참여자 중 목록에 없는 멤버는 만남에서 제외되고, 새로 포함된 멤버는 추가됩니다.\n" +
+                "- 방장은 항상 참여자로 유지되므로 목록에 포함하지 않습니다.\n" +
+                "- 만남 생성자와 Bill-log 결제·분담·정산 기록이 있는 참여자는 제외할 수 없습니다.\n" +
+                "- 제외된 참여자의 일정 조율 응답은 함께 삭제됩니다.\n" +
+                "- 추가된 멤버에게는 초대 알림, 제외된 멤버에게는 제외 알림을 전송합니다.\n" +
+                "- 종료된 만남은 수정할 수 없습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "만남 참여자 수정 성공",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = UPDATE_MEETING_MEMBERS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 또는 참여자 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "그룹 멤버가 아닌 참여자", value = INVALID_PARTICIPANT_EXAMPLE),
+                            ExampleObject(name = "중복 참여자", value = DUPLICATE_PARTICIPANT_EXAMPLE),
+                            ExampleObject(name = "방장 포함", value = OWNER_INCLUDED_AS_PARTICIPANT_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "만남 방장이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_MEETING_OWNER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없거나 이미 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "만남 상태 또는 참여자 기록 때문에 수정 불가",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "종료된 만남", value = ENDED_MEETING_MEMBERS_NOT_EDITABLE_EXAMPLE),
+                            ExampleObject(name = "만남 생성자 제외", value = CREATOR_CANNOT_BE_EXCLUDED_EXAMPLE),
+                            ExampleObject(
+                                name = "Bill-log 기록이 있는 참여자 제외",
+                                value = BILL_LOG_PARTICIPANT_CANNOT_BE_EXCLUDED_EXAMPLE,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "500", ref = CommonOpenApiResponse.INTERNAL_SERVER_ERROR),
+        ],
+    )
+    fun updateMeetingMembers(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = UpdateMeetingMembersRequest::class),
+                    examples = [ExampleObject(value = UPDATE_MEETING_MEMBERS_REQUEST_EXAMPLE)],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: UpdateMeetingMembersRequest,
+    ): ResponseEntity<CommonResponse<Nothing>>
 }
 
 private const val MEETING_MEMBERS_SUCCESS_EXAMPLE =
     """{"code":"MEETING-S011","message":"만남 멤버 목록을 조회했습니다.","data":{"items":[{"groupMemberId":22,"nickname":"요청자","profileImageUrl":null,"isMe":true},{"groupMemberId":21,"nickname":"참여자","profileImageUrl":"https://example.com/profile","isMe":false}]}}"""
+
+private const val MEETING_MEMBER_OPTIONS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S013","message":"만남 참여자 선택 목록을 조회했습니다.","data":{"items":[{"groupMemberId":22,"nickname":"방장","profileImageUrl":null,"isMe":true,"isParticipant":true,"isRemovable":false},{"groupMemberId":21,"nickname":"참여자","profileImageUrl":"https://example.com/profile","isMe":false,"isParticipant":true,"isRemovable":true},{"groupMemberId":23,"nickname":"미참여자","profileImageUrl":null,"isMe":false,"isParticipant":false,"isRemovable":false}]}}"""
 
 private const val CREATE_FIXED_MEETING_REQUEST_EXAMPLE =
     """{"name":"광주 1박 2일","location":"서울고속버스터미널","participantMemberIds":[22,23],"schedule":{"type":"FIXED","dateRanges":[{"startDate":"2026-10-03","endDate":"2026-10-04"}]}}"""
@@ -548,3 +726,21 @@ private const val MEETING_END_NOT_STARTED_EXAMPLE =
 
 private const val MEETING_END_LOGS_INCOMPLETE_EXAMPLE =
     """{"code":"MEETING-E028","message":"Pre-log, Bill-log, Post-log를 모두 작성해야 만남을 종료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val ENDED_MEETING_MEMBERS_NOT_EDITABLE_EXAMPLE =
+    """{"code":"MEETING-E030","message":"종료된 만남의 참여자는 수정할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val UPDATE_MEETING_MEMBERS_REQUEST_EXAMPLE =
+    """{"participantMemberIds":[21,23]}"""
+
+private const val UPDATE_MEETING_MEMBERS_SUCCESS_EXAMPLE =
+    """{"code":"MEETING-S014","message":"만남 참여자를 수정했습니다.","data":null}"""
+
+private const val OWNER_INCLUDED_AS_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E029","message":"만남 방장은 참여자 목록에 포함할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val CREATOR_CANNOT_BE_EXCLUDED_EXAMPLE =
+    """{"code":"MEETING-E031","message":"만남 생성자는 만남에서 제외할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""
+
+private const val BILL_LOG_PARTICIPANT_CANNOT_BE_EXCLUDED_EXAMPLE =
+    """{"code":"MEETING-E032","message":"Bill-log 기록이 있는 참여자는 만남에서 제외할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-21T00:00:00Z"}}"""

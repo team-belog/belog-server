@@ -2,6 +2,7 @@ package org.com.belog.meeting.repository
 
 import org.com.belog.meeting.domain.MeetingAvailableDate
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -20,4 +21,19 @@ interface MeetingAvailableDateRepository : JpaRepository<MeetingAvailableDate, L
     fun findAllWithResponseParticipantAndCandidateByMeetingId(
         @Param("meetingId") meetingId: Long,
     ): List<MeetingAvailableDate>
+
+    @Modifying
+    @Query(
+        """
+        DELETE FROM MeetingAvailableDate availableDate
+        WHERE availableDate.response.id IN (
+            SELECT response.id
+            FROM MeetingScheduleResponse response
+            WHERE response.participant.id IN :participantIds
+        )
+        """,
+    )
+    fun deleteAllByResponseParticipantIdIn(
+        @Param("participantIds") participantIds: Collection<Long>,
+    ): Int
 }

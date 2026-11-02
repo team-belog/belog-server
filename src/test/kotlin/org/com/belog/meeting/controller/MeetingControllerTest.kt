@@ -11,6 +11,7 @@ import org.com.belog.meeting.service.MeetingEndService
 import org.com.belog.meeting.service.MeetingMemberService
 import org.com.belog.meeting.service.MeetingService
 import org.com.belog.meeting.service.result.CreatedMeeting
+import org.com.belog.meeting.service.result.MeetingMemberOptionResult
 import org.com.belog.meeting.service.result.MeetingMemberResult
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
@@ -26,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -114,6 +116,43 @@ class MeetingControllerTest {
             .perform(get("/api/v1/meetings/7/members").principal(authenticatedUser()))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.code").value("MEETING-E010"))
+    }
+
+    @Test
+    fun `참여자 선택 목록은 참여 여부와 제외 가능 여부를 반환한다`() {
+        `when`(meetingMemberService.getMeetingMemberOptions(7L, 15L)).thenReturn(
+            listOf(
+                MeetingMemberOptionResult(22L, "방장", null, isMe = true, isParticipant = true, isRemovable = false),
+                MeetingMemberOptionResult(23L, "미참여자", null, isMe = false, isParticipant = false, isRemovable = false),
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/meetings/7/member-options").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("MEETING-S013"))
+            .andExpect(jsonPath("$.data.items.length()").value(2))
+            .andExpect(jsonPath("$.data.items[0].groupMemberId").value(22))
+            .andExpect(jsonPath("$.data.items[0].isParticipant").value(true))
+            .andExpect(jsonPath("$.data.items[0].isRemovable").value(false))
+            .andExpect(jsonPath("$.data.items[1].groupMemberId").value(23))
+            .andExpect(jsonPath("$.data.items[1].isParticipant").value(false))
+    }
+
+    @Test
+    fun `만남 참여자 수정 인원이 최대 인원을 초과하면 거절한다`() {
+        val participantIds = (1L..15L).joinToString(",")
+
+        mockMvc
+            .perform(
+                put("/api/v1/meetings/7/members")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"participantMemberIds":[$participantIds]}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(meetingMemberService)
     }
 
     @Test

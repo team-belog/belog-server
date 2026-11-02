@@ -58,6 +58,7 @@ import kotlin.test.assertFailsWith
     AccountNumberEncryptionConfig::class,
     AccountNumberAttributeConverter::class,
     GroupMemberFinder::class,
+    MeetingInviteeFinder::class,
 )
 class MeetingServiceTest {
     @Autowired

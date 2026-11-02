@@ -1,6 +1,9 @@
 package org.com.belog.meeting.repository
 
 import jakarta.persistence.EntityManager
+import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillCurrency
+import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.global.config.JpaAuditingConfig
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
@@ -29,6 +32,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.data.domain.PageRequest
 import org.springframework.test.context.ActiveProfiles
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import kotlin.test.assertEquals
@@ -400,6 +404,61 @@ class MeetingRepositoryTest {
 
         assertEquals(listOf(creator.id, activeMember.id), participants.map { it.groupMember.id })
         assertTrue(participants.all { Hibernate.isInitialized(it.groupMember) && Hibernate.isInitialized(it.groupMember.user) })
+    }
+
+    @Test
+    fun `제외할 참여자의 일정 응답과 가능 날짜를 삭제하면 다른 참여자의 응답은 남고 참여자를 삭제할 수 있다`() {
+        val context = savePollResponseContext()
+        val otherMember = saveGroupMember(context.meeting.group, "other-subject", "다른참여자")
+        val otherParticipant = meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, otherMember))
+        val candidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(context.meeting, LocalDate.of(2026, 9, 21), LocalDate.of(2026, 9, 22)),
+            )
+        val response = saveScheduleResponse(context)
+        val otherResponse = saveScheduleResponse(PollResponseContext(context.meeting, otherParticipant))
+        meetingAvailableDateRepository.saveAllAndFlush(
+            listOf(MeetingAvailableDate.create(response, candidate), MeetingAvailableDate.create(otherResponse, candidate)),
+        )
+        val participantIds = listOf(requireNotNull(context.participant.id))
+
+        meetingAvailableDateRepository.deleteAllByResponseParticipantIdIn(participantIds)
+        meetingScheduleResponseRepository.deleteAllByParticipantIdIn(participantIds)
+        meetingParticipantRepository.deleteAllInBatch(listOf(context.participant))
+        entityManager.clear()
+
+        assertEquals(listOf(otherResponse.id), meetingScheduleResponseRepository.findAll().map { it.id })
+        assertEquals(1L, meetingAvailableDateRepository.count())
+        assertFalse(meetingParticipantRepository.existsById(participantIds.single()))
+    }
+
+    @Test
+    fun `Bill-log 연결 참여자 조회는 결제 기록이 있는 참여자의 그룹 멤버 ID만 반환한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator", "생성자")
+        val payer = saveGroupMember(group, "payer", "결제자")
+        val unlinkedMember = saveGroupMember(group, "unlinked", "미연결자")
+        val meeting = meetingRepository.saveAndFlush(createMeeting(group, creator))
+        val participants =
+            meetingParticipantRepository.saveAllAndFlush(
+                listOf(creator, payer, unlinkedMember).map { MeetingParticipant.create(meeting, it) },
+            )
+        entityManager.persist(
+            Bill.create(
+                meeting = meeting,
+                creator = creator,
+                payer = participants[1],
+                title = "저녁",
+                currency = BillCurrency.KRW,
+                totalAmount = BigDecimal("30000"),
+                splitType = BillSplitType.MANUAL,
+            ),
+        )
+        entityManager.flush()
+
+        val linkedMemberIds = meetingParticipantRepository.findAllBillLogLinkedGroupMemberIds(requireNotNull(meeting.id))
+
+        assertEquals(listOf(payer.id), linkedMemberIds)
     }
 
     private fun saveGroupWithEndedMeeting(

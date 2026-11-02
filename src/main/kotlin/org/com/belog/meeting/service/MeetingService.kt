@@ -4,9 +4,7 @@ import org.com.belog.billlog.service.SettlementRequestService
 import org.com.belog.global.error.BusinessException
 import org.com.belog.global.time.currentBusinessDate
 import org.com.belog.group.code.GroupErrorCode
-import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
-import org.com.belog.group.repository.GroupMemberRepository
 import org.com.belog.group.repository.GroupRepository
 import org.com.belog.group.service.GroupMemberFinder
 import org.com.belog.meeting.code.MeetingErrorCode
@@ -32,7 +30,7 @@ import java.time.LocalDate
 @Service
 class MeetingService(
     private val groupRepository: GroupRepository,
-    private val groupMemberRepository: GroupMemberRepository,
+    private val meetingInviteeFinder: MeetingInviteeFinder,
     private val groupMemberFinder: GroupMemberFinder,
     private val meetingRepository: MeetingRepository,
     private val meetingParticipantRepository: MeetingParticipantRepository,
@@ -283,21 +281,10 @@ class MeetingService(
         creator: GroupMember,
         participantMemberIds: List<Long>,
     ): List<GroupMember> {
-        if (participantMemberIds.size > Group.MAX_MEMBER_COUNT - CREATOR_COUNT) {
-            throw BusinessException(MeetingErrorCode.PARTICIPANT_LIMIT_EXCEEDED)
-        }
-        if (participantMemberIds.distinct().size != participantMemberIds.size) {
-            throw BusinessException(MeetingErrorCode.DUPLICATE_PARTICIPANT)
-        }
         if (creator.id in participantMemberIds) {
             throw BusinessException(MeetingErrorCode.CREATOR_INCLUDED_AS_PARTICIPANT)
         }
-
-        val participants = groupMemberRepository.findAllByGroupIdAndIdInAndWithdrawnAtIsNull(groupId, participantMemberIds)
-        if (participants.size != participantMemberIds.size) {
-            throw BusinessException(MeetingErrorCode.INVALID_PARTICIPANT)
-        }
-        return participants
+        return meetingInviteeFinder.findInvitees(groupId, participantMemberIds)
     }
 
     private fun validateCandidateDateRanges(

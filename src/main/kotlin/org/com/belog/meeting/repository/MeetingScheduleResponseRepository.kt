@@ -4,6 +4,7 @@ import jakarta.persistence.LockModeType
 import org.com.belog.meeting.domain.MeetingScheduleResponse
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
 
@@ -47,4 +48,15 @@ interface MeetingScheduleResponseRepository : JpaRepository<MeetingScheduleRespo
         @Param("meetingId") meetingId: Long,
         @Param("participantId") participantId: Long,
     ): MeetingScheduleResponse?
+
+    @Modifying
+    @Query(
+        """
+        DELETE FROM MeetingScheduleResponse response
+        WHERE response.participant.id IN :participantIds
+        """,
+    )
+    fun deleteAllByParticipantIdIn(
+        @Param("participantIds") participantIds: Collection<Long>,
+    ): Int
 }

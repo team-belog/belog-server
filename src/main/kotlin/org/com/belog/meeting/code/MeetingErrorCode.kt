@@ -36,4 +36,8 @@ enum class MeetingErrorCode(
     MEETING_END_ALREADY_ENDED(HttpStatus.CONFLICT, "MEETING-E026", "이미 종료된 만남입니다."),
     MEETING_END_NOT_STARTED(HttpStatus.CONFLICT, "MEETING-E027", "일정이 확정된 만남은 시작일부터 종료할 수 있습니다."),
     MEETING_END_LOGS_INCOMPLETE(HttpStatus.CONFLICT, "MEETING-E028", "Pre-log, Bill-log, Post-log를 모두 작성해야 만남을 종료할 수 있습니다."),
+    OWNER_INCLUDED_AS_PARTICIPANT(HttpStatus.BAD_REQUEST, "MEETING-E029", "만남 방장은 참여자 목록에 포함할 수 없습니다."),
+    ENDED_MEETING_MEMBERS_NOT_EDITABLE(HttpStatus.CONFLICT, "MEETING-E030", "종료된 만남의 참여자는 수정할 수 없습니다."),
+    CREATOR_CANNOT_BE_EXCLUDED(HttpStatus.CONFLICT, "MEETING-E031", "만남 생성자는 만남에서 제외할 수 없습니다."),
+    BILL_LOG_PARTICIPANT_CANNOT_BE_EXCLUDED(HttpStatus.CONFLICT, "MEETING-E032", "Bill-log 기록이 있는 참여자는 만남에서 제외할 수 없습니다."),
 }
