@@ -3,21 +3,28 @@ name: Rollback
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: Environment to roll back
+        required: true
+        type: choice
+        options:
+          - development
+          - production
       confirm:
-        description: Roll back development to the previous Blue/Green environment
+        description: Roll back the selected environment to the previous Blue/Green environment
         required: true
         type: boolean
 
 concurrency:
-  group: development-deployment
+  group: ${{ inputs.environment }}-deployment
   cancel-in-progress: false
 
 jobs:
   rollback:
-    name: Roll back development
+    name: Roll back ${{ inputs.environment }}
     if: inputs.confirm
     runs-on: ubuntu-latest
-    environment: development
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
     env:
@@ -25,14 +32,14 @@ jobs:
       EC2_HOST_KEY: ${{ secrets.EC2_HOST_KEY }}
       EC2_USER: ${{ secrets.EC2_USER }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-      SPRING_PROFILE: dev
+      SPRING_PROFILE: ${{ inputs.environment == 'production' && 'prod' || 'dev' }}
       REMOTE_ROLLBACK_SCRIPT: /tmp/belog-rollback-${{ github.run_id }}.sh
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
         with:
-          ref: develop
+          ref: ${{ inputs.environment == 'production' && 'main' || 'develop' }}
 
       - name: Configure SSH
         run: |

@@ -1,19 +1,22 @@
-name: CD
+name: Deploy
 
 on:
-  push:
-    branches:
-      - develop
-
-concurrency:
-  group: development-deployment
-  cancel-in-progress: false
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy to
+        required: true
+        type: string
+      spring-profile:
+        description: Spring profile to activate on the server
+        required: true
+        type: string
 
 jobs:
   publish-image:
     name: Build and publish Docker image
     runs-on: ubuntu-latest
-    environment: development
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
       id-token: write
@@ -67,7 +70,7 @@ jobs:
     name: Deploy inactive environment
     needs: publish-image
     runs-on: ubuntu-latest
-    environment: development
+    environment: ${{ inputs.environment }}
     permissions:
       contents: read
     env:
@@ -77,7 +80,7 @@ jobs:
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
       APP_ENV: ${{ secrets.APP_ENV }}
       CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
-      SPRING_PROFILE: dev
+      SPRING_PROFILE: ${{ inputs.spring-profile }}
       API_DOMAIN: ${{ vars.API_DOMAIN }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
       ECR_REGISTRY: ${{ needs.publish-image.outputs.registry }}
@@ -107,6 +110,7 @@ jobs:
           test -n "$IMAGE_REF"
           test -n "$API_DOMAIN"
           test -n "$CERTBOT_EMAIL"
+          [[ "$SPRING_PROFILE" =~ ^[a-zA-Z0-9_-]+$ ]]
           [[ "$CERTBOT_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
 
           install -d -m 700 "$HOME/.ssh"
@@ -166,7 +170,7 @@ jobs:
             deploy/configure-maintenance.sh \
             "$EC2_USER@$EC2_HOST:$REMOTE_MAINTENANCE_CONFIG_SCRIPT"
 
-      - name: Configure development environment
+      - name: Configure application environment
         run: |
           test -n "$APP_ENV"
           printf '%s\n' "$APP_ENV" | ssh \
@@ -174,7 +178,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.dev"'
+            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.'"$SPRING_PROFILE"'"'
 
       - name: Configure Swagger credentials
         env:
