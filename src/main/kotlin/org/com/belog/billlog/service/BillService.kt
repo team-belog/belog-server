@@ -1,0 +1,372 @@
+package org.com.belog.billlog.service
+
+import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.Bill
+import org.com.belog.billlog.domain.BillAmount
+import org.com.belog.billlog.domain.BillItem
+import org.com.belog.billlog.domain.BillShare
+import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.billlog.repository.BillItemRepository
+import org.com.belog.billlog.repository.BillRepository
+import org.com.belog.billlog.repository.BillShareRepository
+import org.com.belog.billlog.repository.SettlementRequestRepository
+import org.com.belog.billlog.service.command.BillLogNotificationCommands
+import org.com.belog.billlog.service.command.RegisterBillCommand
+import org.com.belog.billlog.service.result.BillDetailResult
+import org.com.belog.billlog.service.result.BillItemResult
+import org.com.belog.billlog.service.result.BillShareResult
+import org.com.belog.billlog.service.result.RegisteredBill
+import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.toBusinessDate
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.service.GroupMemberFinder
+import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.calculateMeetingDayNumber
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingAccessChecker
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.user.service.UserService
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.math.BigDecimal
+import java.time.Clock
+import java.time.Instant
+
+@Service
+class BillService(
+    private val meetingRepository: MeetingRepository,
+    private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingAccessChecker: MeetingAccessChecker,
+    private val groupMemberFinder: GroupMemberFinder,
+    private val billRepository: BillRepository,
+    private val billItemRepository: BillItemRepository,
+    private val billShareRepository: BillShareRepository,
+    private val settlementRequestRepository: SettlementRequestRepository,
+    private val userService: UserService,
+    private val notificationService: NotificationService,
+    private val clock: Clock,
+) {
+    @Transactional
+    fun registerBill(command: RegisterBillCommand): RegisteredBill {
+        validateCommand(command)
+
+        val meeting = findMeetingForUpdate(command.meetingId)
+        val creator = meetingAccessChecker.requireParticipant(meeting, command.creatorUserId)
+        val participantsByMemberId = findParticipantsByMemberId(meeting, command)
+        val payer =
+            participantsByMemberId[command.payerMemberId]
+                ?: throw BusinessException(BillLogErrorCode.PAYER_NOT_MEETING_PARTICIPANT)
+        val shareParticipants =
+            command.shares.map { share ->
+                participantsByMemberId[share.participantMemberId]
+                    ?: throw BusinessException(BillLogErrorCode.INVALID_SHARE_PARTICIPANT)
+            }
+
+        val bill = saveBill(command, meeting, creator, payer)
+        saveItems(command, bill)
+        val settlementRequestsByParticipantId = offsetSettlementRequests(command, bill, shareParticipants)
+        saveShares(command, bill, shareParticipants, settlementRequestsByParticipantId)
+        val requestedSettlements =
+            settlementRequestsByParticipantId.values.filter { settlementRequest ->
+                settlementRequest.status == SettlementRequestStatus.PENDING
+            }
+        notifySettlementRequested(meeting, bill, requestedSettlements)
+        notifyBillRegistered(meeting, bill, creator, requestedSettlements)
+
+        return RegisteredBill(
+            billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." },
+        )
+    }
+
+    @Transactional(readOnly = true)
+    fun getBillDetail(
+        billId: Long,
+        userId: Long,
+    ): BillDetailResult {
+        val bill =
+            billRepository.findByIdWithMeetingAndPayer(billId)
+                ?: throw BusinessException(BillLogErrorCode.BILL_NOT_FOUND)
+        val meeting = bill.meeting
+        groupMemberFinder.findActiveMember(meeting.group, userId)
+        val items = billItemRepository.findAllByBillIdOrderByItemOrderAsc(billId)
+        val shares = billShareRepository.findAllWithParticipantAndUserByBillId(billId)
+        val paymentDate =
+            checkNotNull(bill.createdAt) { "조회된 결제 내역의 생성 시각이 없습니다." }
+                .toBusinessDate()
+        val meetingStartDate =
+            meeting.startDate
+                ?: throw BusinessException(BillLogErrorCode.MEETING_DATE_NOT_CONFIRMED)
+        val payerParticipantId = checkNotNull(bill.payer.id) { "조회된 결제자의 만남 참여자 ID가 없습니다." }
+        val payerNickname = userService.resolveDisplayNickname(bill.payer.groupMember.user)
+
+        return BillDetailResult(
+            billId = checkNotNull(bill.id) { "조회된 결제 내역의 ID가 없습니다." },
+            dayNumber = calculateMeetingDayNumber(meetingStartDate, paymentDate),
+            paymentDate = paymentDate,
+            title = bill.title,
+            payerNickname = payerNickname,
+            settlementMethod = bill.splitType,
+            currency = bill.currency,
+            items =
+                items.map { item ->
+                    BillItemResult(
+                        name = item.name,
+                        amount = bill.currency.normalize(item.amount),
+                    )
+                },
+            totalAmount = bill.currency.normalize(bill.totalAmount),
+            shares =
+                shares.map { share ->
+                    val participant = share.participant
+                    val participantId =
+                        checkNotNull(participant.id) { "조회된 부담자의 만남 참여자 ID가 없습니다." }
+                    val participantUser = participant.groupMember.user
+
+                    BillShareResult(
+                        meetingParticipantId = participantId,
+                        nickname = userService.resolveDisplayNickname(participantUser),
+                        profileImageUrl = userService.resolveProfileImageUrl(participantUser),
+                        amount = bill.currency.normalize(share.amount),
+                        payer = participantId == payerParticipantId,
+                    )
+                },
+        )
+    }
+
+    private fun validateCommand(command: RegisterBillCommand) {
+        if (command.items.isEmpty()) {
+            throw BusinessException(BillLogErrorCode.EMPTY_BILL_ITEM)
+        }
+        if (command.shares.isEmpty()) {
+            throw BusinessException(BillLogErrorCode.EMPTY_BILL_SHARE)
+        }
+        val amounts = listOf(command.totalAmount) + command.items.map { item -> item.amount } + command.shares.map { share -> share.amount }
+        if (amounts.any { amount -> amount.signum() <= 0 }) {
+            throw BusinessException(BillLogErrorCode.INVALID_AMOUNT)
+        }
+        if (amounts.any { amount -> !command.currency.supports(amount) }) {
+            throw BusinessException(BillLogErrorCode.INVALID_CURRENCY_AMOUNT)
+        }
+        if (!BillAmount.isStorable(command.totalAmount)) {
+            throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
+        }
+
+        val shareMemberIds = command.shares.map { share -> share.participantMemberId }
+        if (shareMemberIds.distinct().size != shareMemberIds.size) {
+            throw BusinessException(BillLogErrorCode.DUPLICATE_SHARE_PARTICIPANT)
+        }
+
+        val itemTotal = sumAmounts(command.items.map { item -> item.amount })
+        if (itemTotal.compareTo(command.totalAmount) != 0) {
+            throw BusinessException(BillLogErrorCode.ITEM_TOTAL_MISMATCH)
+        }
+
+        val shareTotal = sumAmounts(command.shares.map { share -> share.amount })
+        if (shareTotal.compareTo(command.totalAmount) != 0) {
+            throw BusinessException(BillLogErrorCode.SHARE_TOTAL_MISMATCH)
+        }
+    }
+
+    private fun sumAmounts(amounts: List<BigDecimal>): BigDecimal = amounts.fold(BigDecimal.ZERO, BigDecimal::add)
+
+    private fun findMeetingForUpdate(meetingId: Long): Meeting =
+        meetingRepository.findByIdWithGroupForUpdate(meetingId)
+            ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+
+    private fun findParticipantsByMemberId(
+        meeting: Meeting,
+        command: RegisterBillCommand,
+    ): Map<Long, MeetingParticipant> {
+        val memberIds =
+            (listOf(command.payerMemberId) + command.shares.map { share -> share.participantMemberId }).distinct()
+
+        return meetingParticipantRepository
+            .findAllByMeetingIdAndGroupMemberIdIn(
+                meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." },
+                groupMemberIds = memberIds,
+            ).associateBy { participant ->
+                checkNotNull(participant.groupMember.id) { "만남 참여자의 그룹 멤버 ID가 없습니다." }
+            }
+    }
+
+    private fun saveBill(
+        command: RegisterBillCommand,
+        meeting: Meeting,
+        creator: GroupMember,
+        payer: MeetingParticipant,
+    ): Bill =
+        saveDomainEntity {
+            billRepository.save(
+                Bill.create(
+                    meeting = meeting,
+                    creator = creator,
+                    payer = payer,
+                    title = command.title,
+                    currency = command.currency,
+                    totalAmount = command.totalAmount,
+                    splitType = command.splitType,
+                ),
+            )
+        }
+
+    private fun saveItems(
+        command: RegisterBillCommand,
+        bill: Bill,
+    ) {
+        saveDomainEntity {
+            billItemRepository.saveAll(
+                command.items.mapIndexed { index, item ->
+                    BillItem.create(
+                        bill = bill,
+                        name = item.name,
+                        amount = item.amount,
+                        itemOrder = index,
+                    )
+                },
+            )
+        }
+    }
+
+    private fun offsetSettlementRequests(
+        command: RegisterBillCommand,
+        bill: Bill,
+        participants: List<MeetingParticipant>,
+    ): Map<Long, SettlementRequest> {
+        val meetingId = checkNotNull(bill.meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val payer = bill.payer
+        val payerId = checkNotNull(payer.id) { "결제자의 만남 참여자 ID가 없습니다." }
+        val offsetAt = Instant.now(clock)
+
+        return command.shares
+            .zip(participants)
+            .filter { (_, participant) -> participant.id != payerId }
+            .associate { (share, participant) ->
+                val participantId = checkNotNull(participant.id) { "부담자의 만남 참여자 ID가 없습니다." }
+                val pendingRequest =
+                    settlementRequestRepository.findPendingBetweenForUpdate(
+                        meetingId = meetingId,
+                        currency = bill.currency,
+                        participantId = participantId,
+                        otherParticipantId = payerId,
+                        pendingStatus = SettlementRequestStatus.PENDING,
+                    )
+                if (pendingRequest != null && !pendingRequest.canStoreOffset(participant, payer, share.amount)) {
+                    throw BusinessException(BillLogErrorCode.AMOUNT_OVERFLOW)
+                }
+                val settlementRequest =
+                    saveDomainEntity {
+                        if (pendingRequest == null) {
+                            settlementRequestRepository.save(
+                                SettlementRequest.create(
+                                    meeting = bill.meeting,
+                                    currency = bill.currency,
+                                    debtor = participant,
+                                    creditor = payer,
+                                    debtAmount = share.amount,
+                                ),
+                            )
+                        } else {
+                            pendingRequest.also { request ->
+                                request.offset(
+                                    debtor = participant,
+                                    creditor = payer,
+                                    debtAmount = share.amount,
+                                    offsetAt = offsetAt,
+                                )
+                            }
+                        }
+                    }
+                participantId to settlementRequest
+            }
+    }
+
+    private fun saveShares(
+        command: RegisterBillCommand,
+        bill: Bill,
+        participants: List<MeetingParticipant>,
+        settlementRequestsByParticipantId: Map<Long, SettlementRequest>,
+    ) {
+        saveDomainEntity {
+            billShareRepository.saveAll(
+                command.shares.zip(participants).mapIndexed { index, (share, participant) ->
+                    BillShare.create(
+                        bill = bill,
+                        participant = participant,
+                        amount = share.amount,
+                        allocationOrder = index,
+                        settlementRequest = settlementRequestsByParticipantId[participant.id],
+                    )
+                },
+            )
+        }
+    }
+
+    private fun notifySettlementRequested(
+        meeting: Meeting,
+        bill: Bill,
+        settlementRequests: List<SettlementRequest>,
+    ) {
+        val meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." }
+
+        notificationService.createAll(
+            settlementRequests.map { settlementRequest ->
+                val receiverUser = settlementRequest.receiver.groupMember.user
+                BillLogNotificationCommands.settlementRequested(
+                    meetingId = meetingId,
+                    settlementRequestId = checkNotNull(settlementRequest.id) { "저장된 정산 요청의 ID가 없습니다." },
+                    billId = billId,
+                    recipientUserId =
+                        checkNotNull(settlementRequest.sender.groupMember.user.id) {
+                            "정산 송금자의 사용자 ID가 없습니다."
+                        },
+                    receiverUserId = checkNotNull(receiverUser.id) { "정산 수취인의 사용자 ID가 없습니다." },
+                    receiverNickname = userService.resolveDisplayNickname(receiverUser),
+                )
+            },
+        )
+    }
+
+    private fun notifyBillRegistered(
+        meeting: Meeting,
+        bill: Bill,
+        creator: GroupMember,
+        settlementRequests: List<SettlementRequest>,
+    ) {
+        val meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." }
+        val billId = checkNotNull(bill.id) { "저장된 결제 내역의 ID가 없습니다." }
+        val creatorUser = creator.user
+        val creatorUserId = checkNotNull(creatorUser.id) { "결제 내역 등록자의 사용자 ID가 없습니다." }
+        val creatorNickname = userService.resolveDisplayNickname(creatorUser)
+        val settlementParticipantIds = settlementRequests.map { settlementRequest -> settlementRequest.sender.id }.toSet()
+        val recipients =
+            meetingParticipantRepository
+                .findAllActiveWithUserByMeetingId(meetingId)
+                .filter { participant ->
+                    participant.id !in settlementParticipantIds && participant.groupMember.id != creator.id
+                }
+
+        notificationService.createAll(
+            recipients.map { participant ->
+                BillLogNotificationCommands.billRegistered(
+                    meetingId = meetingId,
+                    billId = billId,
+                    recipientUserId = checkNotNull(participant.groupMember.user.id) { "만남 참여자의 사용자 ID가 없습니다." },
+                    creatorUserId = creatorUserId,
+                    creatorNickname = creatorNickname,
+                )
+            },
+        )
+    }
+
+    private fun <T> saveDomainEntity(block: () -> T): T =
+        try {
+            block()
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(BillLogErrorCode.INVALID_BILL, exception)
+        }
+}

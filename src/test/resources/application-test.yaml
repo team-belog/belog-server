@@ -1,0 +1,60 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:belog;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+server:
+  port: 0
+
+auth:
+  google:
+    client-id: test-google-client-id
+    client-secret: test-google-client-secret
+    redirect-uris:
+      - http://localhost:3000/oauth/google/callback
+      - https://belog.co.kr/oauth/google/callback
+      - https://www.belog.co.kr/oauth/google/callback
+  jwt:
+    secret: test-jwt-secret-must-be-at-least-32-characters
+    issuer: belog
+    access-token-expiration: 30m
+    refresh-token-expiration: 14d
+    refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax
+
+app:
+  cors:
+    allowed-origins:
+      - http://localhost:3000
+  security:
+    account-number:
+      encryption-key: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+
+storage:
+  s3:
+    bucket: belog-test-storage
+    region: ap-northeast-2
+    presign-expiration: 5m
+
+group:
+  invite:
+    base-url: https://belog.example/invitations
+
+ocr:
+  upstage:
+    api-key: test-upstage-api-key

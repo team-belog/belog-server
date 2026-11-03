@@ -1,0 +1,867 @@
+package org.com.belog.meeting.service
+
+import jakarta.persistence.EntityManager
+import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingCandidateDateRange
+import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.domain.MeetingStatus
+import org.com.belog.meeting.repository.MeetingAvailableDateRepository
+import org.com.belog.meeting.repository.MeetingCandidateDateRangeRepository
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.postlog.domain.PostLogTicket
+import org.com.belog.postlog.repository.PostLogTicketRepository
+import org.com.belog.user.config.AccountNumberEncryptionConfig
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
+import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.context.annotation.Primary
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.sql.Timestamp
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import(
+    MeetingDatePollService::class,
+    MeetingDatePollServiceTest.FixedClockConfig::class,
+    JpaAuditingConfig::class,
+    AccountNumberEncryptionConfig::class,
+    AccountNumberAttributeConverter::class,
+)
+class MeetingDatePollServiceTest {
+    @Autowired
+    private lateinit var meetingDatePollService: MeetingDatePollService
+
+    @Autowired
+    private lateinit var meetingRepository: MeetingRepository
+
+    @Autowired
+    private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
+    private lateinit var meetingCandidateDateRangeRepository: MeetingCandidateDateRangeRepository
+
+    @Autowired
+    private lateinit var meetingScheduleResponseRepository: MeetingScheduleResponseRepository
+
+    @Autowired
+    private lateinit var meetingAvailableDateRepository: MeetingAvailableDateRepository
+
+    @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var postLogTicketRepository: PostLogTicketRepository
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @MockitoBean
+    private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
+    @BeforeEach
+    fun stubUserService() {
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
+    }
+
+    @Test
+    fun `참여자는 후보 일정을 조회한다`() {
+        val context = savePollContext()
+
+        val result =
+            meetingDatePollService.getDatePoll(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.member.user.id),
+            )
+
+        assertEquals(context.candidates.map { it.id }, result.candidateDateRanges.map { it.id })
+    }
+
+    @Test
+    fun `참여자가 복수 후보 일정에 응답하면 완료 정보와 선택 날짜를 저장한다`() {
+        val context = savePollContext()
+        val selectedCandidateIds = context.candidates.map { requireNotNull(it.id) }
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = selectedCandidateIds,
+        )
+
+        assertEquals(1L, meetingScheduleResponseRepository.count())
+        assertEquals(2L, meetingAvailableDateRepository.count())
+    }
+
+    @Test
+    fun `참여자가 후보 일정에 응답하면 만남 방장에게 응답 알림이 저장된다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val memberUserId = requireNotNull(context.member.user.id)
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = meetingId,
+            userId = memberUserId,
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val responseParticipantId =
+            requireNotNull(meetingParticipantRepository.findByMeetingIdAndGroupMemberUserId(meetingId, memberUserId)?.id)
+        assertEquals(
+            listOf(
+                CreateNotificationCommand(
+                    recipientUserId = requireNotNull(context.creator.user.id),
+                    actorUserId = memberUserId,
+                    type = NotificationType.DATE_POLL_RESPONDED,
+                    message = "참여자 님이 일정 조율에 응답했어요",
+                    targetId = meetingId,
+                    deduplicationKey = "DATE_POLL_RESPONDED:$meetingId:$responseParticipantId",
+                ),
+            ),
+            requestedNotificationCommands(),
+        )
+    }
+
+    @Test
+    fun `만남 방장이 직접 응답하면 응답 알림이 저장되지 않는다`() {
+        val context = savePollContext()
+        context.meeting.delegateOwnerTo(context.member)
+        meetingRepository.flush()
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        assertEquals(emptyList(), requestedNotificationCommands())
+    }
+
+    @Test
+    fun `빈 선택으로 응답하면 미응답과 구분되는 완료 상태를 저장한다`() {
+        val context = savePollContext()
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        assertEquals(1L, meetingScheduleResponseRepository.count())
+        assertEquals(0L, meetingAvailableDateRepository.count())
+    }
+
+    @Test
+    fun `조율 현황에서 가능 불가 멤버와 응답 진행률을 계산한다`() {
+        val context = savePollResultsContext()
+        val firstCandidateId = requireNotNull(context.candidates[0].id)
+        val secondCandidateId = requireNotNull(context.candidates[1].id)
+
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.firstMember.user.id),
+            candidateDateRangeIds = listOf(firstCandidateId, secondCandidateId),
+        )
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.secondMember.user.id),
+            candidateDateRangeIds = listOf(secondCandidateId),
+        )
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.unavailableMember.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val result =
+            meetingDatePollService.getDatePollResults(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.firstMember.user.id),
+            )
+
+        assertEquals(5, result.totalParticipantCount)
+        assertEquals(4, result.respondedParticipantCount)
+        assertEquals(listOf(3, 2, 1), result.candidateDateResults.map { it.availableCount })
+        assertEquals(listOf(1, 2, 3), result.candidateDateResults.map { it.rank })
+
+        val mostAvailableCandidate = result.candidateDateResults.first()
+        assertEquals(secondCandidateId, mostAvailableCandidate.candidateDateRangeId)
+        assertEquals(
+            listOf("생성자", "참여자1", "참여자2"),
+            mostAvailableCandidate.availableMembers.map { it.nickname },
+        )
+        assertEquals(
+            listOf("모두불가"),
+            mostAvailableCandidate.unavailableMembers.map { it.nickname },
+        )
+
+        val leastAvailableCandidate = result.candidateDateResults.last()
+        assertEquals(listOf("생성자"), leastAvailableCandidate.availableMembers.map { it.nickname })
+        assertEquals(
+            listOf("참여자1", "참여자2", "모두불가"),
+            leastAvailableCandidate.unavailableMembers.map { it.nickname },
+        )
+    }
+
+    @Test
+    fun `만남 참여자가 아닌 사용자는 후보 일정을 조회할 수 없다`() {
+        val context = savePollContext()
+        val otherUser = saveCompletedUser("other-subject", "외부인")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.getDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(otherUser.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 참여자는 후보 일정을 조회할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.getDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 참여자는 일정 조율 현황을 조회할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.getDatePollResults(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `삭제된 만남의 참여자는 후보 일정에 응답할 수 없다`() {
+        val context = savePollContext()
+        deleteMeeting(context.meeting)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                    candidateDateRangeIds = listOf(requireNotNull(context.candidates.first().id)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+        assertEquals(0L, meetingScheduleResponseRepository.count())
+    }
+
+    @Test
+    fun `만남 생성자는 후보 일정에 응답할 수 없다`() {
+        val context = savePollContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.creator.user.id),
+                    candidateDateRangeIds = emptyList(),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.CREATOR_CANNOT_RESPOND_DATE_POLL, exception.errorCode)
+        assertEquals(0L, meetingScheduleResponseRepository.count())
+    }
+
+    @Test
+    fun `다른 만남의 후보 일정 ID로 응답할 수 없다`() {
+        val context = savePollContext()
+        val otherMeeting = meetingRepository.saveAndFlush(createPollMeeting(context.group, context.creator))
+        val otherCandidate =
+            meetingCandidateDateRangeRepository.saveAndFlush(
+                createCandidateDateRange(
+                    meeting = otherMeeting,
+                    startDate = LocalDate.of(2026, 10, 6),
+                    endDate = LocalDate.of(2026, 10, 7),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                    candidateDateRangeIds = listOf(requireNotNull(otherCandidate.id)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.INVALID_AVAILABLE_DATE, exception.errorCode)
+        assertEquals(0L, meetingScheduleResponseRepository.count())
+    }
+
+    @Test
+    fun `중복된 후보 일정 ID로 응답할 수 없다`() {
+        val context = savePollContext()
+        val candidateId = requireNotNull(context.candidates.first().id)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                    candidateDateRangeIds = listOf(candidateId, candidateId),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.DUPLICATE_AVAILABLE_DATE, exception.errorCode)
+        assertEquals(0L, meetingScheduleResponseRepository.count())
+    }
+
+    @Test
+    fun `응답을 완료한 참여자는 다시 응답할 수 없다`() {
+        val context = savePollContext()
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.respondDatePoll(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                    candidateDateRangeIds = listOf(requireNotNull(context.candidates.first().id)),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.DATE_POLL_ALREADY_RESPONDED, exception.errorCode)
+        assertEquals(1L, meetingScheduleResponseRepository.count())
+        assertEquals(0L, meetingAvailableDateRepository.count())
+    }
+
+    @Test
+    fun `만남 방장이 리마인드를 요청하면 미응답 참여자에게 리마인드 알림이 저장된다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val memberUserId = requireNotNull(context.member.user.id)
+
+        meetingDatePollService.remindUnrespondedParticipants(
+            meetingId = meetingId,
+            userId = requireNotNull(context.creator.user.id),
+        )
+
+        val command = requestedNotificationBatches().single().single() as CreateNotificationCommand
+        assertEquals(memberUserId, command.recipientUserId)
+        assertEquals(context.creator.user.id, command.actorUserId)
+        assertEquals(NotificationType.DATE_POLL_REMINDER, command.type)
+        assertEquals("아직 응답 안 하셨어요, 되는 날짜를 체크해주세요", command.message)
+        assertEquals(meetingId, command.targetId)
+        assertTrue(
+            Regex("DATE_POLL_REMINDER:$meetingId:${FIXED_INSTANT.toEpochMilli()}:[0-9a-f-]{36}:$memberUserId")
+                .matches(command.deduplicationKey),
+        )
+    }
+
+    @Test
+    fun `만남 방장이 아니면 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.member.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationBatches())
+    }
+
+    @Test
+    fun `미응답 참여자가 없으면 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+        meetingDatePollService.respondDatePoll(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.member.user.id),
+            candidateDateRangeIds = emptyList(),
+        )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.creator.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TARGET_NOT_FOUND, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationBatches())
+    }
+
+    @Test
+    fun `일정이 확정된 만남에는 리마인드를 요청할 수 없다`() {
+        val context = savePollContext()
+        context.meeting.confirmDate(
+            candidateDateRange = context.candidates.first(),
+            confirmedAt = FIXED_INSTANT,
+            currentDate = LocalDate.of(2026, 9, 22),
+        )
+        meetingRepository.flush()
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(
+                    meetingId = requireNotNull(context.meeting.id),
+                    userId = requireNotNull(context.creator.user.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_DATE_NOT_SCHEDULING, exception.errorCode)
+        assertEquals(emptyList(), requestedNotificationBatches())
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나지 않으면 리마인드를 다시 요청할 수 없다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        val creatorUserId = requireNotNull(context.creator.user.id)
+        meetingDatePollService.remindUnrespondedParticipants(meetingId = meetingId, userId = creatorUserId)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.remindUnrespondedParticipants(meetingId = meetingId, userId = creatorUserId)
+            }
+
+        assertEquals(MeetingErrorCode.DATE_POLL_REMINDER_TOO_FREQUENT, exception.errorCode)
+        assertEquals(1, requestedNotificationBatches().size)
+    }
+
+    @Test
+    fun `마지막 리마인드 후 1분이 지나면 리마인드를 다시 요청할 수 있다`() {
+        val context = savePollContext()
+        val meetingId = requireNotNull(context.meeting.id)
+        updateLastDatePollRemindedAt(meetingId, FIXED_INSTANT.minusSeconds(60))
+
+        meetingDatePollService.remindUnrespondedParticipants(
+            meetingId = meetingId,
+            userId = requireNotNull(context.creator.user.id),
+        )
+        meetingRepository.flush()
+
+        assertEquals(1, requestedNotificationBatches().size)
+        assertEquals(FIXED_INSTANT, meetingRepository.findById(meetingId).orElseThrow().lastDatePollRemindedAt)
+    }
+
+    @Test
+    fun `만남 생성자가 후보 일정을 최종 일정으로 확정한다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val changed =
+            meetingDatePollService.confirmMeetingDate(
+                meetingId = requireNotNull(meeting.id),
+                userId = requireNotNull(creator.user.id),
+                candidateDateRangeId = requireNotNull(candidateDateRange.id),
+            )
+
+        assertTrue(changed)
+        assertEquals(MeetingStatus.CONFIRMED, meeting.status)
+        assertEquals(candidateDateRange.startDate, meeting.startDate)
+        assertEquals(candidateDateRange.endDate, meeting.endDate)
+        assertEquals(FIXED_INSTANT, meeting.confirmedAt)
+    }
+
+    @Test
+    fun `후보 일정을 확정하면 일정 조율 중 생성한 티켓에도 확정 일정이 저장된다`() {
+        val context = saveConfirmationContext()
+        val ticket =
+            postLogTicketRepository.saveAndFlush(
+                PostLogTicket.issue(
+                    meeting = context.meeting,
+                    creator = context.participant,
+                    memory = "함께한 추억",
+                    coverImageObjectKey = null,
+                    issuedAt = FIXED_INSTANT,
+                ),
+            )
+
+        meetingDatePollService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        assertEquals(context.candidateDateRange.startDate, ticket.meetingStartDate)
+        assertEquals(context.candidateDateRange.endDate, ticket.meetingEndDate)
+    }
+
+    @Test
+    fun `후보 일정을 확정하면 방장과 탈퇴한 멤버를 제외한 참여자에게 확정 알림이 저장된다`() {
+        val context = saveConfirmationContext()
+
+        meetingDatePollService.confirmMeetingDate(
+            meetingId = requireNotNull(context.meeting.id),
+            userId = requireNotNull(context.owner.user.id),
+            candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+        )
+
+        val meetingId = requireNotNull(context.meeting.id)
+        val recipientUserId = requireNotNull(context.participant.user.id)
+        assertEquals(
+            listOf(
+                setOf(
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.owner.user.id,
+                        type = NotificationType.MEETING_DATE_CONFIRMED,
+                        message = "일정이 9월 22일~9월 23일로 확정됐어요",
+                        targetId = meetingId,
+                        deduplicationKey = "MEETING_DATE_CONFIRMED:$meetingId:$recipientUserId",
+                    ),
+                ),
+            ),
+            requestedNotificationBatches().map { commands -> commands.toSet() },
+        )
+    }
+
+    @Test
+    fun `이미 확정된 일정으로 다시 확정하면 확정 알림이 다시 저장되지 않는다`() {
+        val context = saveConfirmationContext()
+        repeat(2) {
+            meetingDatePollService.confirmMeetingDate(
+                meetingId = requireNotNull(context.meeting.id),
+                userId = requireNotNull(context.owner.user.id),
+                candidateDateRangeId = requireNotNull(context.candidateDateRange.id),
+            )
+        }
+
+        assertEquals(1, requestedNotificationBatches().size)
+    }
+
+    @Test
+    fun `생성자가 아닌 사용자는 후보 일정을 확정할 수 없다`() {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "멤버")
+        val meeting = meetingRepository.save(createPollMeeting(group, creator))
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                meetingDatePollService.confirmMeetingDate(
+                    meetingId = requireNotNull(meeting.id),
+                    userId = requireNotNull(member.user.id),
+                    candidateDateRangeId = requireNotNull(candidateDateRange.id),
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_OWNER, exception.errorCode)
+        assertEquals(MeetingStatus.SCHEDULING, meeting.status)
+    }
+
+    private fun updateLastDatePollRemindedAt(
+        meetingId: Long,
+        lastDatePollRemindedAt: Instant,
+    ) {
+        meetingRepository.flush()
+        jdbcTemplate.update(
+            "UPDATE meetings SET last_date_poll_reminded_at = ? WHERE id = ?",
+            Timestamp.from(lastDatePollRemindedAt),
+            meetingId,
+        )
+        entityManager.clear()
+    }
+
+    private fun requestedNotificationBatches(): List<List<*>> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .map { invocation -> invocation.arguments.single() as List<*> }
+
+    private fun requestedNotificationCommands(): List<Any?> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "create" }
+            .map { invocation -> invocation.arguments.single() }
+
+    private fun savePollContext(): PollContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val creator = saveGroupMember(group, "creator-subject", "생성자")
+        val member = saveGroupMember(group, "member-subject", "참여자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        val creatorParticipant = MeetingParticipant.create(meeting, creator)
+        val memberParticipant = MeetingParticipant.create(meeting, member)
+        meetingParticipantRepository.saveAllAndFlush(listOf(creatorParticipant, memberParticipant))
+        val candidates =
+            meetingCandidateDateRangeRepository.saveAllAndFlush(
+                listOf(
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 1),
+                        LocalDate.of(2026, 10, 2),
+                    ),
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 3),
+                        LocalDate.of(2026, 10, 4),
+                    ),
+                ),
+            )
+        return PollContext(group, creator, member, meeting, candidates)
+    }
+
+    private fun saveConfirmationContext(): ConfirmationContext {
+        val group = groupRepository.save(createGroup("AB12CD"))
+        val owner = saveGroupMember(group, "owner-subject", "방장")
+        val participant = saveGroupMember(group, "participant-subject", "참여자")
+        val withdrawnParticipant = saveGroupMember(group, "withdrawn-subject", "탈퇴자")
+        val meeting = meetingRepository.save(createPollMeeting(group, owner))
+        meetingParticipantRepository.saveAll(
+            listOf(owner, participant, withdrawnParticipant).map { member -> MeetingParticipant.create(meeting, member) },
+        )
+        withdrawnParticipant.withdraw(FIXED_INSTANT)
+        groupMemberRepository.flush()
+        val candidateDateRange =
+            meetingCandidateDateRangeRepository.save(
+                createCandidateDateRange(
+                    meeting = meeting,
+                    startDate = LocalDate.of(2026, 9, 22),
+                    endDate = LocalDate.of(2026, 9, 23),
+                ),
+            )
+        return ConfirmationContext(owner, participant, meeting, candidateDateRange)
+    }
+
+    private fun deleteMeeting(meeting: Meeting) {
+        meeting.delete(FIXED_INSTANT)
+        meetingRepository.flush()
+    }
+
+    private fun savePollResultsContext(): PollResultsContext {
+        val group = groupRepository.save(createGroup("RS12LT"))
+        val creator = saveGroupMember(group, "results-creator-subject", "생성자")
+        val firstMember = saveGroupMember(group, "results-member-1-subject", "참여자1")
+        val secondMember = saveGroupMember(group, "results-member-2-subject", "참여자2")
+        val unavailableMember = saveGroupMember(group, "results-unavailable-subject", "모두불가")
+        val unansweredMember = saveGroupMember(group, "results-unanswered-subject", "미응답자")
+        val meeting = meetingRepository.saveAndFlush(createPollMeeting(group, creator))
+        meetingParticipantRepository.saveAllAndFlush(
+            listOf(creator, firstMember, secondMember, unavailableMember, unansweredMember).map { member ->
+                MeetingParticipant.create(meeting, member)
+            },
+        )
+        val candidates =
+            meetingCandidateDateRangeRepository.saveAllAndFlush(
+                listOf(
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 1),
+                        LocalDate.of(2026, 10, 2),
+                    ),
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 3),
+                        LocalDate.of(2026, 10, 4),
+                    ),
+                    createCandidateDateRange(
+                        meeting,
+                        LocalDate.of(2026, 10, 5),
+                        LocalDate.of(2026, 10, 6),
+                    ),
+                ),
+            )
+
+        return PollResultsContext(
+            meeting = meeting,
+            firstMember = firstMember,
+            secondMember = secondMember,
+            unavailableMember = unavailableMember,
+            candidates = candidates,
+        )
+    }
+
+    private fun createPollMeeting(
+        group: Group,
+        creator: GroupMember,
+    ): Meeting =
+        Meeting.createPoll(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = null,
+        )
+
+    private fun createCandidateDateRange(
+        meeting: Meeting,
+        startDate: LocalDate,
+        endDate: LocalDate,
+    ): MeetingCandidateDateRange =
+        MeetingCandidateDateRange.create(
+            meeting = meeting,
+            dateRange = MeetingDateRange(startDate, endDate),
+            currentDate = LocalDate.of(2026, 9, 22),
+        )
+
+    private fun createGroup(inviteCode: String): Group =
+        Group.create(
+            name = "주말 여행 모임",
+            coverImageObjectKey = null,
+            inviteCode = InviteCode.create(inviteCode),
+        )
+
+    private fun saveGroupMember(
+        group: Group,
+        providerUserId: String,
+        nickname: String,
+    ): GroupMember {
+        val user = saveCompletedUser(providerUserId, nickname)
+        return groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+    }
+
+    private fun saveCompletedUser(
+        providerUserId: String,
+        nickname: String,
+    ): User {
+        val user =
+            userRepository.save(
+                User.createSocialUser(
+                    email = "$providerUserId@example.com",
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = providerUserId,
+                ),
+            )
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = nickname,
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                ),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+        return userRepository.saveAndFlush(user)
+    }
+
+    data class PollContext(
+        val group: Group,
+        val creator: GroupMember,
+        val member: GroupMember,
+        val meeting: Meeting,
+        val candidates: List<MeetingCandidateDateRange>,
+    )
+
+    data class ConfirmationContext(
+        val owner: GroupMember,
+        val participant: GroupMember,
+        val meeting: Meeting,
+        val candidateDateRange: MeetingCandidateDateRange,
+    )
+
+    data class PollResultsContext(
+        val meeting: Meeting,
+        val firstMember: GroupMember,
+        val secondMember: GroupMember,
+        val unavailableMember: GroupMember,
+        val candidates: List<MeetingCandidateDateRange>,
+    )
+
+    @TestConfiguration
+    class FixedClockConfig {
+        @Bean
+        @Primary
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+    }
+
+    companion object {
+        private val FIXED_INSTANT: Instant = Instant.parse("2026-09-22T00:00:00Z")
+    }
+}

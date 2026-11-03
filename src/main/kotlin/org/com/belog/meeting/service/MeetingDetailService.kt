@@ -1,0 +1,62 @@
+package org.com.belog.meeting.service
+
+import org.com.belog.billlog.repository.BillRepository
+import org.com.belog.global.error.BusinessException
+import org.com.belog.global.time.currentBusinessDate
+import org.com.belog.group.service.GroupMemberFinder
+import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.MeetingLogStatus
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.result.MeetingDetailResult
+import org.com.belog.postlog.repository.PostLogPhotoRepository
+import org.com.belog.prelog.repository.PlanRepository
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+
+@Service
+class MeetingDetailService(
+    private val meetingRepository: MeetingRepository,
+    private val groupMemberFinder: GroupMemberFinder,
+    private val planRepository: PlanRepository,
+    private val billRepository: BillRepository,
+    private val postLogPhotoRepository: PostLogPhotoRepository,
+    private val clock: Clock,
+) {
+    @Transactional(readOnly = true)
+    fun getMeetingDetail(
+        meetingId: Long,
+        userId: Long,
+    ): MeetingDetailResult {
+        val meeting =
+            meetingRepository.findByIdWithGroupOwnerAndCreator(meetingId)
+                ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
+        val groupMember = groupMemberFinder.findActiveMember(meeting.group, userId)
+        val preLogStatus = toLogStatus(planRepository.existsByMeetingId(meetingId))
+        val billLogStatus = toLogStatus(billRepository.existsByMeetingId(meetingId))
+        val postLogStatus = toLogStatus(postLogPhotoRepository.existsByMeetingId(meetingId))
+        val canEditMeeting = meeting.isOwnedBy(groupMember)
+        val hasAllLogs = listOf(preLogStatus, billLogStatus, postLogStatus).all { it == MeetingLogStatus.IN_PROGRESS }
+
+        return MeetingDetailResult(
+            meetingId = checkNotNull(meeting.id) { "조회된 만남의 ID가 없습니다." },
+            groupId = checkNotNull(meeting.group.id) { "조회된 만남의 그룹 ID가 없습니다." },
+            groupName = meeting.group.name,
+            meetingName = meeting.name,
+            scheduleType = meeting.scheduleType,
+            meetingStatus = meeting.status,
+            startDate = meeting.startDate,
+            endDate = meeting.endDate,
+            location = meeting.location,
+            isEnded = meeting.isEnded(),
+            canEditMeeting = canEditMeeting,
+            canEndMeeting = canEditMeeting && meeting.canEnd(clock.currentBusinessDate(), hasAllLogs),
+            preLogStatus = preLogStatus,
+            billLogStatus = billLogStatus,
+            postLogStatus = postLogStatus,
+        )
+    }
+
+    private fun toLogStatus(hasData: Boolean): MeetingLogStatus =
+        if (hasData) MeetingLogStatus.IN_PROGRESS else MeetingLogStatus.NOT_STARTED
+}

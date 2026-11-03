@@ -1,0 +1,21 @@
+package org.com.belog.group.code
+
+import org.com.belog.global.response.code.SuccessCode
+import org.springframework.http.HttpStatus
+
+enum class GroupSuccessCode(
+    override val status: HttpStatus,
+    override val code: String,
+    override val message: String,
+) : SuccessCode {
+    GROUP_CREATED(HttpStatus.CREATED, "GROUP-S001", "그룹이 생성되었습니다."),
+    COVER_IMAGE_UPLOAD_URL_ISSUED(HttpStatus.OK, "GROUP-S002", "그룹 커버 이미지 업로드 URL이 발급되었습니다."),
+    GROUP_JOINED(HttpStatus.CREATED, "GROUP-S003", "그룹에 참여했습니다."),
+    GROUP_MEMBERS_RETRIEVED(HttpStatus.OK, "GROUP-S004", "그룹 멤버 목록을 조회했습니다."),
+    GROUP_RETRIEVED(HttpStatus.OK, "GROUP-S005", "그룹을 조회했습니다."),
+    GROUP_COVER_IMAGE_UPDATED(HttpStatus.OK, "GROUP-S006", "그룹 커버 이미지가 변경되었습니다."),
+    MY_GROUPS_RETRIEVED(HttpStatus.OK, "GROUP-S007", "내 그룹 목록을 조회했습니다."),
+    GROUP_PINNED(HttpStatus.OK, "GROUP-S008", "그룹이 고정되었습니다."),
+    GROUP_UNPINNED(HttpStatus.OK, "GROUP-S009", "그룹 고정이 해제되었습니다."),
+    GROUP_DELETED(HttpStatus.NO_CONTENT, "GROUP-S010", "그룹이 삭제되었습니다."),
+}

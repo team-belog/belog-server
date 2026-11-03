@@ -1,0 +1,382 @@
+package org.com.belog.group.service
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.GroupRole
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.user.code.UserErrorCode
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.ProfileImageObjectKey
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.mysql.MySQLContainer
+import java.time.Instant
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Testcontainers(disabledWithoutDocker = true)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class GroupMembershipServiceTest {
+    @Autowired
+    private lateinit var groupMembershipService: GroupMembershipService
+
+    @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @MockitoBean
+    private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
+    @AfterEach
+    fun cleanUp() {
+        groupMemberRepository.deleteAll()
+        groupRepository.deleteAll()
+        userRepository.deleteAll()
+    }
+
+    @Test
+    fun `초대 코드로 그룹에 참여하면 MEMBER 역할의 멤버가 생성된다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val user = saveCompletedUser("joiner", "참여자")
+
+        val result = groupMembershipService.joinGroup(requireNotNull(user.id), "AB12CD")
+
+        val savedMember = groupMemberRepository.findAll().single()
+        assertEquals(group.id, result.groupId)
+        assertEquals(group.name, result.name)
+        assertEquals(1, result.currentMemberCount)
+        assertEquals(GroupRole.MEMBER, savedMember.role)
+        assertEquals(group.id, savedMember.group.id)
+        assertEquals(user.id, savedMember.user.id)
+    }
+
+    @Test
+    fun `그룹에 참여하면 참여자를 제외한 기존 멤버에게 참여 알림이 저장된다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "방장")
+        val member = saveCompletedUser("member", "멤버")
+        val withdrawnUser = saveCompletedUser("withdrawn", "탈퇴자")
+        groupMemberRepository.save(GroupMember.createOwner(group, owner))
+        groupMemberRepository.save(GroupMember.createMember(group, member))
+        val withdrawnMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, withdrawnUser))
+        withdrawnMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        groupMemberRepository.saveAndFlush(withdrawnMember)
+        val joiner = saveCompletedUser("joiner", "참여자")
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        groupMembershipService.joinGroup(requireNotNull(joiner.id), "AB12CD")
+
+        val joinedMemberId =
+            requireNotNull(
+                groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(requireNotNull(group.id), requireNotNull(joiner.id))?.id,
+            )
+        val expectedCommands =
+            listOf(owner, member)
+                .map { recipient ->
+                    val recipientUserId = requireNotNull(recipient.id)
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = joiner.id,
+                        type = NotificationType.GROUP_MEMBER_JOINED,
+                        message = "참여자 님이 그룹에 참여했어요",
+                        targetId = group.id,
+                        deduplicationKey = "GROUP_MEMBER_JOINED:$joinedMemberId:$recipientUserId",
+                    )
+                }.toSet()
+        assertEquals(expectedCommands, requestedNotificationCommands())
+    }
+
+    @Test
+    fun `형식이 올바르지 않은 초대 코드는 거절한다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(1L, "invalid")
+            }
+
+        assertEquals(GroupErrorCode.INVALID_INVITE_CODE, exception.errorCode)
+    }
+
+    @Test
+    fun `초대 코드에 해당하는 그룹이 없으면 참여할 수 없다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(1L, "AB12CD")
+            }
+
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND_BY_INVITE_CODE, exception.errorCode)
+    }
+
+    @Test
+    fun `존재하지 않는 사용자는 그룹에 참여할 수 없다`() {
+        groupRepository.saveAndFlush(createGroup())
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(999L, "AB12CD")
+            }
+
+        assertEquals(UserErrorCode.USER_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `온보딩을 완료하지 않은 사용자는 그룹에 참여할 수 없다`() {
+        groupRepository.saveAndFlush(createGroup())
+        val user = saveUser("joiner")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(requireNotNull(user.id), "AB12CD")
+            }
+
+        assertEquals(GroupErrorCode.ONBOARDING_REQUIRED, exception.errorCode)
+        assertEquals(0L, groupMemberRepository.count())
+    }
+
+    @Test
+    fun `이미 참여한 사용자는 같은 그룹에 다시 참여할 수 없다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val user = saveCompletedUser("joiner", "참여자")
+        groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(requireNotNull(user.id), "AB12CD")
+            }
+
+        assertEquals(GroupErrorCode.ALREADY_GROUP_MEMBER, exception.errorCode)
+        assertEquals(1L, groupMemberRepository.count())
+        assertEquals(emptySet(), requestedNotificationCommands())
+    }
+
+    @Test
+    fun `최대 인원에 도달한 그룹에는 참여할 수 없다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        repeat(Group.MAX_MEMBER_COUNT) { index ->
+            val member = saveCompletedUser("member-$index", "멤버$index")
+            groupMemberRepository.save(GroupMember.createMember(group, member))
+        }
+        groupMemberRepository.flush()
+        val joiningUser = saveCompletedUser("joiner", "참여자")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.joinGroup(requireNotNull(joiningUser.id), "AB12CD")
+            }
+
+        assertEquals(GroupErrorCode.GROUP_MEMBER_LIMIT_EXCEEDED, exception.errorCode)
+        assertEquals(Group.MAX_MEMBER_COUNT.toLong(), groupMemberRepository.count())
+    }
+
+    @Test
+    fun `일반 멤버 요청자를 먼저 조회하고 나머지는 방장 우선과 멤버 ID 순서를 유지한다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val earlierUser = saveCompletedUser("earlier", "첫멤버")
+        val requester = saveCompletedUser("requester", "요청자")
+        val laterUser = saveCompletedUser("later", "둘째멤버")
+        val owner = saveCompletedUser("owner", "방장")
+        val earlierMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, earlierUser))
+        val requesterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        val laterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, laterUser))
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), null)
+
+        assertEquals(
+            listOf(requesterMember.id, ownerMember.id, earlierMember.id, laterMember.id),
+            results.map { it.groupMemberId },
+        )
+        assertEquals(listOf(true, false, false, false), results.map { it.isMe })
+    }
+
+    @Test
+    fun `검색 결과에 포함된 일반 멤버 요청자를 먼저 반환한다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "검색 방장")
+        val requester = saveCompletedUser("requester", "검색 요청자")
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        val requesterMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), " 검색 ")
+
+        assertEquals(listOf(requesterMember.id, ownerMember.id), results.map { it.groupMemberId })
+        assertEquals(listOf(true, false), results.map { it.isMe })
+    }
+
+    @Test
+    fun `검색 조건에 맞지 않는 요청자는 목록에 추가하지 않는다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "검색 방장")
+        val matchedUser = saveCompletedUser("matched", "검색 멤버")
+        val requester = saveCompletedUser("requester", "요청자")
+        val matchedMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, matchedUser))
+        val ownerMember = groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        groupMemberRepository.saveAndFlush(GroupMember.createMember(group, requester))
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+
+        val results = groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(requester.id), "검색")
+
+        assertEquals(listOf(ownerMember.id, matchedMember.id), results.map { it.groupMemberId })
+        assertEquals(listOf(false, false), results.map { it.isMe })
+    }
+
+    @Test
+    fun `존재하지 않는 그룹의 멤버는 조회할 수 없다`() {
+        val user = saveCompletedUser("requester", "요청자")
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.getGroupMembers(999L, requireNotNull(user.id), null)
+            }
+
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `그룹에 참여하지 않은 사용자는 멤버를 조회할 수 없다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "방장")
+        val outsider = saveCompletedUser("outsider", "외부인")
+        groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.getGroupMembers(requireNotNull(group.id), requireNotNull(outsider.id), null)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `탈퇴한 멤버는 그룹 멤버를 조회할 수 없다`() {
+        val group = groupRepository.saveAndFlush(createGroup())
+        val owner = saveCompletedUser("owner", "방장")
+        val withdrawnUser = saveCompletedUser("withdrawn", "탈퇴자")
+        groupMemberRepository.saveAndFlush(GroupMember.createOwner(group, owner))
+        val withdrawnMember = groupMemberRepository.saveAndFlush(GroupMember.createMember(group, withdrawnUser))
+        withdrawnMember.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+        groupMemberRepository.saveAndFlush(withdrawnMember)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupMembershipService.getGroupMembers(
+                    requireNotNull(group.id),
+                    requireNotNull(withdrawnUser.id),
+                    null,
+                )
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    private fun createGroup(): Group =
+        Group.create(
+            name = "주말 러닝 모임",
+            coverImageObjectKey = null,
+            inviteCode = InviteCode.create("AB12CD"),
+        )
+
+    private fun saveCompletedUser(
+        providerUserId: String,
+        nickname: String,
+        hasUploadedProfileImage: Boolean = true,
+        socialProfileImageUrl: String? = null,
+    ): User {
+        val user = saveUser(providerUserId, socialProfileImageUrl)
+        val userId = requireNotNull(user.id)
+        user.completeOnboarding(
+            profileImageObjectKey =
+                if (hasUploadedProfileImage) {
+                    ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp")
+                } else {
+                    null
+                },
+            nickname = nickname,
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                ),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+        return userRepository.saveAndFlush(user)
+    }
+
+    private fun requestedNotificationCommands(): Set<CreateNotificationCommand> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
+            .toSet()
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
+    }
+
+    private fun saveUser(
+        providerUserId: String,
+        socialProfileImageUrl: String? = null,
+    ): User =
+        userRepository.saveAndFlush(
+            User.createSocialUser(
+                email = "$providerUserId@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = providerUserId,
+                socialProfileImageUrl = socialProfileImageUrl,
+            ),
+        )
+
+    companion object {
+        @Container
+        @ServiceConnection
+        @JvmField
+        val mysql = MySQLContainer("mysql:8.4")
+    }
+}

@@ -1,0 +1,35 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: "${DB_URL:jdbc:mysql://localhost:3306/belog}"
+    username: "${DB_USERNAME:belog}"
+    password: "${DB_PASSWORD:belog-local-password}"
+  flyway:
+    enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+server:
+  port: "${SERVER_PORT:8080}"
+
+auth:
+  jwt:
+    refresh-cookie-secure: false
+    refresh-cookie-same-site: Lax
+
+group:
+  invite:
+    base-url: "${GROUP_INVITE_BASE_URL:http://localhost:3000/invitations}"

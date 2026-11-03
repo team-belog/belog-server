@@ -1,0 +1,420 @@
+package org.com.belog.group.controller
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.GroupCoverImageObjectKey
+import org.com.belog.group.domain.GroupCoverImageUpload
+import org.com.belog.group.domain.GroupRole
+import org.com.belog.group.service.GroupCoverImageService
+import org.com.belog.group.service.GroupMembershipService
+import org.com.belog.group.service.GroupService
+import org.com.belog.group.service.result.ActiveMeetingResult
+import org.com.belog.group.service.result.CreatedGroup
+import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupMeetingParticipantResult
+import org.com.belog.group.service.result.GroupMemberResult
+import org.com.belog.group.service.result.SchedulingMeetingResult
+import org.com.belog.meeting.service.PastMeetingService
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Instant
+import kotlin.test.assertEquals
+
+@WebMvcTest(GroupController::class)
+@AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
+class GroupControllerTest {
+    @Autowired
+    private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var groupService: GroupService
+
+    @MockitoBean
+    private lateinit var groupCoverImageService: GroupCoverImageService
+
+    @MockitoBean
+    private lateinit var groupMembershipService: GroupMembershipService
+
+    @MockitoBean
+    private lateinit var pastMeetingService: PastMeetingService
+
+    @Test
+    fun `그룹 상세 조회의 두 만남 목록에 만남장 정보를 반환한다`() {
+        `when`(groupService.getGroup(1L, 15L)).thenReturn(
+            GroupDetailResult(
+                groupId = 1L,
+                name = "여행 모임",
+                coverImageUrl = null,
+                inviteCode = "AB12CD",
+                memberCount = 2,
+                canEditCoverImage = true,
+                canDeleteGroup = true,
+                schedulingMeetings =
+                    listOf(
+                        SchedulingMeetingResult(
+                            meetingId = 10L,
+                            name = "일정 조율",
+                            isMeetingOwner = true,
+                            hasResponded = true,
+                            participants =
+                                listOf(
+                                    GroupMeetingParticipantResult("요청자", true),
+                                    GroupMeetingParticipantResult("다른 참여자", false),
+                                ),
+                            participantCount = 2,
+                        ),
+                    ),
+                activeMeetings =
+                    listOf(
+                        ActiveMeetingResult(
+                            meetingId = 11L,
+                            name = "확정 만남",
+                            isMeetingOwner = false,
+                            participants =
+                                listOf(
+                                    GroupMeetingParticipantResult("다른 참여자", true),
+                                    GroupMeetingParticipantResult("요청자", false),
+                                ),
+                            participantCount = 2,
+                        ),
+                    ),
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/groups/1").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].hasResponded").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].nickname").value("요청자"))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[1].nickname").value("다른 참여자"))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participants[1].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].meetingOwnerNickname").doesNotExist())
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participantNicknames").doesNotExist())
+            .andExpect(jsonPath("$.data.schedulingMeetings[0].participantCount").value(2))
+            .andExpect(jsonPath("$.data.activeMeetings[0].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.activeMeetings[0].hasResponded").doesNotExist())
+            .andExpect(jsonPath("$.data.activeMeetings[0].participants[0].nickname").value("다른 참여자"))
+            .andExpect(jsonPath("$.data.activeMeetings[0].participants[0].isMeetingOwner").value(true))
+            .andExpect(jsonPath("$.data.activeMeetings[0].participants[1].nickname").value("요청자"))
+            .andExpect(jsonPath("$.data.activeMeetings[0].participants[1].isMeetingOwner").value(false))
+            .andExpect(jsonPath("$.data.activeMeetings[0].participantCount").value(2))
+            .andExpect(jsonPath("$.data.activeMeetings[0].meetingOwnerNickname").doesNotExist())
+            .andExpect(jsonPath("$.data.activeMeetings[0].startDate").doesNotExist())
+            .andExpect(jsonPath("$.data.activeMeetings[0].endDate").doesNotExist())
+    }
+
+    @Test
+    fun `그룹 멤버 목록을 조회한다`() {
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
+            .thenReturn(
+                listOf(
+                    GroupMemberResult(
+                        groupMemberId = 21L,
+                        nickname = "방장",
+                        profileImageUrl = "https://example.com/owner-profile",
+                        role = GroupRole.OWNER,
+                        isMe = true,
+                    ),
+                    GroupMemberResult(
+                        groupMemberId = 22L,
+                        nickname = "멤버",
+                        profileImageUrl = null,
+                        role = GroupRole.MEMBER,
+                        isMe = false,
+                    ),
+                ),
+            )
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/1/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S004"))
+            .andExpect(jsonPath("$.message").value("그룹 멤버 목록을 조회했습니다."))
+            .andExpect(jsonPath("$.data.items.length()").value(2))
+            .andExpect(jsonPath("$.data.items[0].groupMemberId").value(21))
+            .andExpect(jsonPath("$.data.items[0].nickname").value("방장"))
+            .andExpect(jsonPath("$.data.items[0].profileImageUrl").value("https://example.com/owner-profile"))
+            .andExpect(jsonPath("$.data.items[0].role").value("OWNER"))
+            .andExpect(jsonPath("$.data.items[0].isMe").value(true))
+            .andExpect(jsonPath("$.data.items[1].groupMemberId").value(22))
+            .andExpect(jsonPath("$.data.items[1].profileImageUrl").isEmpty)
+            .andExpect(jsonPath("$.data.items[1].role").value("MEMBER"))
+            .andExpect(jsonPath("$.data.items[1].isMe").value(false))
+    }
+
+    @Test
+    fun `그룹에 참여하지 않은 사용자는 멤버 목록을 조회할 수 없다`() {
+        `when`(groupMembershipService.getGroupMembers(1L, 15L, null))
+            .thenThrow(BusinessException(GroupErrorCode.NOT_GROUP_MEMBER))
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/1/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("GROUP-E013"))
+    }
+
+    @Test
+    fun `존재하지 않는 그룹의 멤버 목록을 조회하면 404 응답을 반환한다`() {
+        `when`(groupMembershipService.getGroupMembers(999L, 15L, null))
+            .thenThrow(BusinessException(GroupErrorCode.GROUP_NOT_FOUND))
+
+        mockMvc
+            .perform(
+                get("/api/v1/groups/999/members")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.code").value("GROUP-E012"))
+    }
+
+    @Test
+    fun `그룹을 고정하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/groups/1/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S008"))
+            .andExpect(jsonPath("$.message").value("그룹이 고정되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(groupService).pinGroup(groupId = 1L, userId = 15L)
+    }
+
+    @Test
+    fun `그룹 고정을 해제하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/groups/1/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S009"))
+            .andExpect(jsonPath("$.message").value("그룹 고정이 해제되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(groupService).unpinGroup(groupId = 1L, userId = 15L)
+    }
+
+    @Test
+    fun `그룹 커버 이미지 업로드 URL을 발급한다`() {
+        val upload =
+            GroupCoverImageUpload(
+                objectKey = "group-covers/15/image-id.webp",
+                uploadUrl = "https://belog-test-storage.s3.ap-northeast-2.amazonaws.com/upload",
+                contentType = "image/webp",
+                contentLength = 524_288L,
+                expiresAt = Instant.parse("2026-09-17T03:05:00Z"),
+            )
+        `when`(groupCoverImageService.issueUploadUrl(15L, "image/webp", 524_288L)).thenReturn(upload)
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """
+                        {
+                          "contentType": "image/webp",
+                          "fileSize": 524288
+                        }
+                        """.trimIndent(),
+                    ),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("GROUP-S002"))
+            .andExpect(jsonPath("$.message").value("그룹 커버 이미지 업로드 URL이 발급되었습니다."))
+            .andExpect(jsonPath("$.data.objectKey").value("group-covers/15/image-id.webp"))
+            .andExpect(jsonPath("$.data.uploadUrl").value(upload.uploadUrl))
+            .andExpect(jsonPath("$.data.method").value("PUT"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Type").value("image/webp"))
+            .andExpect(jsonPath("$.data.requiredHeaders.Content-Length").value("524288"))
+            .andExpect(jsonPath("$.data.expiresAt").value("2026-09-17T03:05:00Z"))
+    }
+
+    @Test
+    fun `그룹 커버 이미지 업로드 요청값이 올바르지 않으면 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"contentType":" ","fileSize":0}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(groupCoverImageService)
+    }
+
+    @Test
+    fun `지원하지 않는 그룹 커버 이미지 형식이면 400 응답을 반환한다`() {
+        `when`(groupCoverImageService.issueUploadUrl(15L, "image/gif", 1024L))
+            .thenThrow(BusinessException(GroupErrorCode.UNSUPPORTED_COVER_IMAGE_TYPE))
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups/cover-image/upload-url")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"contentType":"image/gif","fileSize":1024}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("GROUP-E004"))
+    }
+
+    @Test
+    fun `커버 이미지 없이 그룹을 생성한다`() {
+        `when`(groupService.createGroup(15L, "주말 러닝 모임", null))
+            .thenReturn(createdGroup())
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"주말 러닝 모임"}"""),
+            ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.code").value("GROUP-S001"))
+            .andExpect(jsonPath("$.message").value("그룹이 생성되었습니다."))
+            .andExpect(jsonPath("$.data.groupId").value(1))
+            .andExpect(jsonPath("$.data.name").value("주말 러닝 모임"))
+            .andExpect(jsonPath("$.data.coverImageUrl").doesNotExist())
+            .andExpect(jsonPath("$.data.currentMemberCount").value(1))
+            .andExpect(jsonPath("$.data.inviteCode").value("AB12CD"))
+            .andExpect(jsonPath("$.data.inviteLink").value("https://belog.co.kr/invitations/AB12CD"))
+    }
+
+    @Test
+    fun `현재 사용자의 커버 이미지 Object Key로 그룹을 생성한다`() {
+        val objectKey = "group-covers/15/550e8400-e29b-41d4-a716-446655440000.webp"
+        val coverImage = GroupCoverImageObjectKey.create(15L, objectKey)
+        `when`(groupService.createGroup(15L, "주말 러닝 모임", coverImage))
+            .thenReturn(createdGroup())
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"주말 러닝 모임","coverImageObjectKey":"$objectKey"}"""),
+            ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.data.coverImageUrl").doesNotExist())
+
+        val invocation = mockingDetails(groupService).invocations.single()
+        assertEquals(15L, invocation.arguments[0])
+        assertEquals("주말 러닝 모임", invocation.arguments[1])
+        assertEquals(objectKey, invocation.arguments[2])
+    }
+
+    @Test
+    fun `다른 사용자의 커버 이미지 Object Key는 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"name":"주말 러닝 모임","coverImageObjectKey":"group-covers/16/image.webp"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("GROUP-E003"))
+
+        verifyNoInteractions(groupService)
+    }
+
+    @Test
+    fun `그룹명이 공백이거나 20자를 초과하면 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"${"가".repeat(21)}"}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(groupService)
+    }
+
+    @Test
+    fun `온보딩을 완료하지 않은 사용자는 403 응답을 반환한다`() {
+        `when`(groupService.createGroup(15L, "주말 러닝 모임", null))
+            .thenThrow(BusinessException(GroupErrorCode.ONBOARDING_REQUIRED))
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"주말 러닝 모임"}"""),
+            ).andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.code").value("GROUP-E001"))
+    }
+
+    @Test
+    fun `인증 사용자 식별자가 올바르지 않으면 401 응답을 반환한다`() {
+        val invalidAuthentication =
+            UsernamePasswordAuthenticationToken.authenticated(
+                "invalid-user-id",
+                "access-token",
+                emptyList(),
+            )
+
+        mockMvc
+            .perform(
+                post("/api/v1/groups")
+                    .principal(invalidAuthentication)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"name":"주말 러닝 모임"}"""),
+            ).andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.code").value("CMN-E005"))
+
+        verifyNoInteractions(groupService)
+    }
+
+    private fun authenticatedUser() =
+        UsernamePasswordAuthenticationToken.authenticated(
+            "15",
+            "access-token",
+            emptyList(),
+        )
+
+    private fun createdGroup(): CreatedGroup =
+        CreatedGroup(
+            groupId = 1L,
+            name = "주말 러닝 모임",
+            currentMemberCount = 1,
+            inviteCode = "AB12CD",
+            inviteLink = "https://belog.co.kr/invitations/AB12CD",
+        )
+}

@@ -1,0 +1,79 @@
+package org.com.belog.billlog.controller.dto.response
+
+import io.swagger.v3.oas.annotations.media.Schema
+import org.com.belog.billlog.domain.BillCurrency
+import org.com.belog.billlog.service.result.BillDayResult
+import org.com.belog.billlog.service.result.BillListItemResult
+import org.com.belog.billlog.service.result.BillListResult
+import org.com.belog.meeting.domain.formatSignedMeetingDayNumber
+import java.math.BigDecimal
+import java.time.LocalDate
+
+@Schema(description = "결제 내역 목록 조회 결과")
+data class BillListResponse(
+    @field:Schema(description = "결제일별 결제 내역")
+    val days: List<BillDayResponse>,
+    @field:Schema(description = "다음 페이지 날짜 커서. 다음 페이지가 없으면 null", nullable = true)
+    val nextCursorDate: LocalDate?,
+    @field:Schema(description = "다음 페이지 존재 여부", example = "true")
+    val hasNext: Boolean,
+) {
+    companion object {
+        fun from(result: BillListResult): BillListResponse =
+            BillListResponse(
+                days = result.days.map(BillDayResponse::from),
+                nextCursorDate = result.nextCursorDate,
+                hasNext = result.hasNext,
+            )
+    }
+}
+
+@Schema(description = "결제일별 결제 내역")
+data class BillDayResponse(
+    @field:Schema(
+        description = "만남 시작일을 +1일 차로 계산한 부호 포함 일차. 시작일 이전은 -1, -2 순으로 계산",
+        example = "+1",
+    )
+    val dayNumber: String,
+    @field:Schema(description = "결제일", example = "2026-08-06")
+    val paymentDate: LocalDate,
+    @field:Schema(description = "해당 날짜의 화폐 단위별 총 결제 금액. 화폐 단위 순서는 KRW, USD, JPY, EUR")
+    val dailyTotalAmounts: List<CurrencyAmountResponse>,
+    @field:Schema(description = "해당 날짜의 결제 내역")
+    val bills: List<BillListItemResponse>,
+) {
+    companion object {
+        fun from(result: BillDayResult): BillDayResponse =
+            BillDayResponse(
+                dayNumber = formatSignedMeetingDayNumber(result.dayNumber),
+                paymentDate = result.paymentDate,
+                dailyTotalAmounts = result.dailyTotalAmounts.map(CurrencyAmountResponse::from),
+                bills = result.bills.map(BillListItemResponse::from),
+            )
+    }
+}
+
+@Schema(description = "결제 내역 목록 항목")
+data class BillListItemResponse(
+    @field:Schema(description = "결제 내역 ID", example = "45")
+    val billId: Long,
+    @field:Schema(description = "결제 내역 제목", example = "아랑이 카페")
+    val title: String,
+    @field:Schema(description = "결제자 닉네임", example = "정바미")
+    val payerNickname: String,
+    @field:Schema(description = "결제 화폐 단위", example = "KRW", allowableValues = ["KRW", "USD", "JPY", "EUR"])
+    val currency: BillCurrency,
+    @field:Schema(description = "결제 금액", example = "7500")
+    val totalAmount: BigDecimal,
+) {
+    companion object {
+        fun from(result: BillListItemResult): BillListItemResponse =
+            BillListItemResponse(
+                billId = result.billId,
+                title = result.title,
+                payerNickname = result.payerNickname,
+                currency = result.currency,
+                totalAmount = result.totalAmount,
+            )
+    }
+}

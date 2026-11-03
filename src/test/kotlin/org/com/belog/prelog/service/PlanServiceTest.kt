@@ -1,0 +1,670 @@
+package org.com.belog.prelog.service
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.GroupRole
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.service.GroupMemberFinder
+import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingAccessChecker
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.prelog.code.PreLogErrorCode
+import org.com.belog.prelog.domain.MapProvider
+import org.com.belog.prelog.domain.Plan
+import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.domain.PlanLocation
+import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.repository.PlanLikeRepository
+import org.com.belog.prelog.repository.PlanRepository
+import org.com.belog.user.domain.User
+import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.mockito.Mockito.any
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
+import org.springframework.data.domain.PageRequest
+import org.springframework.test.util.ReflectionTestUtils
+import java.time.Instant
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+class PlanServiceTest {
+    private val meetingRepository = mock(MeetingRepository::class.java)
+    private val groupMemberRepository = mock(GroupMemberRepository::class.java)
+    private val planRepository = mock(PlanRepository::class.java)
+    private val planLikeRepository = mock(PlanLikeRepository::class.java)
+    private val meetingParticipantRepository = mock(MeetingParticipantRepository::class.java)
+    private val notificationService = mock(NotificationService::class.java)
+    private val userService = mock(UserService::class.java)
+    private val groupMemberFinder = GroupMemberFinder(groupMemberRepository)
+    private val planService =
+        PlanService(
+            meetingRepository,
+            planRepository,
+            planLikeRepository,
+            meetingParticipantRepository,
+            MeetingAccessChecker(groupMemberFinder, meetingParticipantRepository),
+            groupMemberFinder,
+            notificationService,
+            userService,
+        )
+
+    @ParameterizedTest
+    @ValueSource(booleans = [true, false])
+    fun `그룹 멤버가 메모 상세를 조회하면 작성자 여부에 따른 수정 권한을 반환한다`(isCreator: Boolean) {
+        val target = stubPlanActionTarget(loginIsPlanCreator = isCreator, type = PlanType.MEMO)
+
+        val result = planService.getPlanDetail(planId = 20L, userId = 15L)
+
+        assertEquals(20L, result.planId)
+        assertEquals(target.plan.category, result.category)
+        assertEquals(target.plan.title, result.title)
+        assertEquals(target.plan.content, result.content)
+        assertEquals(isCreator, result.canEdit)
+    }
+
+    @Test
+    fun `존재하지 않는 계획은 상세 조회할 수 없다`() {
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, exception.errorCode)
+    }
+
+    @Test
+    fun `활성 그룹 멤버가 아니면 메모 상세를 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+    }
+
+    @Test
+    fun `위치 계획은 상세 조회할 수 없다`() {
+        stubPlanActionTarget(loginIsPlanCreator = true)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlanDetail(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED, exception.errorCode)
+    }
+
+    @Test
+    fun `그룹 멤버만 계획 목록을 조회할 수 있다`() {
+        val context = meetingContext()
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.getPlans(
+                    meetingId = 1L,
+                    userId = 15L,
+                    category = null,
+                    pinnedOnly = false,
+                    cursor = null,
+                )
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        verifyNoInteractions(planRepository)
+    }
+
+    @Test
+    fun `계획 목록이 비어 있으면 좋아요를 조회하지 않는다`() {
+        stubPlanList(loginGroupMemberId = 10L, planCreatorId = 11L, isMeetingCreator = false)
+        `when`(
+            planRepository.findPageWithCreator(
+                meetingId = 1L,
+                category = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
+                pageable = PageRequest.of(0, 21),
+            ),
+        ).thenReturn(emptyList())
+
+        val result = getPlans()
+
+        assertTrue(result.items.isEmpty())
+        assertFalse(result.hasNext)
+        assertNull(result.nextCursor)
+        verifyNoInteractions(planLikeRepository)
+    }
+
+    @Test
+    fun `계획 작성자는 종료된 만남에서도 자신의 계획을 삭제할 수 있다`() {
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 10L,
+            isMeetingCreator = false,
+            address = "광주광역시 동구",
+            ended = true,
+        )
+
+        val result = getPlans()
+
+        assertTrue(result.items.single().canDelete)
+        assertEquals("광주광역시 동구", result.items.single().content)
+    }
+
+    @Test
+    fun `만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
+        val memoContent = "가".repeat(Plan.CONTENT_MAX_LENGTH)
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 11L,
+            isMeetingCreator = true,
+            type = PlanType.MEMO,
+            content = memoContent,
+        )
+
+        val result = getPlans()
+
+        assertTrue(result.items.single().canDelete)
+        assertEquals(memoContent, result.items.single().content)
+    }
+
+    @Test
+    fun `만남 생성자가 아닌 그룹 생성자는 다른 사용자의 계획을 삭제할 수 없다`() {
+        stubPlanList(
+            loginGroupMemberId = 10L,
+            planCreatorId = 11L,
+            isMeetingCreator = false,
+            loginRole = GroupRole.OWNER,
+        )
+
+        val result = getPlans()
+
+        assertFalse(result.items.single().canDelete)
+        assertNull(result.items.single().content)
+    }
+
+    @Test
+    fun `메모 작성자는 자신의 메모를 수정할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true, type = PlanType.MEMO)
+
+        val result =
+            planService.updateMemoPlan(
+                planId = 20L,
+                userId = 15L,
+                category = PlanCategory.CAFE,
+                title = "수정한 메모",
+                content = "변경한 내용",
+            )
+
+        assertSame(target.plan, result)
+        assertEquals(PlanType.MEMO, result.type)
+        assertEquals(PlanCategory.CAFE, result.category)
+        assertEquals("수정한 메모", result.title)
+        assertEquals("변경한 내용", result.content)
+    }
+
+    @Test
+    fun `위치 계획 작성자도 위치를 메모로 수정할 수 없다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.updateMemoPlan(
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "수정 시도",
+                    content = "변경 시도",
+                )
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_NOT_SUPPORTED, exception.errorCode)
+        assertEquals(PlanType.LOCATION, target.plan.type)
+        assertEquals(PlanCategory.RESTAURANT, target.plan.category)
+        assertEquals("맛집", target.plan.title)
+        assertEquals("https://example.com/place", target.plan.url)
+        assertNull(target.plan.content)
+    }
+
+    @Test
+    fun `계획 작성자가 아니면 계획을 수정할 수 없다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, type = PlanType.MEMO)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.updateMemoPlan(
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "수정 시도",
+                    content = "수정할 수 없는 내용",
+                )
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_UPDATE_FORBIDDEN, exception.errorCode)
+        assertEquals(PlanType.MEMO, target.plan.type)
+        assertEquals("준비물", target.plan.title)
+        assertEquals("가".repeat(Plan.CONTENT_MAX_LENGTH), target.plan.content)
+    }
+
+    @Test
+    fun `서비스에서 계획 작성자는 자신의 계획을 삭제할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = true)
+
+        planService.deletePlan(planId = 20L, userId = 15L)
+
+        verify(planLikeRepository).deleteAllByPlanId(20L)
+        verify(planRepository).delete(target.plan)
+    }
+
+    @Test
+    fun `서비스에서 만남 생성자는 다른 사용자의 계획을 삭제할 수 있다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, loginIsMeetingCreator = true)
+
+        planService.deletePlan(planId = 20L, userId = 15L)
+
+        verify(planLikeRepository).deleteAllByPlanId(20L)
+        verify(planRepository).delete(target.plan)
+    }
+
+    @Test
+    fun `작성자와 만남 생성자가 아니면 계획을 삭제할 수 없다`() {
+        val target = stubPlanActionTarget(loginIsPlanCreator = false, loginIsMeetingCreator = false)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.deletePlan(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_DELETE_FORBIDDEN, exception.errorCode)
+        verifyNoInteractions(planLikeRepository)
+        verify(planRepository, never()).delete(target.plan)
+    }
+
+    @Test
+    fun `존재하지 않는 계획은 수정하거나 삭제할 수 없다`() {
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(null)
+
+        val updateException =
+            assertFailsWith<BusinessException> {
+                planService.updateMemoPlan(
+                    planId = 20L,
+                    userId = 15L,
+                    category = PlanCategory.CAFE,
+                    title = "카페",
+                    content = "내용",
+                )
+            }
+        val deleteException =
+            assertFailsWith<BusinessException> {
+                planService.deletePlan(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, updateException.errorCode)
+        assertEquals(PreLogErrorCode.PLAN_NOT_FOUND, deleteException.errorCode)
+        verifyNoInteractions(planLikeRepository)
+    }
+
+    @Test
+    fun `일반 그룹 멤버는 다른 사용자의 계획을 핀 고정할 수 있다`() {
+        val plan = stubPlanPinTarget()
+
+        planService.pinPlan(planId = 20L, userId = 15L)
+
+        assertTrue(plan.pinned)
+    }
+
+    @Test
+    fun `일반 그룹 멤버는 다른 사용자가 고정한 계획을 해제할 수 있다`() {
+        val plan = stubPlanPinTarget(initiallyPinned = true)
+
+        planService.unpinPlan(planId = 20L, userId = 15L)
+
+        assertFalse(plan.pinned)
+    }
+
+    @Test
+    fun `그룹 멤버가 아니면 계획을 핀 고정하거나 해제할 수 없다`() {
+        val context = meetingContext()
+        val plan = mock(Plan::class.java)
+        `when`(plan.meeting).thenReturn(context.meeting)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                planService.pinPlan(planId = 20L, userId = 15L)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                planService.unpinPlan(planId = 20L, userId = 15L)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, pinException.errorCode)
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unpinException.errorCode)
+        verifyNoInteractions(planLikeRepository)
+    }
+
+    @Test
+    fun `존재하지 않는 만남에는 계획을 생성할 수 없다`() {
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.createLocationPlan(
+                    meetingId = 1L,
+                    creatorUserId = 15L,
+                    category = PlanCategory.RESTAURANT,
+                    title = "맛집",
+                    url = "https://example.com/place",
+                )
+            }
+
+        assertEquals(MeetingErrorCode.MEETING_NOT_FOUND, exception.errorCode)
+        verifyNoInteractions(planRepository)
+    }
+
+    @Test
+    fun `해당 만남이 속한 그룹의 멤버가 아니면 계획을 생성할 수 없다`() {
+        val context = meetingContext()
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(null)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.createMemoPlan(
+                    meetingId = 1L,
+                    creatorUserId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "메모",
+                    content = "내용",
+                )
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        verifyNoInteractions(planRepository)
+    }
+
+    @Test
+    fun `만남 참여자가 아닌 그룹 멤버는 계획을 생성할 수 없다`() {
+        val context = meetingContext()
+        stubPlanCreator(context, participating = false)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.createMemoPlan(
+                    meetingId = 1L,
+                    creatorUserId = 15L,
+                    category = PlanCategory.OTHER,
+                    title = "메모",
+                    content = "내용",
+                )
+            }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        verifyNoInteractions(planRepository)
+        verifyNoInteractions(notificationService)
+    }
+
+    @Test
+    fun `계획을 등록하면 등록자를 제외한 만남 참여자에게 등록 알림을 저장한다`() {
+        val context = meetingContext()
+        stubPlanCreator(context)
+        val participants = listOf(15L, 16L, 17L).map { userId -> meetingParticipant(userId) }
+        `when`(meetingParticipantRepository.findAllActiveWithUserByMeetingId(1L)).thenReturn(participants)
+
+        planService.createLocationPlan(
+            meetingId = 1L,
+            creatorUserId = 15L,
+            category = PlanCategory.CAFE,
+            title = "카페",
+            url = "https://example.com/cafe",
+        )
+
+        assertEquals(
+            listOf(16L, 17L).map { recipientUserId ->
+                CreateNotificationCommand(
+                    recipientUserId = recipientUserId,
+                    actorUserId = 15L,
+                    type = NotificationType.PRE_LOG_PLAN_CREATED,
+                    message = "등록자 님이 새로운 계획을 등록했어요",
+                    targetId = 1L,
+                    deduplicationKey = "PRE_LOG_PLAN_CREATED:20:$recipientUserId",
+                )
+            },
+            requestedNotificationCommands(),
+        )
+    }
+
+    @Test
+    fun `종료된 만남에는 계획을 생성할 수 없다`() {
+        val context = meetingContext(ended = true)
+        val groupMember = mock(GroupMember::class.java)
+        `when`(groupMember.id).thenReturn(CREATOR_GROUP_MEMBER_ID)
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(groupMember)
+        `when`(meetingParticipantRepository.existsByMeetingIdAndGroupMemberId(1L, CREATOR_GROUP_MEMBER_ID)).thenReturn(true)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                planService.createLocationPlan(
+                    meetingId = 1L,
+                    creatorUserId = 15L,
+                    category = PlanCategory.CAFE,
+                    title = "카페",
+                    url = "https://example.com/cafe",
+                )
+            }
+
+        assertEquals(PreLogErrorCode.MEETING_ALREADY_ENDED, exception.errorCode)
+        verifyNoInteractions(planRepository)
+        verifyNoInteractions(notificationService)
+    }
+
+    private fun meetingContext(ended: Boolean = false): MeetingContext {
+        val group = mock(Group::class.java)
+        val meeting = mock(Meeting::class.java)
+        `when`(group.id).thenReturn(3L)
+        `when`(meeting.id).thenReturn(1L)
+        `when`(meeting.group).thenReturn(group)
+        `when`(meeting.isEnded()).thenReturn(ended)
+        return MeetingContext(group, meeting)
+    }
+
+    private fun stubPlanCreator(
+        context: MeetingContext,
+        participating: Boolean = true,
+    ): GroupMember {
+        val creatorUser = mock(User::class.java)
+        val creator = mock(GroupMember::class.java)
+        `when`(creatorUser.id).thenReturn(15L)
+        `when`(creator.id).thenReturn(CREATOR_GROUP_MEMBER_ID)
+        `when`(creator.user).thenReturn(creatorUser)
+        `when`(creator.group).thenReturn(context.group)
+        `when`(creator.belongsTo(context.group)).thenCallRealMethod()
+        `when`(userService.resolveDisplayNickname(creatorUser)).thenReturn("등록자")
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(creator)
+        `when`(meetingParticipantRepository.existsByMeetingIdAndGroupMemberId(1L, CREATOR_GROUP_MEMBER_ID))
+            .thenReturn(participating)
+        `when`(planRepository.save(any(Plan::class.java))).thenAnswer { invocation ->
+            invocation.getArgument<Plan>(0).also { plan -> ReflectionTestUtils.setField(plan, "id", 20L) }
+        }
+        return creator
+    }
+
+    private fun meetingParticipant(userId: Long): MeetingParticipant {
+        val user = mock(User::class.java)
+        val groupMember = mock(GroupMember::class.java)
+        val participant = mock(MeetingParticipant::class.java)
+        `when`(user.id).thenReturn(userId)
+        `when`(groupMember.user).thenReturn(user)
+        `when`(participant.groupMember).thenReturn(groupMember)
+        return participant
+    }
+
+    private fun requestedNotificationCommands(): List<CreateNotificationCommand> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
+
+    private fun stubPlanList(
+        loginGroupMemberId: Long,
+        planCreatorId: Long,
+        isMeetingCreator: Boolean,
+        loginRole: GroupRole = GroupRole.MEMBER,
+        type: PlanType = PlanType.LOCATION,
+        content: String? = null,
+        address: String? = null,
+        ended: Boolean = false,
+    ) {
+        val context = meetingContext(ended = ended)
+        val loginGroupMember = mock(GroupMember::class.java)
+        val planCreator = mock(GroupMember::class.java)
+        val plan = mock(Plan::class.java)
+        `when`(loginGroupMember.id).thenReturn(loginGroupMemberId)
+        `when`(loginGroupMember.role).thenReturn(loginRole)
+        `when`(planCreator.id).thenReturn(planCreatorId)
+        `when`(plan.id).thenReturn(20L)
+        `when`(plan.createdBy).thenReturn(planCreator)
+        `when`(plan.type).thenReturn(type)
+        `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
+        `when`(plan.title).thenReturn("맛집")
+        `when`(plan.url).thenReturn(if (type == PlanType.LOCATION) "https://example.com/place" else null)
+        `when`(plan.content).thenReturn(content)
+        `when`(plan.location).thenReturn(address?.let { PlanLocation.unresolved(MapProvider.KAKAO, null, address = it) })
+        `when`(plan.createdAt).thenReturn(Instant.parse("2026-09-22T10:30:00Z"))
+        `when`(meetingRepository.findActiveById(1L)).thenReturn(context.meeting)
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(isMeetingCreator)
+        `when`(
+            planRepository.findPageWithCreator(
+                meetingId = 1L,
+                category = null,
+                pinnedOnly = false,
+                cursorPinned = null,
+                cursorId = null,
+                pageable = PageRequest.of(0, 21),
+            ),
+        ).thenReturn(listOf(plan))
+    }
+
+    private fun stubPlanPinTarget(initiallyPinned: Boolean = false): Plan {
+        val context = meetingContext()
+        val loginGroupMember = mock(GroupMember::class.java)
+        val planCreator = mock(GroupMember::class.java)
+        `when`(loginGroupMember.role).thenReturn(GroupRole.MEMBER)
+        `when`(planCreator.group).thenReturn(context.group)
+        `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
+
+        val plan =
+            Plan.createLocation(
+                meeting = context.meeting,
+                creator = planCreator,
+                category = PlanCategory.RESTAURANT,
+                title = "맛집",
+                url = "https://example.com/place",
+            )
+        ReflectionTestUtils.setField(plan, "id", 20L)
+        if (initiallyPinned) {
+            plan.pin()
+        }
+
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
+
+        return plan
+    }
+
+    private fun stubPlanActionTarget(
+        loginIsPlanCreator: Boolean,
+        loginIsMeetingCreator: Boolean = false,
+        type: PlanType = PlanType.LOCATION,
+    ): PlanActionTarget {
+        val context = meetingContext()
+        val planCreator = mock(GroupMember::class.java)
+        val loginGroupMember = if (loginIsPlanCreator) planCreator else mock(GroupMember::class.java)
+        `when`(planCreator.id).thenReturn(10L)
+        `when`(planCreator.group).thenReturn(context.group)
+        `when`(planCreator.belongsTo(context.group)).thenCallRealMethod()
+        if (!loginIsPlanCreator) {
+            `when`(loginGroupMember.id).thenReturn(11L)
+        }
+
+        val plan =
+            when (type) {
+                PlanType.LOCATION ->
+                    Plan.createLocation(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.RESTAURANT,
+                        title = "맛집",
+                        url = "https://example.com/place",
+                    )
+
+                PlanType.MEMO ->
+                    Plan.createMemo(
+                        meeting = context.meeting,
+                        creator = planCreator,
+                        category = PlanCategory.OTHER,
+                        title = "준비물",
+                        content = "가".repeat(Plan.CONTENT_MAX_LENGTH),
+                    )
+            }
+        ReflectionTestUtils.setField(plan, "id", 20L)
+
+        `when`(groupMemberRepository.findByGroupIdAndUserIdAndWithdrawnAtIsNull(3L, 15L)).thenReturn(loginGroupMember)
+        `when`(planRepository.findByIdWithMeetingAndCreator(20L)).thenReturn(plan)
+        `when`(context.meeting.isCreatedBy(loginGroupMember)).thenReturn(loginIsMeetingCreator)
+
+        return PlanActionTarget(plan)
+    }
+
+    private fun getPlans() =
+        planService.getPlans(
+            meetingId = 1L,
+            userId = 15L,
+            category = null,
+            pinnedOnly = false,
+            cursor = null,
+        )
+
+    private data class MeetingContext(
+        val group: Group,
+        val meeting: Meeting,
+    )
+
+    private data class PlanActionTarget(
+        val plan: Plan,
+    )
+
+    companion object {
+        private const val CREATOR_GROUP_MEMBER_ID = 30L
+    }
+}

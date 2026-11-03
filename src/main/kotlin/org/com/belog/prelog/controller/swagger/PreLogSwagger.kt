@@ -1,0 +1,805 @@
+package org.com.belog.prelog.controller.swagger
+
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.ExampleObject
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import org.com.belog.global.annotation.LoginUserId
+import org.com.belog.global.openapi.CommonOpenApiExample
+import org.com.belog.global.openapi.CommonOpenApiResponse
+import org.com.belog.global.response.CommonResponse
+import org.com.belog.prelog.controller.dto.request.CreatePlanRequest
+import org.com.belog.prelog.controller.dto.request.UpdatePlanRequest
+import org.com.belog.prelog.controller.dto.response.CreatePlanResponse
+import org.com.belog.prelog.controller.dto.response.MapPlanListResponse
+import org.com.belog.prelog.controller.dto.response.PlanDetailResponse
+import org.com.belog.prelog.controller.dto.response.PlanLikeResponse
+import org.com.belog.prelog.controller.dto.response.PlanListResponse
+import org.com.belog.prelog.controller.dto.response.PreLogMainResponse
+import org.com.belog.prelog.controller.dto.response.UpdatePlanResponse
+import org.com.belog.prelog.domain.PlanCategory
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestParam
+
+@Tag(name = "Pre-log", description = "Pre-log 관련 API")
+interface PreLogSwagger {
+    @Operation(
+        summary = "Pre-log 메인 화면 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 만남 및 그룹 정보와 " +
+                "로그인 사용자의 만남 수정 권한을 조회합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "Pre-log 메인 정보 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPreLogMain(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+    ): ResponseEntity<CommonResponse<PreLogMainResponse>>
+
+    @Operation(
+        summary = "Pre-log 메모 계획 상세 조회",
+        description =
+            "해당 만남이 속한 그룹의 활성 멤버가 메모의 카테고리, 제목과 본문 전체를 조회합니다. " +
+                "canEdit는 메모 작성자인 경우에만 true이며 만남 종료 여부에 영향을 받지 않습니다. " +
+                "위치 계획은 상세 조회를 지원하지 않습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "메모 계획 상세 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_PLAN_DETAIL_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "위치 계획 상세 조회 요청",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_DETAIL_NOT_SUPPORTED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 활성 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획이 없거나 해당 만남이 삭제됨",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPlanDetail(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "메모 계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<PlanDetailResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 목록 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 계획을 고정 계획 우선, 계획 ID 역순으로 조회합니다. " +
+                "카테고리와 고정 여부를 필터링할 수 있으며 고정 여부와 계획 ID 기반의 복합 커서 페이지네이션을 사용합니다. " +
+                "content는 LOCATION에서 추출한 주소(없으면 null), MEMO에서 본문 전체를 반환합니다. " +
+                "LOCATION 선택 시 url로 이동하고, MEMO 선택 시 메모 상세 조회 API로 상세 정보를 조회합니다. " +
+                "canDelete는 계획 작성자 또는 만남 생성자인 경우에만 true이며, 수정 권한은 메모 상세 조회에서 제공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 목록 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_PLAN_LIST_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "쿼리 파라미터 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(ref = CommonOpenApiExample.INVALID_INPUT)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getPlans(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 카테고리. 생략하면 전체 카테고리를 조회", example = "ACCOMMODATION")
+        @RequestParam(required = false)
+        category: PlanCategory?,
+        @Parameter(description = "고정 계획만 조회할지 여부", example = "false")
+        @RequestParam(defaultValue = "false")
+        pinnedOnly: Boolean,
+        @Parameter(description = "이전 응답의 nextCursor. 첫 요청에서는 생략", example = "MToxMjA")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<PlanListResponse>>
+
+    @Operation(
+        summary = "Pre-log 지도 계획 목록 조회",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 위치 정보 추출에 성공한 위치 계획을 " +
+                "고정 계획 우선, 계획 ID 역순으로 조회합니다. " +
+                "카테고리 필터와 고정 여부 및 계획 ID 기반의 복합 커서 페이지네이션을 지원합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "200", description = "지도 계획 목록 조회 성공", useReturnTypeSchema = true),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getMapPlans(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "계획 카테고리. 생략하면 전체 카테고리를 조회", example = "RESTAURANT")
+        @RequestParam(required = false)
+        category: PlanCategory?,
+        @Parameter(description = "이전 응답의 nextCursor. 첫 요청에서는 생략", example = "MToxMjA")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<MapPlanListResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 생성",
+        description =
+            "해당 만남의 참여자가 위치 또는 메모 계획을 생성합니다. " +
+                "LOCATION은 HTTP 또는 HTTPS URL만, MEMO는 content만 입력할 수 있으며 종료된 만남에는 계획을 추가할 수 없습니다. " +
+                "LOCATION URL이 Google Maps, Kakao Map URL이면 위치 정보를 추출하고, 그 외 URL은 위치 정보 없이 저장합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "201",
+                description = "계획 생성 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [
+                            ExampleObject(name = "위치 계획 생성", value = CREATE_LOCATION_PLAN_SUCCESS_EXAMPLE),
+                            ExampleObject(name = "메모 계획 생성", value = CREATE_MEMO_PLAN_SUCCESS_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 또는 계획 정보 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버 또는 만남 참여자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "만남 참여자가 아님", value = NOT_MEETING_PARTICIPANT_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "종료된 만남",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_ALREADY_ENDED_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun createPlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "1", required = true)
+        @PathVariable
+        meetingId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = CreatePlanRequest::class),
+                    examples = [
+                        ExampleObject(name = "위치 계획", value = CREATE_LOCATION_PLAN_REQUEST_EXAMPLE),
+                        ExampleObject(name = "메모 계획", value = CREATE_MEMO_PLAN_REQUEST_EXAMPLE),
+                    ],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: CreatePlanRequest,
+    ): ResponseEntity<CommonResponse<CreatePlanResponse>>
+
+    @Operation(
+        summary = "Pre-log 메모 계획 수정",
+        description =
+            "메모 작성자가 카테고리, 제목과 본문을 수정합니다. 종료된 만남의 메모도 수정할 수 있습니다. " +
+                "위치 계획은 수정할 수 없으며 계획 유형 변경은 지원하지 않습니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 수정 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [
+                            ExampleObject(name = "메모 계획 수정", value = UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "요청값 또는 계획 정보 검증 실패",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "요청값 검증 실패", ref = CommonOpenApiExample.INVALID_INPUT),
+                            ExampleObject(name = "잘못된 계획 정보", value = INVALID_PLAN_EXAMPLE),
+                            ExampleObject(name = "위치 계획 수정 불가", value = PLAN_UPDATE_NOT_SUPPORTED_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아니거나 계획 작성자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "계획 작성자가 아님", value = PLAN_UPDATE_FORBIDDEN_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun updatePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+        @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = [
+                Content(
+                    mediaType = MediaType.APPLICATION_JSON_VALUE,
+                    schema = Schema(implementation = UpdatePlanRequest::class),
+                    examples = [
+                        ExampleObject(name = "메모 계획", value = UPDATE_MEMO_PLAN_REQUEST_EXAMPLE),
+                    ],
+                ),
+            ],
+        )
+        @Valid
+        @RequestBody
+        request: UpdatePlanRequest,
+    ): ResponseEntity<CommonResponse<UpdatePlanResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 삭제",
+        description =
+            "계획 작성자 또는 만남 생성자가 계획을 삭제합니다. " +
+                "종료된 만남의 계획도 삭제할 수 있으며 계획에 등록된 좋아요도 함께 삭제됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "계획 삭제 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "그룹 멤버가 아니거나 계획 삭제 권한이 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [
+                            ExampleObject(name = "그룹 멤버가 아님", value = NOT_GROUP_MEMBER_EXAMPLE),
+                            ExampleObject(name = "삭제 권한 없음", value = PLAN_DELETE_FORBIDDEN_EXAMPLE),
+                        ],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun deletePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
+        summary = "Pre-log 계획 핀 고정",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 계획을 핀 고정합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 이미 고정된 계획에 대한 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 핀 고정 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = PIN_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun pinPlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
+        summary = "Pre-log 계획 핀 고정 해제",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 계획의 핀 고정을 해제합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 이미 해제된 계획에 대한 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 핀 고정 해제 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = UNPIN_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun unpinPlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<Nothing>>
+
+    @Operation(
+        summary = "Pre-log 계획 좋아요 등록",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 계획에 좋아요를 등록합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 이미 등록된 좋아요 요청도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 좋아요 등록 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = LIKE_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun likePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>>
+
+    @Operation(
+        summary = "Pre-log 계획 좋아요 취소",
+        description =
+            "해당 만남이 속한 그룹의 멤버가 자신이 등록한 계획 좋아요를 취소합니다. " +
+                "만남 참여 여부와 종료 여부에 관계없이 이용할 수 있으며 등록된 좋아요가 없어도 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "계획 좋아요 취소 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = UNLIKE_PLAN_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "계획을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = PLAN_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun unlikePlan(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "계획 ID", example = "12", required = true)
+        @PathVariable
+        planId: Long,
+    ): ResponseEntity<CommonResponse<PlanLikeResponse>>
+}
+
+private const val CREATE_LOCATION_PLAN_REQUEST_EXAMPLE =
+    """{"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}"""
+
+private const val CREATE_MEMO_PLAN_REQUEST_EXAMPLE =
+    """{"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}"""
+
+private const val UPDATE_MEMO_PLAN_REQUEST_EXAMPLE =
+    """{"category":"OTHER","title":"준비물","content":"우산 챙기기"}"""
+
+private const val CREATE_LOCATION_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":1,"meetingId":1,"creatorGroupMemberId":10,"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456","content":null}}"""
+
+private const val CREATE_MEMO_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S001","message":"계획이 생성되었습니다.","data":{"planId":2,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"RESTAURANT","title":"시드니 핫플 식당","url":null,"content":"웨이팅을 대비해 여유롭게 일정을 잡아야 함"}}"""
+
+private const val UPDATE_MEMO_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S004","message":"계획이 수정되었습니다.","data":{"planId":12,"meetingId":1,"creatorGroupMemberId":10,"type":"MEMO","category":"OTHER","title":"준비물","url":null,"content":"우산 챙기기"}}"""
+
+private const val INVALID_PLAN_EXAMPLE =
+    """{"code":"PRE_LOG-E001","message":"계획 정보가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val NOT_GROUP_MEMBER_EXAMPLE =
+    """{"code":"GROUP-E013","message":"해당 그룹의 멤버가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val NOT_MEETING_PARTICIPANT_EXAMPLE =
+    """{"code":"MEETING-E011","message":"해당 만남의 참여자가 아닙니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val MEETING_NOT_FOUND_EXAMPLE =
+    """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val MEETING_ALREADY_ENDED_EXAMPLE =
+    """{"code":"PRE_LOG-E002","message":"종료된 만남에는 계획을 추가할 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_NOT_FOUND_EXAMPLE =
+    """{"code":"PRE_LOG-E003","message":"계획을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_UPDATE_FORBIDDEN_EXAMPLE =
+    """{"code":"PRE_LOG-E004","message":"계획 작성자만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_DELETE_FORBIDDEN_EXAMPLE =
+    """{"code":"PRE_LOG-E005","message":"계획을 삭제할 권한이 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val LIKE_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S005","message":"계획에 좋아요를 등록했습니다.","data":{"planId":12,"likedByMe":true,"likeCount":3}}"""
+
+private const val UNLIKE_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S006","message":"계획 좋아요를 취소했습니다.","data":{"planId":12,"likedByMe":false,"likeCount":2}}"""
+
+private const val PIN_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S007","message":"계획이 핀 고정되었습니다.","data":null}"""
+
+private const val UNPIN_PLAN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S008","message":"계획 핀 고정이 해제되었습니다.","data":null}"""
+
+private const val GET_PLAN_LIST_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S002","message":"계획 목록을 조회했습니다.","data":{"items":[{"planId":121,"type":"LOCATION","category":"ACCOMMODATION","title":"광주 숙소","url":"https://place.map.kakao.com/123456","content":"광주광역시 동구","thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":true,"canDelete":true,"createdAt":"2026-09-22T10:30:00Z"},{"planId":120,"type":"MEMO","category":"OTHER","title":"준비물","url":null,"content":"우산 챙기기","thumbnailUrl":null,"likeCount":0,"likedByMe":false,"pinned":false,"canDelete":false,"createdAt":"2026-09-22T10:00:00Z"}],"nextCursor":"MDoxMjA","hasNext":true}}"""
+
+private const val GET_PRE_LOG_MAIN_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S003","message":"Pre-log 메인 정보를 조회했습니다.","data":{"meetingId":7,"meetingName":"1박 2일 광주 여행","groupId":1,"groupName":"피놀리와 기니휘기","meetingStatus":"CONFIRMED","startDate":"2026-08-26","endDate":"2026-08-28","location":"광주광역시 000 000","isEnded":false,"canEditMeeting":true}}"""
+
+private const val GET_PLAN_DETAIL_SUCCESS_EXAMPLE =
+    """{"code":"PRE_LOG-S011","message":"메모 계획 상세 정보를 조회했습니다.","data":{"planId":12,"category":"OTHER","title":"준비물","content":"우산 챙기기","canEdit":true}}"""
+
+private const val PLAN_DETAIL_NOT_SUPPORTED_EXAMPLE =
+    """{"code":"PRE_LOG-E008","message":"메모 계획만 상세 조회할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""
+
+private const val PLAN_UPDATE_NOT_SUPPORTED_EXAMPLE =
+    """{"code":"PRE_LOG-E006","message":"메모 계획만 수정할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-22T00:00:00Z"}}"""

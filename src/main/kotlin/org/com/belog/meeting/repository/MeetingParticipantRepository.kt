@@ -1,0 +1,195 @@
+package org.com.belog.meeting.repository
+
+import jakarta.persistence.LockModeType
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+
+interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long> {
+    fun countByMeetingId(meetingId: Long): Long
+
+    fun existsByMeetingIdAndGroupMemberId(
+        meetingId: Long,
+        groupMemberId: Long,
+    ): Boolean
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id = :meetingId
+          AND groupMember.user.id = :userId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findByMeetingIdAndGroupMemberUserId(
+        @Param("meetingId") meetingId: Long,
+        @Param("userId") userId: Long,
+    ): MeetingParticipant?
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id IN :meetingIds
+        ORDER BY meeting.id DESC, participant.id ASC
+        """,
+    )
+    fun findAllWithUserByMeetingIdIn(
+        @Param("meetingIds") meetingIds: Collection<Long>,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id IN :groupMemberIds
+          AND groupMember.withdrawnAt IS NULL
+        """,
+    )
+    fun findAllByMeetingIdAndGroupMemberIdIn(
+        @Param("meetingId") meetingId: Long,
+        @Param("groupMemberIds") groupMemberIds: Collection<Long>,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH meeting.createdBy
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id = :meetingId
+          AND meeting.deletedAt IS NULL
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllWithMemberAndUserByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.withdrawnAt IS NULL
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllActiveWithUserByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id <> participant.meeting.createdBy.id
+          AND groupMember.withdrawnAt IS NULL
+          AND NOT EXISTS (
+              SELECT response.id
+              FROM MeetingScheduleResponse response
+              WHERE response.meeting.id = :meetingId
+                AND response.participant = participant
+          )
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllUnrespondedActiveWithUserByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Query(
+        """
+        SELECT participant.groupMember.id
+        FROM MeetingParticipant participant
+        WHERE participant.meeting.id = :meetingId
+          AND (
+              EXISTS (
+                  SELECT bill.id
+                  FROM Bill bill
+                  WHERE bill.payer = participant
+              )
+              OR EXISTS (
+                  SELECT share.id
+                  FROM BillShare share
+                  WHERE share.participant = participant
+              )
+              OR EXISTS (
+                  SELECT settlementRequest.id
+                  FROM SettlementRequest settlementRequest
+                  WHERE settlementRequest.sender = participant
+                     OR settlementRequest.receiver = participant
+              )
+          )
+        """,
+    )
+    fun findAllBillLogLinkedGroupMemberIds(
+        @Param("meetingId") meetingId: Long,
+    ): List<Long>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        WHERE participant.meeting.id = :meetingId
+        """,
+    )
+    fun findAllByMeetingIdForUpdate(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingParticipant>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.meeting meeting
+        JOIN FETCH participant.groupMember groupMember
+        JOIN FETCH groupMember.user
+        WHERE meeting.id = :meetingId
+          AND groupMember.user.id = :userId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findByMeetingIdAndUserIdForUpdate(
+        @Param("meetingId") meetingId: Long,
+        @Param("userId") userId: Long,
+    ): MeetingParticipant?
+
+    @Query(
+        """
+        SELECT participant
+        FROM MeetingParticipant participant
+        JOIN FETCH participant.groupMember groupMember
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id <> :excludedGroupMemberId
+          AND groupMember.withdrawnAt IS NULL
+        ORDER BY participant.createdAt ASC, participant.id ASC
+        """,
+    )
+    fun findEarliestActiveParticipant(
+        @Param("meetingId") meetingId: Long,
+        @Param("excludedGroupMemberId") excludedGroupMemberId: Long,
+        pageable: Pageable,
+    ): List<MeetingParticipant>
+}

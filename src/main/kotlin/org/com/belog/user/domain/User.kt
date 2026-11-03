@@ -1,0 +1,259 @@
+package org.com.belog.user.domain
+
+import jakarta.persistence.CheckConstraint
+import jakarta.persistence.Column
+import jakarta.persistence.Embedded
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.GeneratedValue
+import jakarta.persistence.GenerationType
+import jakarta.persistence.Id
+import jakarta.persistence.Table
+import jakarta.persistence.UniqueConstraint
+import org.com.belog.global.domain.BaseEntity
+import java.net.URI
+import java.time.Instant
+
+const val USER_NICKNAME_UNIQUE_CONSTRAINT_NAME = "uk_users_nickname"
+const val USER_SOCIAL_IDENTITY_UNIQUE_CONSTRAINT_NAME = "uk_users_provider_provider_user_id"
+
+@Entity
+@Table(
+    name = "users",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = USER_SOCIAL_IDENTITY_UNIQUE_CONSTRAINT_NAME,
+            columnNames = ["active_provider", "active_provider_user_id"],
+        ),
+        UniqueConstraint(
+            name = USER_NICKNAME_UNIQUE_CONSTRAINT_NAME,
+            columnNames = ["active_nickname"],
+        ),
+    ],
+    check = [
+        CheckConstraint(
+            name = "chk_users_onboarding_state",
+            constraint =
+                "(" +
+                    "onboarding_completed_at IS NULL AND nickname IS NULL AND last_name IS NULL AND first_name IS NULL " +
+                    "AND profile_image_object_key IS NULL AND bank IS NULL AND encrypted_account_number IS NULL" +
+                    ") OR (" +
+                    "onboarding_completed_at IS NOT NULL AND nickname IS NOT NULL AND last_name IS NOT NULL " +
+                    "AND first_name IS NOT NULL AND bank IS NOT NULL AND encrypted_account_number IS NOT NULL" +
+                    ")",
+        ),
+    ],
+)
+class User protected constructor(
+    @Column(nullable = false, length = 320)
+    val email: String,
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    val provider: SocialProvider,
+    @Column(name = "provider_user_id", nullable = false, length = 255)
+    val providerUserId: String,
+) : BaseEntity() {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    var id: Long? = null
+        protected set
+
+    @Column(length = NICKNAME_MAX_LENGTH)
+    var nickname: String? = null
+        protected set
+
+    @Column(name = "last_name", length = LAST_NAME_MAX_LENGTH)
+    var lastName: String? = null
+        protected set
+
+    @Column(name = "first_name", length = FIRST_NAME_MAX_LENGTH)
+    var firstName: String? = null
+        protected set
+
+    @Column(name = "profile_image_object_key", length = ProfileImageObjectKey.MAX_LENGTH)
+    var profileImageObjectKey: String? = null
+        protected set
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "profile_image_source", nullable = false, length = 20)
+    var profileImageSource: ProfileImageSource = ProfileImageSource.SOCIAL
+        protected set
+
+    @Column(name = "social_profile_image_url", length = SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH)
+    var socialProfileImageUrl: String? = null
+        protected set
+
+    @Embedded
+    var bankAccount: BankAccount? = null
+        protected set
+
+    @Column(name = "onboarding_completed_at")
+    var onboardingCompletedAt: Instant? = null
+        protected set
+
+    @Column(name = "deleted_at")
+    var deletedAt: Instant? = null
+        protected set
+
+    @Column(
+        name = "active_nickname",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR($NICKNAME_MAX_LENGTH) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN nickname ELSE NULL END)",
+    )
+    private var activeNickname: String? = null
+
+    @Enumerated(EnumType.STRING)
+    @Column(
+        name = "active_provider",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR(20) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN provider ELSE NULL END)",
+    )
+    private var activeProvider: SocialProvider? = null
+
+    @Column(
+        name = "active_provider_user_id",
+        insertable = false,
+        updatable = false,
+        columnDefinition =
+            "VARCHAR(255) GENERATED ALWAYS AS " +
+                "(CASE WHEN deleted_at IS NULL THEN provider_user_id ELSE NULL END)",
+    )
+    private var activeProviderUserId: String? = null
+
+    @Column(name = "push_notification_enabled", nullable = false)
+    var pushNotificationEnabled: Boolean = true
+        protected set
+
+    val isOnboardingCompleted: Boolean
+        get() = onboardingCompletedAt != null
+
+    val isActive: Boolean
+        get() = deletedAt == null
+
+    fun withdraw(withdrawnAt: Instant) {
+        check(isActive) { "이미 탈퇴한 사용자입니다." }
+        deletedAt = withdrawnAt
+    }
+
+    fun completeOnboarding(
+        profileImageObjectKey: ProfileImageObjectKey?,
+        nickname: String,
+        lastName: String,
+        firstName: String,
+        bankAccount: BankAccount,
+        completedAt: Instant,
+    ) {
+        check(!isOnboardingCompleted) { "이미 온보딩을 완료한 사용자입니다." }
+
+        val normalizedNickname = normalizeNickname(nickname)
+        val normalizedLastName = lastName.trim()
+        val normalizedFirstName = firstName.trim()
+
+        require(normalizedLastName.isNotEmpty() && normalizedLastName.length <= LAST_NAME_MAX_LENGTH) {
+            "성은 비어 있을 수 없으며 ${LAST_NAME_MAX_LENGTH}자를 초과할 수 없습니다."
+        }
+        require(normalizedFirstName.isNotEmpty() && normalizedFirstName.length <= FIRST_NAME_MAX_LENGTH) {
+            "이름은 비어 있을 수 없으며 ${FIRST_NAME_MAX_LENGTH}자를 초과할 수 없습니다."
+        }
+
+        this.profileImageObjectKey = profileImageObjectKey?.value
+        this.profileImageSource =
+            if (profileImageObjectKey == null) {
+                ProfileImageSource.SOCIAL
+            } else {
+                ProfileImageSource.CUSTOM
+            }
+        this.nickname = normalizedNickname
+        this.lastName = normalizedLastName
+        this.firstName = normalizedFirstName
+        this.bankAccount = bankAccount
+        this.onboardingCompletedAt = completedAt
+    }
+
+    fun updateNickname(nickname: String) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 닉네임을 수정할 수 있습니다." }
+
+        this.nickname = normalizeNickname(nickname)
+    }
+
+    fun updateProfileImage(profileImageObjectKey: ProfileImageObjectKey) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 프로필 이미지를 수정할 수 있습니다." }
+
+        this.profileImageObjectKey = profileImageObjectKey.value
+        this.profileImageSource = ProfileImageSource.CUSTOM
+    }
+
+    fun resetProfileImage() {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 프로필 이미지를 수정할 수 있습니다." }
+
+        this.profileImageObjectKey = null
+        this.profileImageSource = ProfileImageSource.DEFAULT
+    }
+
+    fun updateBankAccount(bankAccount: BankAccount) {
+        check(isOnboardingCompleted) { "온보딩을 완료한 사용자만 계좌를 수정할 수 있습니다." }
+
+        this.bankAccount = bankAccount
+    }
+
+    fun updateSocialProfileImageUrl(socialProfileImageUrl: String?) {
+        if (socialProfileImageUrl != null) {
+            this.socialProfileImageUrl = normalizeSocialProfileImageUrl(socialProfileImageUrl)
+        }
+    }
+
+    fun updatePushNotificationEnabled(enabled: Boolean) {
+        pushNotificationEnabled = enabled
+    }
+
+    companion object {
+        const val NICKNAME_MIN_LENGTH = 1
+        const val NICKNAME_MAX_LENGTH = 8
+        const val LAST_NAME_MAX_LENGTH = 20
+        const val FIRST_NAME_MAX_LENGTH = 50
+        const val SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH = 2048
+
+        fun createSocialUser(
+            email: String,
+            provider: SocialProvider,
+            providerUserId: String,
+            socialProfileImageUrl: String? = null,
+        ): User {
+            require(email.isNotBlank()) { "이메일은 비어 있을 수 없습니다." }
+            require(providerUserId.isNotBlank()) { "소셜 사용자 식별자는 비어 있을 수 없습니다." }
+
+            return User(
+                email = email,
+                provider = provider,
+                providerUserId = providerUserId,
+            ).apply { updateSocialProfileImageUrl(socialProfileImageUrl) }
+        }
+
+        private fun normalizeNickname(value: String): String {
+            val normalizedValue = value.trim()
+            require(normalizedValue.length in NICKNAME_MIN_LENGTH..NICKNAME_MAX_LENGTH) {
+                "닉네임은 ${NICKNAME_MIN_LENGTH}자 이상 ${NICKNAME_MAX_LENGTH}자 이하여야 합니다."
+            }
+            return normalizedValue
+        }
+
+        private fun normalizeSocialProfileImageUrl(value: String): String {
+            val normalizedValue = value.trim()
+            require(normalizedValue.length <= SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH) {
+                "소셜 프로필 이미지 URL은 ${SOCIAL_PROFILE_IMAGE_URL_MAX_LENGTH}자를 초과할 수 없습니다."
+            }
+            val uri = URI.create(normalizedValue)
+            require(uri.scheme == "https" && !uri.host.isNullOrBlank()) {
+                "소셜 프로필 이미지 URL은 유효한 HTTPS URL이어야 합니다."
+            }
+            return normalizedValue
+        }
+    }
+}

@@ -1,0 +1,500 @@
+package org.com.belog.group.service
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupCoverImageObjectKey
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.GroupRole
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
+import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.query.GroupListCursor
+import org.com.belog.user.code.UserErrorCode
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.ProfileImageObjectKey
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.repository.UserRepository
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.times
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection
+import org.springframework.test.annotation.DirtiesContext
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+import org.springframework.test.util.ReflectionTestUtils
+import org.testcontainers.junit.jupiter.Container
+import org.testcontainers.junit.jupiter.Testcontainers
+import org.testcontainers.mysql.MySQLContainer
+import java.time.Instant
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+@SpringBootTest
+@ActiveProfiles("test")
+@Testcontainers(disabledWithoutDocker = true)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
+class GroupServiceTest {
+    @Autowired
+    private lateinit var groupService: GroupService
+
+    @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @MockitoSpyBean
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @MockitoBean
+    private lateinit var inviteCodeGenerator: RandomInviteCodeGenerator
+
+    @MockitoBean
+    private lateinit var groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier
+
+    @AfterEach
+    fun cleanUp() {
+        groupMemberRepository.deleteAll()
+        groupRepository.deleteAll()
+        userRepository.deleteAll()
+    }
+
+    @Test
+    fun `그룹을 생성하면 생성자가 최초 멤버이자 OWNER로 등록된다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val result =
+            groupService.createGroup(
+                creatorId = requireNotNull(creator.id),
+                name = "  주말 러닝 모임  ",
+                coverImageObjectKey = null,
+            )
+
+        val member = groupMemberRepository.findAll().single()
+        assertEquals("주말 러닝 모임", result.name)
+        assertEquals(1, result.currentMemberCount)
+        assertEquals("AB12CD", result.inviteCode)
+        assertEquals("https://belog.example/invitations/AB12CD", result.inviteLink)
+        assertEquals(result.groupId, member.group.id)
+        assertEquals(creator.id, member.user.id)
+        assertEquals(GroupRole.OWNER, member.role)
+    }
+
+    @Test
+    fun `업로드한 커버 이미지 Object Key를 그룹에 저장한다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        val creatorId = requireNotNull(creator.id)
+        val objectKeyValue = "group-covers/$creatorId/550e8400-e29b-41d4-a716-446655440000.webp"
+        val coverImageObjectKey = GroupCoverImageObjectKey.create(creatorId, objectKeyValue)
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val result =
+            groupService.createGroup(
+                creatorId = creatorId,
+                name = "주말 러닝 모임",
+                coverImageObjectKey = coverImageObjectKey,
+            )
+
+        val savedGroup = groupRepository.findById(result.groupId).orElseThrow()
+        assertEquals(objectKeyValue, savedGroup.coverImageObjectKey)
+        verify(groupCoverImageObjectVerifier).verify(coverImageObjectKey)
+    }
+
+    @Test
+    fun `S3에 커버 이미지가 없으면 그룹을 생성하지 않는다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        val creatorId = requireNotNull(creator.id)
+        val coverImageObjectKey =
+            GroupCoverImageObjectKey.create(
+                creatorId,
+                "group-covers/$creatorId/550e8400-e29b-41d4-a716-446655440000.webp",
+            )
+        doThrow(BusinessException(GroupErrorCode.COVER_IMAGE_NOT_FOUND))
+            .`when`(groupCoverImageObjectVerifier)
+            .verify(coverImageObjectKey)
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupService.createGroup(
+                    creatorId = creatorId,
+                    name = "주말 러닝 모임",
+                    coverImageObjectKey = coverImageObjectKey,
+                )
+            }
+
+        assertEquals(GroupErrorCode.COVER_IMAGE_NOT_FOUND, exception.errorCode)
+        assertEquals(0L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+        verifyNoInteractions(inviteCodeGenerator)
+    }
+
+    @Test
+    fun `OWNER 멤버 저장에 실패하면 앞서 저장한 그룹도 롤백한다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+        doThrow(IllegalStateException("멤버 저장 실패"))
+            .`when`(groupMemberRepository)
+            .saveAndFlush(any())
+
+        assertFailsWith<IllegalStateException> {
+            groupService.createGroup(
+                creatorId = requireNotNull(creator.id),
+                name = "주말 러닝 모임",
+                coverImageObjectKey = null,
+            )
+        }
+
+        assertEquals(0L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+    }
+
+    @Test
+    fun `존재하지 않는 사용자는 그룹을 생성할 수 없다`() {
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupService.createGroup(
+                    creatorId = 999L,
+                    name = "주말 러닝 모임",
+                    coverImageObjectKey = null,
+                )
+            }
+
+        assertEquals(UserErrorCode.USER_NOT_FOUND, exception.errorCode)
+        assertEquals(0L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+    }
+
+    @Test
+    fun `온보딩을 완료하지 않은 사용자는 그룹을 생성할 수 없다`() {
+        val creator = saveUser("google-subject")
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupService.createGroup(
+                    creatorId = requireNotNull(creator.id),
+                    name = "주말 러닝 모임",
+                    coverImageObjectKey = null,
+                )
+            }
+
+        assertEquals(GroupErrorCode.ONBOARDING_REQUIRED, exception.errorCode)
+        assertEquals(0L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+    }
+
+    @Test
+    fun `초대 코드가 충돌하면 새로운 트랜잭션에서 다른 코드로 그룹 생성을 재시도한다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        groupRepository.saveAndFlush(createGroup("AB12CD"))
+        `when`(inviteCodeGenerator.generate())
+            .thenReturn(InviteCode.create("AB12CD"), InviteCode.create("EF34GH"))
+
+        val result =
+            groupService.createGroup(
+                creatorId = requireNotNull(creator.id),
+                name = "주말 러닝 모임",
+                coverImageObjectKey = null,
+            )
+
+        assertEquals("EF34GH", result.inviteCode)
+        assertEquals(2L, groupRepository.count())
+        assertEquals(1L, groupMemberRepository.count())
+        verify(inviteCodeGenerator, times(2)).generate()
+    }
+
+    @Test
+    fun `초대 코드 충돌 재시도 횟수를 소진하면 그룹 생성에 실패한다`() {
+        val creator = saveCompletedUser("google-subject", "빌로그")
+        groupRepository.saveAndFlush(createGroup("AB12CD"))
+        `when`(inviteCodeGenerator.generate()).thenReturn(InviteCode.create("AB12CD"))
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                groupService.createGroup(
+                    creatorId = requireNotNull(creator.id),
+                    name = "주말 러닝 모임",
+                    coverImageObjectKey = null,
+                )
+            }
+
+        assertEquals(GroupErrorCode.INVITE_CODE_ISSUANCE_FAILED, exception.errorCode)
+        assertEquals(1L, groupRepository.count())
+        assertEquals(0L, groupMemberRepository.count())
+        verify(inviteCodeGenerator, times(GroupService.MAX_INVITE_CODE_ATTEMPTS)).generate()
+    }
+
+    @Test
+    fun `내 그룹 목록에 전체 멤버와 미리보기 및 사용자별 권한을 조합한다`() {
+        val requester = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+        val firstMember = saveCompletedUser("first-subject", "첫멤버", hasUploadedProfileImage = false)
+        val secondMember = saveCompletedUser("second-subject", "둘째멤버", hasUploadedProfileImage = false)
+        val thirdMember = saveCompletedUser("third-subject", "셋째멤버", hasUploadedProfileImage = false)
+        val otherOwner = saveCompletedUser("other-owner-subject", "다른방장", hasUploadedProfileImage = false)
+        val ownedGroup = groupRepository.save(createGroup("AB12CD"))
+        val joinedGroup = groupRepository.save(createGroup("EF34GH"))
+        val firstMembership = groupMemberRepository.save(GroupMember.createMember(ownedGroup, firstMember))
+        val ownerMembership = saveGroupMember(GroupMember.createOwner(ownedGroup, requester), pinned = true)
+        val secondMembership = groupMemberRepository.save(GroupMember.createMember(ownedGroup, secondMember))
+        groupMemberRepository.save(GroupMember.createMember(ownedGroup, thirdMember))
+        groupMemberRepository.save(GroupMember.createOwner(joinedGroup, otherOwner))
+        val requesterMembership = groupMemberRepository.save(GroupMember.createMember(joinedGroup, requester))
+        groupMemberRepository.flush()
+
+        val result = groupService.getMyGroups(requireNotNull(requester.id), cursor = null, size = 10)
+
+        assertEquals(2, result.items.size)
+        val ownedGroupResult = result.items[0]
+        assertEquals(ownedGroup.id, ownedGroupResult.groupId)
+        assertEquals(4, ownedGroupResult.memberCount)
+        assertEquals(
+            listOf(ownerMembership.id, firstMembership.id, secondMembership.id),
+            ownedGroupResult.previewMembers.map { member -> member.groupMemberId },
+        )
+        assertEquals(listOf("요청자", "첫멤버", "둘째멤버"), ownedGroupResult.previewMembers.map { member -> member.nickname })
+        assertTrue(ownedGroupResult.pinned)
+        assertTrue(ownedGroupResult.canDeleteGroup)
+
+        val joinedGroupResult = result.items[1]
+        assertEquals(joinedGroup.id, joinedGroupResult.groupId)
+        assertFalse(joinedGroupResult.pinned)
+        assertFalse(joinedGroupResult.canDeleteGroup)
+        assertTrue(joinedGroupResult.previewMembers.any { member -> member.groupMemberId == requesterMembership.id })
+    }
+
+    @Test
+    fun `내 그룹 목록의 다음 페이지 여부와 커서를 계산한다`() {
+        val requester = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+        val oldest = saveGroupOwner(createGroup("AB12CD"), requester)
+        val middle = saveGroupOwner(createGroup("EF34GH"), requester)
+        val newest = saveGroupOwner(createGroup("IJ56KL"), requester)
+
+        val firstPage = groupService.getMyGroups(requireNotNull(requester.id), cursor = null, size = 2)
+        val secondPage = groupService.getMyGroups(requireNotNull(requester.id), cursor = firstPage.nextCursor, size = 2)
+
+        assertEquals(listOf(newest.group.id, middle.group.id), firstPage.items.map { group -> group.groupId })
+        assertTrue(firstPage.hasNext)
+        assertEquals(GroupListCursor(pinned = false, groupMemberId = requireNotNull(middle.id)), firstPage.nextCursor)
+        assertEquals(listOf(oldest.group.id), secondPage.items.map { group -> group.groupId })
+        assertFalse(secondPage.hasNext)
+        assertNull(secondPage.nextCursor)
+    }
+
+    @Test
+    fun `참여한 그룹이 없으면 빈 마지막 페이지를 반환한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자", hasUploadedProfileImage = false)
+
+        val result = groupService.getMyGroups(requireNotNull(user.id), cursor = null, size = 10)
+
+        assertTrue(result.items.isEmpty())
+        assertFalse(result.hasNext)
+        assertNull(result.nextCursor)
+    }
+
+    @Test
+    fun `참여 중인 그룹을 고정한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+
+        groupService.pinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertTrue(savedMembership.pinned)
+    }
+
+    @Test
+    fun `고정된 그룹을 해제한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        groupService.pinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        groupService.unpinGroup(
+            groupId = requireNotNull(membership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertFalse(savedMembership.pinned)
+    }
+
+    @Test
+    fun `여러 그룹을 각각 고정할 수 있다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val firstMembership = saveGroupOwner(createGroup("AB12CD"), user)
+        val secondMembership = saveGroupOwner(createGroup("EF34GH"), user)
+
+        groupService.pinGroup(
+            groupId = requireNotNull(firstMembership.group.id),
+            userId = requireNotNull(user.id),
+        )
+        groupService.pinGroup(
+            groupId = requireNotNull(secondMembership.group.id),
+            userId = requireNotNull(user.id),
+        )
+
+        val memberships =
+            groupMemberRepository.findAllById(
+                listOf(requireNotNull(firstMembership.id), requireNotNull(secondMembership.id)),
+            )
+        assertEquals(2, memberships.size)
+        assertTrue(memberships.all { membership -> membership.pinned })
+    }
+
+    @Test
+    fun `이미 고정된 그룹을 다시 고정해도 고정 상태를 유지한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        val groupId = requireNotNull(membership.group.id)
+        val userId = requireNotNull(user.id)
+
+        groupService.pinGroup(groupId = groupId, userId = userId)
+        groupService.pinGroup(groupId = groupId, userId = userId)
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertTrue(savedMembership.pinned)
+    }
+
+    @Test
+    fun `고정되지 않은 그룹을 다시 해제해도 해제 상태를 유지한다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), user)
+        val groupId = requireNotNull(membership.group.id)
+        val userId = requireNotNull(user.id)
+
+        groupService.unpinGroup(groupId = groupId, userId = userId)
+        groupService.unpinGroup(groupId = groupId, userId = userId)
+
+        val savedMembership = groupMemberRepository.findById(requireNotNull(membership.id)).orElseThrow()
+        assertFalse(savedMembership.pinned)
+    }
+
+    @Test
+    fun `그룹 멤버가 아니면 그룹을 고정하거나 해제할 수 없다`() {
+        val owner = saveCompletedUser("owner-subject", "방장")
+        val requester = saveCompletedUser("requester-subject", "요청자")
+        val membership = saveGroupOwner(createGroup("AB12CD"), owner)
+        val groupId = requireNotNull(membership.group.id)
+        val requesterId = requireNotNull(requester.id)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                groupService.pinGroup(groupId = groupId, userId = requesterId)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                groupService.unpinGroup(groupId = groupId, userId = requesterId)
+            }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, pinException.errorCode)
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, unpinException.errorCode)
+    }
+
+    @Test
+    fun `존재하지 않는 그룹은 고정하거나 해제할 수 없다`() {
+        val user = saveCompletedUser("requester-subject", "요청자")
+        val userId = requireNotNull(user.id)
+
+        val pinException =
+            assertFailsWith<BusinessException> {
+                groupService.pinGroup(groupId = 999_999L, userId = userId)
+            }
+        val unpinException =
+            assertFailsWith<BusinessException> {
+                groupService.unpinGroup(groupId = 999_999L, userId = userId)
+            }
+
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, pinException.errorCode)
+        assertEquals(GroupErrorCode.GROUP_NOT_FOUND, unpinException.errorCode)
+    }
+
+    private fun createGroup(inviteCode: String): Group =
+        Group.create(
+            name = "기존 그룹",
+            coverImageObjectKey = null,
+            inviteCode = InviteCode.create(inviteCode),
+        )
+
+    private fun saveCompletedUser(
+        providerUserId: String,
+        nickname: String,
+        hasUploadedProfileImage: Boolean = true,
+    ): User {
+        val user = saveUser(providerUserId)
+        val userId = requireNotNull(user.id)
+        user.completeOnboarding(
+            profileImageObjectKey =
+                if (hasUploadedProfileImage) {
+                    ProfileImageObjectKey.create(userId, "users/$userId/profile/image.webp")
+                } else {
+                    null
+                },
+            nickname = nickname,
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                ),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+        return userRepository.saveAndFlush(user)
+    }
+
+    private fun saveGroupOwner(
+        group: Group,
+        user: User,
+    ): GroupMember {
+        val savedGroup = groupRepository.save(group)
+        return groupMemberRepository.saveAndFlush(GroupMember.createOwner(savedGroup, user))
+    }
+
+    private fun saveGroupMember(
+        member: GroupMember,
+        pinned: Boolean,
+    ): GroupMember {
+        ReflectionTestUtils.setField(member, "pinned", pinned)
+        return groupMemberRepository.save(member)
+    }
+
+    private fun saveUser(providerUserId: String): User =
+        userRepository.saveAndFlush(
+            User.createSocialUser(
+                email = "$providerUserId@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = providerUserId,
+            ),
+        )
+
+    companion object {
+        @Container
+        @ServiceConnection
+        @JvmField
+        val mysql = MySQLContainer("mysql:8.4")
+    }
+}

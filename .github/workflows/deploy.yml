@@ -1,0 +1,229 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy to
+        required: true
+        type: string
+      spring-profile:
+        description: Spring profile to activate on the server
+        required: true
+        type: string
+
+jobs:
+  publish-image:
+    name: Build and publish Docker image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image-ref: ${{ steps.image.outputs.image-ref }}
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+      AWS_ROLE_ARN: ${{ vars.AWS_ROLE_ARN }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY || 'belog-server' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate AWS configuration
+        run: |
+          test -n "$AWS_REGION"
+          test -n "$AWS_ROLE_ARN"
+          test -n "$ECR_REPOSITORY"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.2.3
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Define image reference
+        id: image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: echo "image-ref=$ECR_REGISTRY/$ECR_REPOSITORY:sha-$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Build and publish Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.image.outputs.image-ref }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-inactive:
+    name: Deploy inactive environment
+    needs: publish-image
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+    env:
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_HOST_KEY: ${{ secrets.EC2_HOST_KEY }}
+      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+      APP_ENV: ${{ secrets.APP_ENV }}
+      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
+      SPRING_PROFILE: ${{ inputs.spring-profile }}
+      API_DOMAIN: ${{ vars.API_DOMAIN }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+      ECR_REGISTRY: ${{ needs.publish-image.outputs.registry }}
+      IMAGE_REF: ${{ needs.publish-image.outputs.image-ref }}
+      ROLLBACK_WINDOW_SECONDS: ${{ vars.ROLLBACK_WINDOW_SECONDS || '600' }}
+      REMOTE_SCRIPT: /tmp/belog-deploy-inactive-${{ github.run_id }}.sh
+      REMOTE_COMPOSE_FILE: /tmp/belog-compose-${{ github.run_id }}.yaml
+      REMOTE_NGINX_CONFIG: /tmp/belog-nginx-${{ github.run_id }}.conf
+      REMOTE_NGINX_BOOTSTRAP_CONFIG: /tmp/belog-nginx-bootstrap-${{ github.run_id }}.conf
+      REMOTE_CLEANUP_SCRIPT: /tmp/belog-stop-previous-${{ github.run_id }}.sh
+      REMOTE_RENEWAL_SCRIPT: /tmp/belog-renew-certificate-${{ github.run_id }}.sh
+      REMOTE_IMAGE_PRUNE_SCRIPT: /tmp/belog-prune-images-${{ github.run_id }}.sh
+      REMOTE_MAINTENANCE_CONFIG_SCRIPT: /tmp/belog-configure-maintenance-${{ github.run_id }}.sh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Configure SSH
+        run: |
+          test -n "$EC2_HOST"
+          test -n "$EC2_HOST_KEY"
+          test -n "$EC2_USER"
+          test -n "$EC2_SSH_KEY"
+          test -n "$AWS_REGION"
+          test -n "$ECR_REGISTRY"
+          test -n "$IMAGE_REF"
+          test -n "$API_DOMAIN"
+          test -n "$CERTBOT_EMAIL"
+          [[ "$SPRING_PROFILE" =~ ^[a-zA-Z0-9_-]+$ ]]
+          [[ "$CERTBOT_EMAIL" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
+
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$EC2_SSH_KEY" > "$HOME/.ssh/belog-deploy-key"
+          printf '%s\n' "$EC2_HOST_KEY" > "$HOME/.ssh/known_hosts"
+          test -s "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/belog-deploy-key" "$HOME/.ssh/known_hosts"
+
+      - name: Upload deployment files
+        run: |
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/deploy-inactive.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/compose.yaml \
+            "$EC2_USER@$EC2_HOST:$REMOTE_COMPOSE_FILE"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/nginx/belog.conf \
+            "$EC2_USER@$EC2_HOST:$REMOTE_NGINX_CONFIG"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/nginx/belog-bootstrap.conf \
+            "$EC2_USER@$EC2_HOST:$REMOTE_NGINX_BOOTSTRAP_CONFIG"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/stop-previous-container.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_CLEANUP_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/renew-certificate.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_RENEWAL_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/prune-images.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_IMAGE_PRUNE_SCRIPT"
+          scp \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            deploy/configure-maintenance.sh \
+            "$EC2_USER@$EC2_HOST:$REMOTE_MAINTENANCE_CONFIG_SCRIPT"
+
+      - name: Configure application environment
+        run: |
+          test -n "$APP_ENV"
+          printf '%s\n' "$APP_ENV" | ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            'install -d -m 700 "$HOME/belog" && umask 077 && cat > "$HOME/belog/.env.'"$SPRING_PROFILE"'"'
+
+      - name: Configure Swagger credentials
+        env:
+          SWAGGER_USERNAME: ${{ secrets.SWAGGER_USERNAME }}
+          SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
+        run: |
+          test -n "$SWAGGER_USERNAME"
+          test -n "$SWAGGER_PASSWORD"
+          [[ "$SWAGGER_USERNAME" =~ ^[a-zA-Z0-9._-]+$ ]]
+          command -v openssl >/dev/null
+
+          SWAGGER_PASSWORD_HASH="$(printf '%s' "$SWAGGER_PASSWORD" | openssl passwd -apr1 -stdin)"
+          printf '%s:%s\n' "$SWAGGER_USERNAME" "$SWAGGER_PASSWORD_HASH" | ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            'install -d -m 755 "$HOME/belog/nginx" && umask 022 && cat > "$HOME/belog/nginx/swagger.htpasswd" && chmod 644 "$HOME/belog/nginx/swagger.htpasswd"'
+
+      - name: Log in to Amazon ECR from EC2
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '$ECR_REGISTRY'"
+
+      - name: Deploy image to inactive environment
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "chmod 700 '$REMOTE_SCRIPT' && BELOG_DOMAIN='$API_DOMAIN' BELOG_CERTBOT_EMAIL='$CERTBOT_EMAIL' BELOG_SPRING_PROFILE='$SPRING_PROFILE' BELOG_ROLLBACK_WINDOW_SECONDS='$ROLLBACK_WINDOW_SECONDS' '$REMOTE_SCRIPT' '$IMAGE_REF' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_NGINX_BOOTSTRAP_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'"
+
+      - name: Remove temporary credentials and script
+        if: always()
+        run: |
+          ssh \
+            -i "$HOME/.ssh/belog-deploy-key" \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "docker logout '$ECR_REGISTRY' >/dev/null 2>&1 || true; rm -f '$REMOTE_SCRIPT' '$REMOTE_COMPOSE_FILE' '$REMOTE_NGINX_CONFIG' '$REMOTE_NGINX_BOOTSTRAP_CONFIG' '$REMOTE_CLEANUP_SCRIPT' '$REMOTE_RENEWAL_SCRIPT' '$REMOTE_IMAGE_PRUNE_SCRIPT' '$REMOTE_MAINTENANCE_CONFIG_SCRIPT'" \
+            || true
+          rm -f "$HOME/.ssh/belog-deploy-key"

@@ -1,0 +1,158 @@
+package org.com.belog.group.service
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.GROUP_MEMBER_UNIQUE_CONSTRAINT_NAME
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.command.GroupNotificationCommands
+import org.com.belog.group.service.result.GroupMemberResult
+import org.com.belog.group.service.result.JoinedGroup
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.user.code.UserErrorCode
+import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
+import org.hibernate.exception.ConstraintViolationException
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+
+@Service
+class GroupMembershipService(
+    private val groupRepository: GroupRepository,
+    private val userRepository: UserRepository,
+    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
+    private val userService: UserService,
+    private val notificationService: NotificationService,
+) {
+    @Transactional(readOnly = true)
+    fun getGroupMembers(
+        groupId: Long,
+        userId: Long,
+        query: String?,
+    ): List<GroupMemberResult> {
+        validateGroupMember(groupId, userId)
+
+        val normalizedQuery = query?.trim().orEmpty()
+        val members =
+            if (normalizedQuery.isEmpty()) {
+                groupMemberRepository.findAllWithUserByGroupId(groupId)
+            } else {
+                groupMemberRepository.searchAllWithUserByGroupId(groupId, normalizedQuery)
+            }
+
+        return members.sortedBy { member -> member.user.id != userId }.map { member ->
+            val memberUser = member.user
+            GroupMemberResult(
+                groupMemberId = requireNotNull(member.id),
+                nickname = userService.resolveDisplayNickname(memberUser),
+                profileImageUrl = userService.resolveProfileImageUrl(memberUser),
+                role = member.role,
+                isMe = memberUser.id == userId,
+            )
+        }
+    }
+
+    @Transactional
+    fun joinGroup(
+        userId: Long,
+        inviteCode: String,
+    ): JoinedGroup {
+        val validatedInviteCode = createInviteCode(inviteCode)
+        val group =
+            groupRepository.findByInviteCodeForUpdate(validatedInviteCode.value)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND_BY_INVITE_CODE)
+        val groupId = requireNotNull(group.id)
+        val user =
+            userRepository.findById(userId).orElseThrow {
+                BusinessException(UserErrorCode.USER_NOT_FOUND)
+            }
+
+        if (!user.isOnboardingCompleted) {
+            throw BusinessException(GroupErrorCode.ONBOARDING_REQUIRED)
+        }
+        if (groupMemberRepository.existsByGroupIdAndUserIdAndWithdrawnAtIsNull(groupId, userId)) {
+            throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER)
+        }
+
+        val currentMemberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId)
+        if (currentMemberCount >= Group.MAX_MEMBER_COUNT) {
+            throw BusinessException(GroupErrorCode.GROUP_MEMBER_LIMIT_EXCEEDED)
+        }
+
+        val joinedMember =
+            try {
+                groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+            } catch (exception: DataIntegrityViolationException) {
+                if (exception.isGroupMemberUniqueConstraintViolation()) {
+                    throw BusinessException(GroupErrorCode.ALREADY_GROUP_MEMBER, exception)
+                }
+                throw exception
+            }
+        notifyGroupMemberJoined(groupId, joinedMember)
+
+        return JoinedGroup(
+            groupId = groupId,
+            name = group.name,
+            currentMemberCount = currentMemberCount.toInt() + 1,
+        )
+    }
+
+    private fun notifyGroupMemberJoined(
+        groupId: Long,
+        joinedMember: GroupMember,
+    ) {
+        val joinedMemberId = checkNotNull(joinedMember.id) { "저장된 그룹 멤버의 ID가 없습니다." }
+        val joinedUser = joinedMember.user
+        val joinedUserId = checkNotNull(joinedUser.id) { "그룹 참여자의 사용자 ID가 없습니다." }
+        val joinedUserNickname = userService.resolveDisplayNickname(joinedUser)
+        val recipients =
+            groupMemberRepository
+                .findAllWithUserByGroupId(groupId)
+                .filter { member -> member.id != joinedMemberId }
+
+        notificationService.createAll(
+            recipients.map { member ->
+                GroupNotificationCommands.groupMemberJoined(
+                    groupId = groupId,
+                    joinedMemberId = joinedMemberId,
+                    recipientUserId = checkNotNull(member.user.id) { "그룹 멤버의 사용자 ID가 없습니다." },
+                    joinedUserId = joinedUserId,
+                    joinedUserNickname = joinedUserNickname,
+                )
+            },
+        )
+    }
+
+    private fun validateGroupMember(
+        groupId: Long,
+        userId: Long,
+    ) {
+        if (!groupRepository.existsByIdAndDeletedAtIsNull(groupId)) {
+            throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        }
+        groupMemberFinder.findActiveMember(groupId, userId)
+    }
+
+    private fun createInviteCode(value: String): InviteCode =
+        try {
+            InviteCode.create(value)
+        } catch (exception: IllegalArgumentException) {
+            throw BusinessException(GroupErrorCode.INVALID_INVITE_CODE, exception)
+        }
+
+    private fun DataIntegrityViolationException.isGroupMemberUniqueConstraintViolation(): Boolean {
+        val constraintName =
+            generateSequence(this as Throwable?) { throwable -> throwable.cause }
+                .filterIsInstance<ConstraintViolationException>()
+                .firstOrNull()
+                ?.constraintName
+
+        val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
+        return unqualifiedConstraintName.equals(GROUP_MEMBER_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
+    }
+}

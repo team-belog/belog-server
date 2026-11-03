@@ -1,0 +1,745 @@
+package org.com.belog.billlog.service
+
+import jakarta.persistence.EntityManager
+import org.com.belog.billlog.code.BillLogErrorCode
+import org.com.belog.billlog.domain.BillCurrency
+import org.com.belog.billlog.domain.BillSplitType
+import org.com.belog.billlog.domain.SettlementRequestStatus
+import org.com.belog.billlog.repository.BillItemRepository
+import org.com.belog.billlog.repository.BillRepository
+import org.com.belog.billlog.repository.BillShareRepository
+import org.com.belog.billlog.repository.SettlementRequestRepository
+import org.com.belog.billlog.service.command.BillItemCommand
+import org.com.belog.billlog.service.command.BillShareCommand
+import org.com.belog.billlog.service.command.RegisterBillCommand
+import org.com.belog.global.config.JpaAuditingConfig
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.InviteCode
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.GroupMemberFinder
+import org.com.belog.meeting.code.MeetingErrorCode
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingDateRange
+import org.com.belog.meeting.domain.MeetingParticipant
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.service.MeetingAccessChecker
+import org.com.belog.notification.domain.NotificationType
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.notification.service.command.CreateNotificationCommand
+import org.com.belog.user.config.AccountNumberEncryptionConfig
+import org.com.belog.user.domain.Bank
+import org.com.belog.user.domain.BankAccount
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.com.belog.user.infrastructure.AccountNumberAttributeConverter
+import org.com.belog.user.repository.UserRepository
+import org.com.belog.user.service.UserService
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.any
+import org.mockito.Mockito.mockingDetails
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest
+import org.springframework.boot.test.context.TestConfiguration
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
+import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.math.BigDecimal
+import java.sql.Timestamp
+import java.time.Clock
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+@DataJpaTest
+@ActiveProfiles("test")
+@Import(
+    BillService::class,
+    MeetingAccessChecker::class,
+    BillServiceTest.FixedClockConfig::class,
+    JpaAuditingConfig::class,
+    AccountNumberEncryptionConfig::class,
+    AccountNumberAttributeConverter::class,
+    GroupMemberFinder::class,
+)
+class BillServiceTest {
+    @Autowired
+    private lateinit var billService: BillService
+
+    @Autowired
+    private lateinit var billRepository: BillRepository
+
+    @Autowired
+    private lateinit var billItemRepository: BillItemRepository
+
+    @Autowired
+    private lateinit var billShareRepository: BillShareRepository
+
+    @Autowired
+    private lateinit var settlementRequestRepository: SettlementRequestRepository
+
+    @Autowired
+    private lateinit var meetingRepository: MeetingRepository
+
+    @Autowired
+    private lateinit var meetingParticipantRepository: MeetingParticipantRepository
+
+    @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
+    private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var jdbcTemplate: JdbcTemplate
+
+    @Autowired
+    private lateinit var entityManager: EntityManager
+
+    @MockitoBean
+    private lateinit var userService: UserService
+
+    @MockitoBean
+    private lateinit var notificationService: NotificationService
+
+    @BeforeEach
+    fun stubUserService() {
+        `when`(userService.resolveDisplayNickname(anyValue())).thenAnswer { invocation ->
+            requireNotNull((invocation.arguments[0] as User).nickname)
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> anyValue(): T {
+        any<T>()
+        return null as T
+    }
+
+    @Test
+    fun `그룹 멤버가 결제 내역을 등록하면 항목과 개인별 부담 금액 및 정산 요청이 저장된다`() {
+        val context = saveMeetingContext()
+
+        val result = billService.registerBill(createCommand(context))
+
+        assertEquals(1L, billRepository.count())
+        assertEquals(2L, billItemRepository.count())
+        assertEquals(2L, billShareRepository.count())
+        assertEquals(1L, settlementRequestRepository.count())
+
+        val bill = billRepository.findAll().single()
+        assertEquals(bill.id, result.billId)
+        assertEquals("아랑이 카페", bill.title)
+        assertEquals(BigDecimal.valueOf(11_000L), bill.totalAmount)
+        assertEquals(BillSplitType.EQUAL_SPLIT, bill.splitType)
+        assertEquals(context.creator.id, bill.createdBy.id)
+        assertEquals(context.payerParticipant.id, bill.payer.id)
+
+        val items = billItemRepository.findAll().sortedBy { item -> item.itemOrder }
+        assertEquals(listOf("아메리카노", "프라푸치노"), items.map { item -> item.name })
+        assertEquals(amounts(4_000L, 7_000L), items.map { item -> item.amount })
+        assertEquals(listOf(0, 1), items.map { item -> item.itemOrder })
+
+        val shares = billShareRepository.findAll().sortedBy { share -> share.allocationOrder }
+        assertEquals(
+            listOf(context.payerParticipant.id, context.memberParticipant.id),
+            shares.map { share -> share.participant.id },
+        )
+        assertEquals(amounts(4_000L, 7_000L), shares.map { share -> share.amount })
+        assertEquals(listOf(0, 1), shares.map { share -> share.allocationOrder })
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        assertEquals(context.memberParticipant.id, settlementRequest.sender.id)
+        assertEquals(context.payerParticipant.id, settlementRequest.receiver.id)
+        assertEquals(BigDecimal.valueOf(7_000L), settlementRequest.amount)
+        assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
+    }
+
+    @Test
+    fun `그룹 멤버가 결제 내역 상세를 조회한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-23T01:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(registeredBill.billId, result.billId)
+        assertEquals(LocalDate.of(2026, 9, 23), result.paymentDate)
+        assertEquals("아랑이 카페", result.title)
+        assertEquals("작성자", result.payerNickname)
+        assertEquals(BillSplitType.EQUAL_SPLIT, result.settlementMethod)
+        assertEquals(listOf("아메리카노", "프라푸치노"), result.items.map { item -> item.name })
+        assertEquals(amounts(4_000L, 7_000L), result.items.map { item -> item.amount })
+        assertEquals(BigDecimal.valueOf(11_000L), result.totalAmount)
+        assertEquals(
+            listOf(context.payerParticipant.id, context.memberParticipant.id),
+            result.shares.map { share -> share.meetingParticipantId },
+        )
+        assertEquals(listOf("작성자", "참여자"), result.shares.map { share -> share.nickname })
+        assertEquals(amounts(4_000L, 7_000L), result.shares.map { share -> share.amount })
+        assertEquals(listOf(null, null), result.shares.map { share -> share.profileImageUrl })
+    }
+
+    @Test
+    fun `결제일과 만남 시작일을 기준으로 회차를 계산한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-25T00:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(LocalDate.of(2026, 9, 25), result.paymentDate)
+        assertEquals(3, result.dayNumber)
+    }
+
+    @Test
+    fun `정산 참여자 중 결제자를 식별한다`() {
+        val context = saveMeetingContext()
+        val registeredBill = billService.registerBill(createCommand(context))
+        updateBillCreatedAt(registeredBill.billId, Instant.parse("2026-09-23T01:00:00Z"))
+
+        val result =
+            billService.getBillDetail(
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+        val sharesByParticipantId = result.shares.associateBy { share -> share.meetingParticipantId }
+
+        assertEquals(true, sharesByParticipantId.getValue(requireNotNull(context.payerParticipant.id)).payer)
+        assertEquals(false, sharesByParticipantId.getValue(requireNotNull(context.memberParticipant.id)).payer)
+    }
+
+    @Test
+    fun `결제자의 부담 금액에는 정산 요청을 생성하지 않는다`() {
+        val context = saveMeetingContext()
+        val thirdMember = saveGroupMember(context.group, "third-subject", "세번째")
+        val thirdParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, thirdMember))
+        val command =
+            createCommand(
+                context = context,
+                items = listOf(BillItemCommand("식사", BigDecimal.valueOf(12_000L))),
+                shares =
+                    listOf(
+                        BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                        BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(3_000L)),
+                        BillShareCommand(requireNotNull(thirdMember.id), BigDecimal.valueOf(5_000L)),
+                    ),
+                totalAmount = BigDecimal.valueOf(12_000L),
+            )
+
+        billService.registerBill(command)
+
+        val settlementRequests = settlementRequestRepository.findAll()
+        assertEquals(2, settlementRequests.size)
+        assertEquals(
+            setOf(context.memberParticipant.id, thirdParticipant.id),
+            settlementRequests.map { request -> request.sender.id }.toSet(),
+        )
+    }
+
+    @Test
+    fun `결제 내역을 등록하면 정산 대상자에게 결제자 이름으로 정산 요청 알림이 저장된다`() {
+        val context = saveMeetingContext()
+
+        val result = billService.registerBill(createCommand(context, payerMemberId = requireNotNull(context.member.id)))
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        val expectedCommands =
+            setOf(
+                CreateNotificationCommand(
+                    recipientUserId = requireNotNull(context.creator.user.id),
+                    actorUserId = context.member.user.id,
+                    type = NotificationType.SETTLEMENT_REQUESTED,
+                    message = "참여자 님이 정산을 요청했어요",
+                    targetId = context.meeting.id,
+                    deduplicationKey = "SETTLEMENT_REQUESTED:${settlementRequest.id}:${result.billId}",
+                ),
+            )
+        assertEquals(expectedCommands, requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED))
+        assertEquals(1L, billRepository.count())
+        assertEquals(result.billId, billRepository.findAll().single().id)
+    }
+
+    @Test
+    fun `반대 방향 결제를 등록하면 하나의 정산 요청에 상계되어 차액만 남고 방향이 바뀐다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 3_000L))
+
+        billService.registerBill(createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 10_000L))
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        assertEquals(context.payerParticipant.id, settlementRequest.sender.id)
+        assertEquals(context.memberParticipant.id, settlementRequest.receiver.id)
+        assertEquals(BigDecimal.valueOf(7_000L), settlementRequest.amount)
+        assertEquals(SettlementRequestStatus.PENDING, settlementRequest.status)
+        val debtorShares = billShareRepository.findAll().filter { share -> share.settlementRequest != null }
+        assertEquals(2, debtorShares.size)
+        assertEquals(setOf(settlementRequest.id), debtorShares.map { share -> share.settlementRequest?.id }.toSet())
+    }
+
+    @Test
+    fun `상계로 정산 금액이 바뀌면 바뀐 송금자에게 수취인 이름으로 정산 요청 알림을 다시 보낸다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 3_000L))
+
+        val result =
+            billService.registerBill(
+                createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 10_000L),
+            )
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        val reRequestedCommand =
+            requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED).single { command ->
+                command.deduplicationKey == "SETTLEMENT_REQUESTED:${settlementRequest.id}:${result.billId}"
+            }
+        assertEquals(context.creator.user.id, reRequestedCommand.recipientUserId)
+        assertEquals(context.member.user.id, reRequestedCommand.actorUserId)
+        assertEquals("참여자 님이 정산을 요청했어요", reRequestedCommand.message)
+    }
+
+    @Test
+    fun `상계 결과가 0원이면 정산 요청이 자동 완료되고 정산 요청 알림을 보내지 않는다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+
+        val result =
+            billService.registerBill(
+                createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 5_000L),
+            )
+
+        val settlementRequest = settlementRequestRepository.findAll().single()
+        assertEquals(SettlementRequestStatus.COMPLETED, settlementRequest.status)
+        assertEquals(0, BigDecimal.ZERO.compareTo(settlementRequest.amount))
+        assertEquals(FIXED_INSTANT, settlementRequest.completedAt)
+        assertEquals(
+            emptyList(),
+            requestedNotificationCommands(NotificationType.SETTLEMENT_REQUESTED).filter { command ->
+                command.deduplicationKey.endsWith(":${result.billId}")
+            },
+        )
+    }
+
+    @Test
+    fun `완료된 정산 요청 이후 등록한 결제는 0원부터 새 정산 요청으로 시작한다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+        settlementRequestRepository.findAll().single().complete(FIXED_INSTANT)
+
+        billService.registerBill(createPairCommand(context, payer = context.member, debtor = context.creator, debtAmount = 2_000L))
+
+        val pendingRequest =
+            settlementRequestRepository.findAll().single { request -> request.status == SettlementRequestStatus.PENDING }
+        assertEquals(2L, settlementRequestRepository.count())
+        assertEquals(context.payerParticipant.id, pendingRequest.sender.id)
+        assertEquals(context.memberParticipant.id, pendingRequest.receiver.id)
+        assertEquals(BigDecimal.valueOf(2_000L), pendingRequest.amount)
+    }
+
+    @Test
+    fun `같은 방향 대기 중 정산 금액의 합이 저장 범위를 넘으면 금액 초과 오류로 거부한다`() {
+        val context = saveMeetingContext()
+        val maxDebtAmount = 49_999_999_999_999_999L
+        repeat(2) {
+            billService.registerBill(
+                createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+            )
+        }
+
+        val exception =
+            assertFailsWith<BusinessException> {
+                billService.registerBill(
+                    createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = maxDebtAmount),
+                )
+            }
+
+        assertEquals(BillLogErrorCode.AMOUNT_OVERFLOW, exception.errorCode)
+        assertEquals(BigDecimal.valueOf(maxDebtAmount * 2), settlementRequestRepository.findAll().single().amount)
+    }
+
+    @Test
+    fun `화폐 단위가 다른 결제는 별도의 정산 요청으로 상계한다`() {
+        val context = saveMeetingContext()
+        billService.registerBill(createPairCommand(context, payer = context.creator, debtor = context.member, debtAmount = 5_000L))
+
+        billService.registerBill(
+            createPairCommand(
+                context,
+                payer = context.member,
+                debtor = context.creator,
+                debtAmount = 5_000L,
+                currency = BillCurrency.JPY,
+            ),
+        )
+
+        val requestsByCurrency = settlementRequestRepository.findAll().associateBy { request -> request.currency }
+        assertEquals(setOf(BillCurrency.KRW, BillCurrency.JPY), requestsByCurrency.keys)
+        assertEquals(context.memberParticipant.id, requestsByCurrency.getValue(BillCurrency.KRW).sender.id)
+        assertEquals(context.payerParticipant.id, requestsByCurrency.getValue(BillCurrency.JPY).sender.id)
+        assertEquals(
+            listOf(SettlementRequestStatus.PENDING, SettlementRequestStatus.PENDING),
+            requestsByCurrency.values.map { request -> request.status },
+        )
+    }
+
+    @Test
+    fun `결제 내역을 등록하면 등록자와 정산 대상자를 제외한 만남 참여자에게 영수증 등록 알림이 저장된다`() {
+        val context = saveMeetingContext()
+        val observer = saveGroupMember(context.group, "observer-subject", "관전자")
+        meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(context.meeting, observer))
+
+        val result = billService.registerBill(createCommand(context, payerMemberId = requireNotNull(context.member.id)))
+
+        val expectedCommands =
+            listOf(context.member, observer)
+                .map { recipient ->
+                    val recipientUserId = requireNotNull(recipient.user.id)
+                    CreateNotificationCommand(
+                        recipientUserId = recipientUserId,
+                        actorUserId = context.creator.user.id,
+                        type = NotificationType.BILL_REGISTERED,
+                        message = "작성자 님이 영수증을 등록했어요",
+                        targetId = context.meeting.id,
+                        deduplicationKey = "BILL_REGISTERED:${result.billId}:$recipientUserId",
+                    )
+                }.toSet()
+        assertEquals(expectedCommands, requestedNotificationCommands(NotificationType.BILL_REGISTERED))
+    }
+
+    @Test
+    fun `달러로 등록한 결제 내역은 화폐 단위와 소수 금액을 유지한다`() {
+        val context = saveMeetingContext()
+        val registeredBill =
+            billService.registerBill(
+                createCommand(
+                    context = context,
+                    currency = BillCurrency.USD,
+                    totalAmount = BigDecimal("12.50"),
+                    items = listOf(BillItemCommand("아메리카노", BigDecimal("4.5")), BillItemCommand("베이글", BigDecimal("8"))),
+                    shares =
+                        listOf(
+                            BillShareCommand(requireNotNull(context.creator.id), BigDecimal("6.25")),
+                            BillShareCommand(requireNotNull(context.member.id), BigDecimal("6.25")),
+                        ),
+                ),
+            )
+        entityManager.clear()
+
+        val result =
+            billService.getBillDetail(
+                billId = registeredBill.billId,
+                userId = requireNotNull(context.creator.user.id),
+            )
+
+        assertEquals(BillCurrency.USD, result.currency)
+        assertEquals(BigDecimal("12.50"), result.totalAmount)
+        assertEquals(listOf(BigDecimal("4.50"), BigDecimal("8.00")), result.items.map { item -> item.amount })
+        assertEquals(listOf(BigDecimal("6.25"), BigDecimal("6.25")), result.shares.map { share -> share.amount })
+    }
+
+    @Test
+    fun `화폐 단위가 허용하지 않는 소수 금액은 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val command =
+            createCommand(
+                context = context,
+                currency = BillCurrency.KRW,
+                totalAmount = BigDecimal("11000.5"),
+                items = listOf(BillItemCommand("아메리카노", BigDecimal("11000.5"))),
+                shares = listOf(BillShareCommand(requireNotNull(context.creator.id), BigDecimal("11000.5"))),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.INVALID_CURRENCY_AMOUNT, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `결제 항목 합계가 결제 총액과 다르면 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val command =
+            createCommand(
+                context = context,
+                items = listOf(BillItemCommand("아메리카노", BigDecimal.valueOf(10_000L))),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.ITEM_TOTAL_MISMATCH, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `개인별 부담 금액 합계가 결제 총액과 다르면 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val command =
+            createCommand(
+                context = context,
+                shares =
+                    listOf(
+                        BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                        BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(6_000L)),
+                    ),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.SHARE_TOTAL_MISMATCH, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `해당 만남이 속한 그룹의 멤버가 아니면 결제 내역을 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val outsider = saveCompletedUser("outsider-subject", "외부인")
+        val command = createCommand(context).copy(creatorUserId = requireNotNull(outsider.id))
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(GroupErrorCode.NOT_GROUP_MEMBER, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `만남 참여자가 아닌 그룹 멤버는 결제 내역을 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val nonParticipant = saveGroupMember(context.group, "non-participant-subject", "비참여자")
+        val command = createCommand(context).copy(creatorUserId = requireNotNull(nonParticipant.user.id))
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(MeetingErrorCode.NOT_MEETING_PARTICIPANT, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `결제자가 해당 만남의 참여자가 아니면 결제 내역을 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val nonParticipant = saveGroupMember(context.group, "payer-subject", "비참여자")
+        val command =
+            createCommand(
+                context = context,
+                payerMemberId = requireNotNull(nonParticipant.id),
+                shares = listOf(BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(11_000L))),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.PAYER_NOT_MEETING_PARTICIPANT, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    @Test
+    fun `부담자가 해당 만남의 참여자가 아니면 결제 내역을 등록할 수 없다`() {
+        val context = saveMeetingContext()
+        val nonParticipant = saveGroupMember(context.group, "share-subject", "비참여자")
+        val command =
+            createCommand(
+                context = context,
+                shares = listOf(BillShareCommand(requireNotNull(nonParticipant.id), BigDecimal.valueOf(11_000L))),
+            )
+
+        val exception = assertFailsWith<BusinessException> { billService.registerBill(command) }
+
+        assertEquals(BillLogErrorCode.INVALID_SHARE_PARTICIPANT, exception.errorCode)
+        assertBillDataIsEmpty()
+    }
+
+    private fun saveMeetingContext(): MeetingContext {
+        val group = groupRepository.save(createGroup())
+        val creator = saveGroupMember(group, "creator-subject", "작성자")
+        val member = saveGroupMember(group, "member-subject", "참여자")
+        val meeting = meetingRepository.saveAndFlush(createMeeting(group, creator))
+        val payerParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, creator))
+        val memberParticipant =
+            meetingParticipantRepository.saveAndFlush(MeetingParticipant.create(meeting, member))
+
+        return MeetingContext(
+            group = group,
+            creator = creator,
+            member = member,
+            meeting = meeting,
+            payerParticipant = payerParticipant,
+            memberParticipant = memberParticipant,
+        )
+    }
+
+    private fun createCommand(
+        context: MeetingContext,
+        payerMemberId: Long = requireNotNull(context.creator.id),
+        currency: BillCurrency = BillCurrency.KRW,
+        totalAmount: BigDecimal = BigDecimal.valueOf(11_000L),
+        items: List<BillItemCommand> =
+            listOf(
+                BillItemCommand("아메리카노", BigDecimal.valueOf(4_000L)),
+                BillItemCommand("프라푸치노", BigDecimal.valueOf(7_000L)),
+            ),
+        shares: List<BillShareCommand> =
+            listOf(
+                BillShareCommand(requireNotNull(context.creator.id), BigDecimal.valueOf(4_000L)),
+                BillShareCommand(requireNotNull(context.member.id), BigDecimal.valueOf(7_000L)),
+            ),
+    ): RegisterBillCommand =
+        RegisterBillCommand(
+            meetingId = requireNotNull(context.meeting.id),
+            creatorUserId = requireNotNull(context.creator.user.id),
+            title = "아랑이 카페",
+            payerMemberId = payerMemberId,
+            currency = currency,
+            totalAmount = totalAmount,
+            splitType = BillSplitType.EQUAL_SPLIT,
+            items = items,
+            shares = shares,
+        )
+
+    private fun createPairCommand(
+        context: MeetingContext,
+        payer: GroupMember,
+        debtor: GroupMember,
+        debtAmount: Long,
+        currency: BillCurrency = BillCurrency.KRW,
+    ): RegisterBillCommand {
+        val totalAmount = BigDecimal.valueOf(debtAmount * 2)
+        return createCommand(
+            context = context,
+            payerMemberId = requireNotNull(payer.id),
+            currency = currency,
+            totalAmount = totalAmount,
+            items = listOf(BillItemCommand("식사", totalAmount)),
+            shares =
+                listOf(
+                    BillShareCommand(requireNotNull(payer.id), BigDecimal.valueOf(debtAmount)),
+                    BillShareCommand(requireNotNull(debtor.id), BigDecimal.valueOf(debtAmount)),
+                ),
+        )
+    }
+
+    private fun amounts(vararg values: Long): List<BigDecimal> = values.map(BigDecimal::valueOf)
+
+    private fun requestedNotificationCommands(type: NotificationType): Set<CreateNotificationCommand> =
+        mockingDetails(notificationService)
+            .invocations
+            .filter { invocation -> invocation.method.name == "createAll" }
+            .flatMap { invocation -> invocation.arguments.single() as List<*> }
+            .filterIsInstance<CreateNotificationCommand>()
+            .filter { command -> command.type == type }
+            .toSet()
+
+    private fun assertBillDataIsEmpty() {
+        assertEquals(0L, billRepository.count())
+        assertEquals(0L, billItemRepository.count())
+        assertEquals(0L, billShareRepository.count())
+        assertEquals(0L, settlementRequestRepository.count())
+    }
+
+    private fun updateBillCreatedAt(
+        billId: Long,
+        createdAt: Instant,
+    ) {
+        billRepository.flush()
+        jdbcTemplate.update(
+            "UPDATE bill_log_bills SET created_at = ? WHERE id = ?",
+            Timestamp.from(createdAt),
+            billId,
+        )
+        entityManager.clear()
+    }
+
+    private fun createGroup(): Group =
+        Group.create(
+            name = "주말 여행 모임",
+            coverImageObjectKey = null,
+            inviteCode = InviteCode.create("AB12CD"),
+        )
+
+    private fun createMeeting(
+        group: Group,
+        creator: GroupMember,
+    ): Meeting =
+        Meeting.createFixed(
+            group = group,
+            creator = creator,
+            name = "광주 여행",
+            location = null,
+            dateRange = MeetingDateRange(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 23)),
+            confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
+            currentDate = LocalDate.of(2026, 9, 20),
+        )
+
+    private fun saveGroupMember(
+        group: Group,
+        providerUserId: String,
+        nickname: String,
+    ): GroupMember {
+        val user = saveCompletedUser(providerUserId, nickname)
+        return groupMemberRepository.saveAndFlush(GroupMember.createMember(group, user))
+    }
+
+    private fun saveCompletedUser(
+        providerUserId: String,
+        nickname: String,
+    ): User {
+        val user =
+            userRepository.save(
+                User.createSocialUser(
+                    email = "$providerUserId@example.com",
+                    provider = SocialProvider.GOOGLE,
+                    providerUserId = providerUserId,
+                ),
+            )
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = nickname,
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount =
+                BankAccount.create(
+                    bank = Bank.KB_KOOKMIN,
+                    accountNumber = "123456789012",
+                ),
+            completedAt = Instant.parse("2026-09-20T00:00:00Z"),
+        )
+        return userRepository.saveAndFlush(user)
+    }
+
+    @TestConfiguration
+    class FixedClockConfig {
+        @Bean
+        fun fixedClock(): Clock = Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC)
+    }
+
+    companion object {
+        private val FIXED_INSTANT: Instant = Instant.parse("2026-09-23T03:00:00Z")
+    }
+
+    private data class MeetingContext(
+        val group: Group,
+        val creator: GroupMember,
+        val member: GroupMember,
+        val meeting: Meeting,
+        val payerParticipant: MeetingParticipant,
+        val memberParticipant: MeetingParticipant,
+    )
+}

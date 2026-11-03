@@ -1,0 +1,389 @@
+package org.com.belog.group.service
+
+import org.com.belog.billlog.service.SettlementRequestService
+import org.com.belog.global.error.BusinessException
+import org.com.belog.global.storage.S3ObjectReadUrlProvider
+import org.com.belog.group.code.GroupErrorCode
+import org.com.belog.group.domain.GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME
+import org.com.belog.group.domain.Group
+import org.com.belog.group.domain.GroupCoverImageObjectKey
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.group.domain.GroupRole
+import org.com.belog.group.infrastructure.GroupInviteLinkGenerator
+import org.com.belog.group.infrastructure.RandomInviteCodeGenerator
+import org.com.belog.group.infrastructure.S3GroupCoverImageObjectVerifier
+import org.com.belog.group.repository.GroupMemberRepository
+import org.com.belog.group.repository.GroupRepository
+import org.com.belog.group.service.command.GroupNotificationCommands
+import org.com.belog.group.service.query.GroupListCursor
+import org.com.belog.group.service.result.ActiveMeetingResult
+import org.com.belog.group.service.result.CreatedGroup
+import org.com.belog.group.service.result.GroupDetailResult
+import org.com.belog.group.service.result.GroupMeetingParticipantResult
+import org.com.belog.group.service.result.GroupPreviewMemberResult
+import org.com.belog.group.service.result.MyGroupListResult
+import org.com.belog.group.service.result.MyGroupSummaryResult
+import org.com.belog.group.service.result.SchedulingMeetingResult
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.meeting.domain.MeetingStatus
+import org.com.belog.meeting.repository.MeetingParticipantRepository
+import org.com.belog.meeting.repository.MeetingRepository
+import org.com.belog.meeting.repository.MeetingScheduleResponseRepository
+import org.com.belog.notification.service.NotificationService
+import org.com.belog.user.service.UserService
+import org.hibernate.exception.ConstraintViolationException
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
+import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.Instant
+
+@Service
+class GroupService(
+    private val groupCreationAttemptService: GroupCreationAttemptService,
+    private val inviteCodeGenerator: RandomInviteCodeGenerator,
+    private val inviteLinkGenerator: GroupInviteLinkGenerator,
+    private val groupCoverImageObjectVerifier: S3GroupCoverImageObjectVerifier,
+    private val groupRepository: GroupRepository,
+    private val groupMemberRepository: GroupMemberRepository,
+    private val groupMemberFinder: GroupMemberFinder,
+    private val meetingRepository: MeetingRepository,
+    private val meetingParticipantRepository: MeetingParticipantRepository,
+    private val meetingScheduleResponseRepository: MeetingScheduleResponseRepository,
+    private val settlementRequestService: SettlementRequestService,
+    private val s3ObjectReadUrlProvider: S3ObjectReadUrlProvider,
+    private val userService: UserService,
+    private val notificationService: NotificationService,
+    private val clock: Clock,
+) {
+    fun createGroup(
+        creatorId: Long,
+        name: String,
+        coverImageObjectKey: GroupCoverImageObjectKey?,
+    ): CreatedGroup {
+        coverImageObjectKey?.let(groupCoverImageObjectVerifier::verify)
+
+        repeat(MAX_INVITE_CODE_ATTEMPTS) {
+            val inviteCode = inviteCodeGenerator.generate()
+
+            try {
+                val group =
+                    groupCreationAttemptService.create(
+                        creatorId = creatorId,
+                        name = name,
+                        coverImageObjectKey = coverImageObjectKey,
+                        inviteCode = inviteCode,
+                    )
+
+                return CreatedGroup(
+                    groupId = requireNotNull(group.id),
+                    name = group.name,
+                    currentMemberCount = INITIAL_MEMBER_COUNT,
+                    inviteCode = group.inviteCode,
+                    inviteLink = inviteLinkGenerator.generate(inviteCode),
+                )
+            } catch (exception: DataIntegrityViolationException) {
+                if (!exception.isInviteCodeUniqueConstraintViolation()) {
+                    throw exception
+                }
+            }
+        }
+
+        throw BusinessException(GroupErrorCode.INVITE_CODE_ISSUANCE_FAILED)
+    }
+
+    @Transactional(readOnly = true)
+    fun getMyGroups(
+        userId: Long,
+        cursor: GroupListCursor?,
+        size: Int,
+    ): MyGroupListResult {
+        require(size in MIN_GROUP_LIST_PAGE_SIZE..MAX_GROUP_LIST_PAGE_SIZE) {
+            "그룹 목록 조회 개수는 ${MIN_GROUP_LIST_PAGE_SIZE}개 이상 ${MAX_GROUP_LIST_PAGE_SIZE}개 이하여야 합니다."
+        }
+
+        val memberships =
+            groupMemberRepository.findMyGroupPage(
+                userId = userId,
+                cursorPinned = cursor?.pinned,
+                cursorId = cursor?.groupMemberId,
+                pageable = PageRequest.of(0, size + NEXT_PAGE_LOOKAHEAD_COUNT),
+            )
+        val hasNext = memberships.size > size
+        val pageMemberships = memberships.take(size)
+        val membersByGroupId = findMembersByGroupId(pageMemberships)
+
+        return MyGroupListResult(
+            items =
+                pageMemberships.map { membership ->
+                    createMyGroupSummary(
+                        membership = membership,
+                        members = membersByGroupId.getValue(requireNotNull(membership.group.id)),
+                    )
+                },
+            nextCursor =
+                pageMemberships
+                    .lastOrNull()
+                    ?.takeIf { hasNext }
+                    ?.let { membership ->
+                        GroupListCursor(
+                            pinned = membership.pinned,
+                            groupMemberId = requireNotNull(membership.id),
+                        )
+                    },
+            hasNext = hasNext,
+        )
+    }
+
+    @Transactional
+    fun pinGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        findGroup(groupId)
+        groupMemberFinder.findActiveMember(groupId, userId).pin()
+    }
+
+    @Transactional
+    fun unpinGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        findGroup(groupId)
+        groupMemberFinder.findActiveMember(groupId, userId).unpin()
+    }
+
+    @Transactional
+    fun deleteGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        val group =
+            groupRepository.findActiveByIdForUpdate(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        val owner = groupMemberFinder.findActiveMember(groupId, userId)
+        if (owner.role != GroupRole.OWNER) {
+            throw BusinessException(GroupErrorCode.GROUP_DELETE_OWNER_REQUIRED)
+        }
+        val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+        settlementRequestService.validateGroupSettled(groupId)
+
+        notifyGroupDeleted(group, owner)
+        deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+    }
+
+    @Transactional
+    fun delegateOwnerOrDeleteGroup(
+        groupId: Long,
+        userId: Long,
+    ) {
+        val group =
+            groupRepository.findActiveByIdForUpdate(groupId)
+                ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+        val departingOwner =
+            groupMemberFinder.findActiveMember(groupId, userId)
+
+        if (departingOwner.role != GroupRole.OWNER) {
+            return
+        }
+
+        val successor =
+            groupMemberRepository
+                .findEarliestActiveMember(
+                    groupId = groupId,
+                    excludedMemberId = requireNotNull(departingOwner.id),
+                    pageable = PageRequest.of(0, 1),
+                ).firstOrNull()
+
+        if (successor == null) {
+            val meetings = meetingRepository.findAllByGroupIdForUpdate(groupId)
+            settlementRequestService.validateGroupSettled(groupId)
+            deleteGroupAndMeetings(group, meetings, Instant.now(clock))
+            return
+        }
+
+        departingOwner.delegateOwnerTo(successor)
+    }
+
+    private fun notifyGroupDeleted(
+        group: Group,
+        owner: GroupMember,
+    ) {
+        val groupId = checkNotNull(group.id) { "삭제할 그룹의 ID가 없습니다." }
+        val ownerUserId = checkNotNull(owner.user.id) { "방장의 사용자 ID가 없습니다." }
+        val recipients =
+            groupMemberRepository
+                .findAllWithUserByGroupId(groupId)
+                .filter { member -> member.id != owner.id }
+
+        notificationService.createAll(
+            recipients.map { member ->
+                GroupNotificationCommands.groupDeleted(
+                    groupId = groupId,
+                    groupName = group.name,
+                    recipientUserId = checkNotNull(member.user.id) { "그룹 멤버의 사용자 ID가 없습니다." },
+                    ownerUserId = ownerUserId,
+                )
+            },
+        )
+    }
+
+    private fun deleteGroupAndMeetings(
+        group: Group,
+        meetings: List<Meeting>,
+        deletedAt: Instant,
+    ) {
+        group.delete(deletedAt)
+        meetings.forEach { meeting -> meeting.delete(deletedAt) }
+    }
+
+    @Transactional(readOnly = true)
+    fun getGroup(
+        groupId: Long,
+        userId: Long,
+    ): GroupDetailResult {
+        val group = findGroup(groupId)
+        val currentMember = groupMemberFinder.findActiveMember(groupId, userId)
+        val schedulingMeetings = meetingRepository.findSchedulingMeetings(groupId, MeetingStatus.SCHEDULING)
+        val activeMeetings = meetingRepository.findActiveMeetings(groupId, MeetingStatus.CONFIRMED)
+        val participantsByMeetingId = createMeetingParticipantResults(schedulingMeetings + activeMeetings)
+        val respondedMeetingIds =
+            if (schedulingMeetings.isEmpty()) {
+                emptySet()
+            } else {
+                meetingScheduleResponseRepository
+                    .findRespondedMeetingIds(schedulingMeetings.map { requireNotNull(it.id) }, userId)
+                    .toSet()
+            }
+        val canManageGroup = currentMember.role == GroupRole.OWNER
+
+        return GroupDetailResult(
+            groupId = requireNotNull(group.id),
+            name = group.name,
+            coverImageUrl = group.coverImageObjectKey?.let(s3ObjectReadUrlProvider::generateReadUrl),
+            inviteCode = group.inviteCode,
+            memberCount = groupMemberRepository.countByGroupIdAndWithdrawnAtIsNull(groupId).toInt(),
+            canEditCoverImage = canManageGroup,
+            canDeleteGroup = canManageGroup,
+            schedulingMeetings =
+                schedulingMeetings.map { meeting ->
+                    val meetingId = requireNotNull(meeting.id)
+                    val participants = participantsByMeetingId.getValue(meetingId)
+                    SchedulingMeetingResult(
+                        meetingId = meetingId,
+                        name = meeting.name,
+                        isMeetingOwner = meeting.isOwnedBy(currentMember),
+                        hasResponded = meeting.isCreatedBy(currentMember) || meetingId in respondedMeetingIds,
+                        participants = participants,
+                        participantCount = participants.size,
+                    )
+                },
+            activeMeetings =
+                activeMeetings.map { meeting ->
+                    createActiveMeetingResult(meeting, currentMember, participantsByMeetingId.getValue(requireNotNull(meeting.id)))
+                },
+        )
+    }
+
+    private fun findGroup(groupId: Long): Group =
+        groupRepository.findActiveById(groupId)
+            ?: throw BusinessException(GroupErrorCode.GROUP_NOT_FOUND)
+
+    private fun findMembersByGroupId(memberships: List<GroupMember>): Map<Long, List<GroupMember>> {
+        if (memberships.isEmpty()) {
+            return emptyMap()
+        }
+
+        val groupIds = memberships.map { membership -> requireNotNull(membership.group.id) }
+        return groupMemberRepository
+            .findAllWithUserByGroupIdIn(groupIds)
+            .groupBy { member -> requireNotNull(member.group.id) }
+    }
+
+    private fun createMyGroupSummary(
+        membership: GroupMember,
+        members: List<GroupMember>,
+    ): MyGroupSummaryResult {
+        val group = membership.group
+
+        return MyGroupSummaryResult(
+            groupId = requireNotNull(group.id),
+            name = group.name,
+            coverImageUrl = group.coverImageObjectKey?.let(s3ObjectReadUrlProvider::generateReadUrl),
+            memberCount = members.size,
+            previewMembers = members.take(PREVIEW_MEMBER_COUNT).map(::createGroupPreviewMemberResult),
+            pinned = membership.pinned,
+            canDeleteGroup = membership.role == GroupRole.OWNER,
+        )
+    }
+
+    private fun createGroupPreviewMemberResult(member: GroupMember): GroupPreviewMemberResult {
+        val user = member.user
+        return GroupPreviewMemberResult(
+            groupMemberId = requireNotNull(member.id),
+            nickname = userService.resolveDisplayNickname(user),
+            profileImageUrl = userService.resolveProfileImageUrl(user),
+        )
+    }
+
+    private fun createMeetingParticipantResults(meetings: List<Meeting>): Map<Long, List<GroupMeetingParticipantResult>> {
+        if (meetings.isEmpty()) {
+            return emptyMap()
+        }
+
+        val meetingIds = meetings.map { meeting -> requireNotNull(meeting.id) }
+        val participantsByMeetingId =
+            meetingParticipantRepository
+                .findAllWithUserByMeetingIdIn(meetingIds)
+                .groupBy { participant -> requireNotNull(participant.meeting.id) }
+
+        return meetings.associate { meeting ->
+            val meetingId = requireNotNull(meeting.id)
+            val participants =
+                participantsByMeetingId[meetingId]
+                    .orEmpty()
+                    .sortedBy { participant -> !meeting.isOwnedBy(participant.groupMember) }
+                    .map { participant ->
+                        GroupMeetingParticipantResult(
+                            nickname = userService.resolveDisplayNickname(participant.groupMember.user),
+                            isMeetingOwner = meeting.isOwnedBy(participant.groupMember),
+                        )
+                    }
+            meetingId to participants
+        }
+    }
+
+    private fun createActiveMeetingResult(
+        meeting: Meeting,
+        currentMember: GroupMember,
+        participants: List<GroupMeetingParticipantResult>,
+    ): ActiveMeetingResult =
+        ActiveMeetingResult(
+            meetingId = requireNotNull(meeting.id),
+            name = meeting.name,
+            isMeetingOwner = meeting.isOwnedBy(currentMember),
+            participants = participants,
+            participantCount = participants.size,
+        )
+
+    private fun DataIntegrityViolationException.isInviteCodeUniqueConstraintViolation(): Boolean {
+        val constraintName =
+            generateSequence(this as Throwable?) { throwable -> throwable.cause }
+                .filterIsInstance<ConstraintViolationException>()
+                .firstOrNull()
+                ?.constraintName
+
+        val unqualifiedConstraintName = constraintName?.substringAfterLast('.')?.trim('`', '"')
+        return unqualifiedConstraintName.equals(GROUP_INVITE_CODE_UNIQUE_CONSTRAINT_NAME, ignoreCase = true)
+    }
+
+    companion object {
+        const val MAX_INVITE_CODE_ATTEMPTS = 5
+        private const val INITIAL_MEMBER_COUNT = 1
+        private const val MIN_GROUP_LIST_PAGE_SIZE = 1
+        private const val MAX_GROUP_LIST_PAGE_SIZE = 50
+        private const val NEXT_PAGE_LOOKAHEAD_COUNT = 1
+        private const val PREVIEW_MEMBER_COUNT = 3
+    }
+}

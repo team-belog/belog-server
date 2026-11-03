@@ -1,0 +1,259 @@
+package org.com.belog.user.domain
+
+import java.time.Instant
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class UserTest {
+    @Test
+    fun `소셜 사용자 정보를 이용해 사용자를 생성한다`() {
+        val user =
+            User.createSocialUser(
+                email = "user@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-subject",
+            )
+
+        assertEquals("user@example.com", user.email)
+        assertEquals(null, user.nickname)
+        assertEquals(null, user.lastName)
+        assertEquals(null, user.firstName)
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
+        assertEquals(null, user.socialProfileImageUrl)
+        assertEquals(null, user.bankAccount)
+        assertFalse(user.isOnboardingCompleted)
+        assertEquals(SocialProvider.GOOGLE, user.provider)
+        assertEquals("google-subject", user.providerUserId)
+        assertTrue(user.isActive)
+        assertEquals(null, user.deletedAt)
+    }
+
+    @Test
+    fun `사용자를 탈퇴 상태로 변경한다`() {
+        val user = createUser()
+        val withdrawnAt = Instant.parse("2026-10-07T00:00:00Z")
+
+        user.withdraw(withdrawnAt)
+
+        assertFalse(user.isActive)
+        assertEquals(withdrawnAt, user.deletedAt)
+    }
+
+    @Test
+    fun `이미 탈퇴한 사용자는 다시 탈퇴 상태로 변경할 수 없다`() {
+        val user = createUser()
+        user.withdraw(Instant.parse("2026-10-07T00:00:00Z"))
+
+        assertFailsWith<IllegalStateException> {
+            user.withdraw(Instant.parse("2026-10-07T00:00:01Z"))
+        }
+    }
+
+    @Test
+    fun `이메일이 비어 있으면 사용자를 생성할 수 없다`() {
+        assertFailsWith<IllegalArgumentException> {
+            User.createSocialUser(
+                email = " ",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = "google-subject",
+            )
+        }
+    }
+
+    @Test
+    fun `소셜 사용자 식별자가 비어 있으면 사용자를 생성할 수 없다`() {
+        assertFailsWith<IllegalArgumentException> {
+            User.createSocialUser(
+                email = "user@example.com",
+                provider = SocialProvider.GOOGLE,
+                providerUserId = " ",
+            )
+        }
+    }
+
+    @Test
+    fun `온보딩 정보를 한 번에 저장하고 완료 상태로 변경한다`() {
+        val user = createUser()
+        val bankAccount =
+            BankAccount.create(
+                bank = Bank.KB_KOOKMIN,
+                accountNumber = "123456789012",
+            )
+        val completedAt = Instant.parse("2026-09-15T00:00:00Z")
+
+        user.completeOnboarding(
+            profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
+            nickname = " 빌로그 ",
+            lastName = " 홍 ",
+            firstName = " 길동 ",
+            bankAccount = bankAccount,
+            completedAt = completedAt,
+        )
+
+        assertEquals("users/1/profile/image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
+        assertEquals("빌로그", user.nickname)
+        assertEquals("홍", user.lastName)
+        assertEquals("길동", user.firstName)
+        assertEquals(Bank.KB_KOOKMIN, user.bankAccount?.bank)
+        assertEquals("123456789012", user.bankAccount?.accountNumber)
+        assertEquals(completedAt, user.onboardingCompletedAt)
+        assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `직접 업로드한 이미지 없이 온보딩하면 소셜 프로필 이미지를 유지한다`() {
+        val user = createUser()
+
+        user.completeOnboarding(
+            profileImageObjectKey = null,
+            nickname = "빌로그",
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount = createBankAccount(),
+            completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+        )
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.SOCIAL, user.profileImageSource)
+        assertTrue(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `온보딩을 완료한 사용자의 닉네임을 수정한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateNickname(" 새닉네임 ")
+
+        assertEquals("새닉네임", user.nickname)
+    }
+
+    @Test
+    fun `직접 업로드한 프로필 이미지로 변경한다`() {
+        val user = completedUser(profileImageObjectKey = null)
+
+        user.updateProfileImage(ProfileImageObjectKey.create(1L, "users/1/profile/new-image.webp"))
+
+        assertEquals("users/1/profile/new-image.webp", user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.CUSTOM, user.profileImageSource)
+    }
+
+    @Test
+    fun `프로필 이미지를 앱 기본 이미지로 초기화한다`() {
+        val user = completedUser(ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"))
+
+        user.resetProfileImage()
+
+        assertEquals(null, user.profileImageObjectKey)
+        assertEquals(ProfileImageSource.DEFAULT, user.profileImageSource)
+    }
+
+    @Test
+    fun `닉네임이 8자를 초과하면 온보딩을 완료할 수 없다`() {
+        val user = createUser()
+
+        assertFailsWith<IllegalArgumentException> {
+            user.completeOnboarding(
+                profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
+                nickname = "123456789",
+                lastName = "홍",
+                firstName = "길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+        assertFalse(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `성이 비어 있으면 온보딩을 완료할 수 없다`() {
+        val user = createUser()
+
+        assertFailsWith<IllegalArgumentException> {
+            user.completeOnboarding(
+                profileImageObjectKey = null,
+                nickname = "빌로그",
+                lastName = " ",
+                firstName = "길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+        assertFalse(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `이름이 최대 길이를 초과하면 온보딩을 완료할 수 없다`() {
+        val user = createUser()
+
+        assertFailsWith<IllegalArgumentException> {
+            user.completeOnboarding(
+                profileImageObjectKey = null,
+                nickname = "빌로그",
+                lastName = "홍",
+                firstName = "가".repeat(User.FIRST_NAME_MAX_LENGTH + 1),
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+        assertFalse(user.isOnboardingCompleted)
+    }
+
+    @Test
+    fun `이미 온보딩을 완료했다면 다시 완료할 수 없다`() {
+        val user = createUser()
+        val completedAt = Instant.parse("2026-09-15T00:00:00Z")
+
+        user.completeOnboarding(
+            profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/image.webp"),
+            nickname = "빌로그",
+            lastName = "홍",
+            firstName = "길동",
+            bankAccount = createBankAccount(),
+            completedAt = completedAt,
+        )
+
+        assertFailsWith<IllegalStateException> {
+            user.completeOnboarding(
+                profileImageObjectKey = ProfileImageObjectKey.create(1L, "users/1/profile/other.webp"),
+                nickname = "새닉네임",
+                lastName = "김",
+                firstName = "길동",
+                bankAccount = createBankAccount(),
+                completedAt = completedAt.plusSeconds(1),
+            )
+        }
+    }
+
+    private fun createUser(): User =
+        User.createSocialUser(
+            email = "user@example.com",
+            provider = SocialProvider.GOOGLE,
+            providerUserId = "google-subject",
+        )
+
+    private fun completedUser(profileImageObjectKey: ProfileImageObjectKey?): User =
+        createUser().apply {
+            completeOnboarding(
+                profileImageObjectKey = profileImageObjectKey,
+                nickname = "빌로그",
+                lastName = "홍",
+                firstName = "길동",
+                bankAccount = createBankAccount(),
+                completedAt = Instant.parse("2026-09-15T00:00:00Z"),
+            )
+        }
+
+    private fun createBankAccount(): BankAccount =
+        BankAccount.create(
+            bank = Bank.KB_KOOKMIN,
+            accountNumber = "123456789012",
+        )
+}

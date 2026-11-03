@@ -1,0 +1,25 @@
+package org.com.belog.meeting.code
+
+import org.com.belog.global.response.code.SuccessCode
+import org.springframework.http.HttpStatus
+
+enum class MeetingSuccessCode(
+    override val status: HttpStatus,
+    override val code: String,
+    override val message: String,
+) : SuccessCode {
+    MEETING_CREATED(HttpStatus.CREATED, "MEETING-S001", "만남이 생성되었습니다."),
+    DATE_POLL_RETRIEVED(HttpStatus.OK, "MEETING-S002", "후보 일정을 조회했습니다."),
+    DATE_POLL_RESPONSE_SUBMITTED(HttpStatus.OK, "MEETING-S003", "가능한 후보 일정 응답을 완료했습니다."),
+    DATE_POLL_RESULTS_RETRIEVED(HttpStatus.OK, "MEETING-S004", "후보 일정 조율 현황을 조회했습니다."),
+    MEETING_DATE_CONFIRMED(HttpStatus.OK, "MEETING-S005", "만남 일정을 확정했습니다."),
+    MEETING_DETAIL_RETRIEVED(HttpStatus.OK, "MEETING-S006", "만남 상세 정보를 조회했습니다."),
+    PAST_MEETINGS_RETRIEVED(HttpStatus.OK, "MEETING-S007", "지난 만남 목록을 조회했습니다."),
+    MEETING_UPDATED(HttpStatus.OK, "MEETING-S008", "만남이 수정되었습니다."),
+    MEETING_DELETED(HttpStatus.NO_CONTENT, "MEETING-S009", "만남이 삭제되었습니다."),
+    DATE_POLL_REMINDER_SENT(HttpStatus.NO_CONTENT, "MEETING-S010", "미응답자에게 일정 조율 리마인드를 전송했습니다."),
+    MEETING_MEMBERS_RETRIEVED(HttpStatus.OK, "MEETING-S011", "만남 멤버 목록을 조회했습니다."),
+    MEETING_ENDED(HttpStatus.OK, "MEETING-S012", "만남을 종료했습니다."),
+    MEETING_MEMBER_OPTIONS_RETRIEVED(HttpStatus.OK, "MEETING-S013", "만남 참여자 선택 목록을 조회했습니다."),
+    MEETING_MEMBERS_UPDATED(HttpStatus.OK, "MEETING-S014", "만남 참여자를 수정했습니다."),
+}

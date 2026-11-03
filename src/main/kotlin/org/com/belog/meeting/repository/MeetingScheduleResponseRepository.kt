@@ -1,0 +1,62 @@
+package org.com.belog.meeting.repository
+
+import jakarta.persistence.LockModeType
+import org.com.belog.meeting.domain.MeetingScheduleResponse
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Lock
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+
+interface MeetingScheduleResponseRepository : JpaRepository<MeetingScheduleResponse, Long> {
+    @Query(
+        """
+        SELECT response
+        FROM MeetingScheduleResponse response
+        JOIN FETCH response.participant participant
+        WHERE response.meeting.id = :meetingId
+        ORDER BY participant.id ASC
+        """,
+    )
+    fun findAllWithParticipantByMeetingId(
+        @Param("meetingId") meetingId: Long,
+    ): List<MeetingScheduleResponse>
+
+    @Query(
+        """
+        SELECT response.meeting.id
+        FROM MeetingScheduleResponse response
+        WHERE response.meeting.id IN :meetingIds
+          AND response.participant.groupMember.user.id = :userId
+        """,
+    )
+    fun findRespondedMeetingIds(
+        @Param("meetingIds") meetingIds: Collection<Long>,
+        @Param("userId") userId: Long,
+    ): List<Long>
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query(
+        """
+        SELECT response
+        FROM MeetingScheduleResponse response
+        WHERE response.meeting.id = :meetingId
+          AND response.participant.id = :participantId
+        """,
+    )
+    fun findByMeetingIdAndParticipantIdForUpdate(
+        @Param("meetingId") meetingId: Long,
+        @Param("participantId") participantId: Long,
+    ): MeetingScheduleResponse?
+
+    @Modifying
+    @Query(
+        """
+        DELETE FROM MeetingScheduleResponse response
+        WHERE response.participant.id IN :participantIds
+        """,
+    )
+    fun deleteAllByParticipantIdIn(
+        @Param("participantIds") participantIds: Collection<Long>,
+    ): Int
+}

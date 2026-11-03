@@ -1,0 +1,236 @@
+package org.com.belog.billlog.controller.swagger
+
+import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.media.Content
+import io.swagger.v3.oas.annotations.media.ExampleObject
+import io.swagger.v3.oas.annotations.media.Schema
+import io.swagger.v3.oas.annotations.responses.ApiResponse
+import io.swagger.v3.oas.annotations.responses.ApiResponses
+import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.validation.constraints.Max
+import jakarta.validation.constraints.Min
+import org.com.belog.billlog.controller.dto.response.SettlementRequestListResponse
+import org.com.belog.global.annotation.LoginUserId
+import org.com.belog.global.openapi.CommonOpenApiResponse
+import org.com.belog.global.response.CommonResponse
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.RequestParam
+
+@Tag(name = "Bill-log", description = "Bill-log 결제 내역 및 정산 요청 관련 API")
+interface SettlementRequestSwagger {
+    @Operation(
+        summary = "정산 현황 조회",
+        description =
+            "해당 만남의 모든 정산 요청을 조회합니다. 정산 요청은 같은 화폐의 두 참여자 사이 결제 내역을 상계한 결과이며, " +
+                "상계 결과 0원으로 자동 완료된 요청은 제외합니다. PENDING 요청을 COMPLETED 요청보다 먼저 배치하고, " +
+                "각 상태 안에서는 최신순으로 정렬합니다. 진행 중인 요청에서 로그인 사용자가 수취인이면 " +
+                "SEND_REMINDER, 송금자이면 MARK_COMPLETE, 그 외에는 NONE 액션을 반환합니다. " +
+                "수취인의 계좌 정보를 함께 반환하며, 수취인이 계좌를 등록하지 않았거나 탈퇴했다면 null입니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(
+                responseCode = "200",
+                description = "정산 현황 조회 성공",
+                useReturnTypeSchema = true,
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        examples = [ExampleObject(value = GET_SETTLEMENT_REQUESTS_SUCCESS_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 만남이 속한 그룹의 멤버가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_GROUP_MEMBER_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "400",
+                description = "정산 현황 커서가 올바르지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = INVALID_CURSOR_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "만남을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = MEETING_NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun getSettlementRequests(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "만남 ID", example = "7", required = true)
+        @PathVariable
+        meetingId: Long,
+        @Parameter(description = "이전 응답의 다음 페이지 커서. 첫 요청에서는 생략", example = "UEVORElORzoxMDE")
+        @RequestParam(required = false)
+        cursor: String?,
+        @Parameter(description = "조회 개수. 기본 20개, 최대 50개", example = "20")
+        @RequestParam(defaultValue = "20")
+        @Min(1)
+        @Max(50)
+        size: Int,
+    ): ResponseEntity<CommonResponse<SettlementRequestListResponse>>
+
+    @Operation(
+        summary = "정산 요청 완료 처리",
+        description =
+            "정산 요청 송금자가 송금을 완료한 뒤 자신의 요청을 COMPLETED 상태로 변경합니다. " +
+                "상계된 정산 요청을 완료하면 그 요청에 포함된 모든 결제 내역의 부담분이 함께 정산 완료됩니다. " +
+                "이미 완료된 요청은 최초 완료 시각을 유지하며 동일하게 성공합니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "정산 요청 완료 처리 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 정산 요청의 대상자가 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ACCESS_DENIED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "정산 요청을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun complete(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "정산 요청 ID", example = "12", required = true)
+        @PathVariable
+        settlementRequestId: Long,
+    ): ResponseEntity<Void>
+
+    @Operation(
+        summary = "정산 리마인드 전송",
+        description =
+            "수취인이 아직 완료되지 않은 정산 요청의 송금자에게 리마인드 알림을 전송합니다. " +
+                "응답 성공은 푸시 전달 완료가 아니라 알림 저장 완료를 의미합니다. " +
+                "같은 정산 요청에는 마지막 전송 후 1분이 지나야 다시 전송할 수 있고, " +
+                "새 결제 내역으로 상계 금액이 바뀌면 대기 시간이 초기화됩니다.",
+    )
+    @ApiResponses(
+        value = [
+            ApiResponse(responseCode = "204", description = "정산 리마인드 전송 성공"),
+            ApiResponse(responseCode = "401", ref = CommonOpenApiResponse.AUTHENTICATION_REQUIRED),
+            ApiResponse(
+                responseCode = "403",
+                description = "해당 정산 요청의 수취인이 아님",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = REMINDER_ACCESS_DENIED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "404",
+                description = "정산 요청을 찾을 수 없음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = NOT_FOUND_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "409",
+                description = "이미 완료된 정산 요청",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = ALREADY_COMPLETED_EXAMPLE)],
+                    ),
+                ],
+            ),
+            ApiResponse(
+                responseCode = "429",
+                description = "마지막 리마인드 후 1분이 지나지 않음",
+                content = [
+                    Content(
+                        mediaType = MediaType.APPLICATION_JSON_VALUE,
+                        schema = Schema(implementation = CommonResponse::class),
+                        examples = [ExampleObject(value = REMINDER_TOO_FREQUENT_EXAMPLE)],
+                    ),
+                ],
+            ),
+        ],
+    )
+    fun remind(
+        @Parameter(hidden = true)
+        @LoginUserId
+        userId: Long,
+        @Parameter(description = "정산 요청 ID", example = "12", required = true)
+        @PathVariable
+        settlementRequestId: Long,
+    ): ResponseEntity<Void>
+}
+
+private const val GET_SETTLEMENT_REQUESTS_SUCCESS_EXAMPLE =
+    """{"code":"BILL_LOG-S004","message":"정산 현황을 조회했습니다.","data":{"items":[{"settlementRequestId":101,"currency":"KRW","amount":7500,"sender":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false},"receiver":{"meetingParticipantId":31,"nickname":"정바미","profileImageUrl":null,"isMe":true,"bankAccount":{"bankCode":"KAKAO_BANK","bankName":"카카오뱅크","accountNumber":"3333012345678"}},"status":"PENDING","action":"SEND_REMINDER"},{"settlementRequestId":90,"currency":"USD","amount":12.50,"sender":{"meetingParticipantId":33,"nickname":"아랑","profileImageUrl":null,"isMe":false},"receiver":{"meetingParticipantId":32,"nickname":"바비","profileImageUrl":"https://example.com/profile.webp","isMe":false,"bankAccount":null},"status":"COMPLETED","action":"NONE"}],"nextCursor":null,"hasNext":false}}"""
+
+private const val NOT_GROUP_MEMBER_EXAMPLE =
+    """{"code":"GROUP-E013","message":"그룹 멤버만 접근할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
+
+private const val MEETING_NOT_FOUND_EXAMPLE =
+    """{"code":"MEETING-E010","message":"만남을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
+
+private const val INVALID_CURSOR_EXAMPLE =
+    """{"code":"BILL_LOG-E015","message":"정산 현황 커서가 올바르지 않습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-30T00:00:00Z"}}"""
+
+private const val ACCESS_DENIED_EXAMPLE =
+    """{"code":"BILL_LOG-E014","message":"정산 요청 대상자만 완료할 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val NOT_FOUND_EXAMPLE =
+    """{"code":"BILL_LOG-E013","message":"정산 요청을 찾을 수 없습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val REMINDER_ACCESS_DENIED_EXAMPLE =
+    """{"code":"BILL_LOG-E025","message":"정산 수취인만 리마인드를 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val ALREADY_COMPLETED_EXAMPLE =
+    """{"code":"BILL_LOG-E026","message":"이미 완료된 정산 요청입니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""
+
+private const val REMINDER_TOO_FREQUENT_EXAMPLE =
+    """{"code":"BILL_LOG-E027","message":"정산 리마인드는 1분 후에 다시 보낼 수 있습니다.","data":{"fieldErrors":[],"timestamp":"2026-09-28T00:00:00Z"}}"""

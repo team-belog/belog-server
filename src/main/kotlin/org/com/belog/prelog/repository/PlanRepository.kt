@@ -1,0 +1,78 @@
+package org.com.belog.prelog.repository
+
+import org.com.belog.prelog.domain.LocationResolutionStatus
+import org.com.belog.prelog.domain.Plan
+import org.com.belog.prelog.domain.PlanCategory
+import org.springframework.data.domain.Pageable
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
+
+interface PlanRepository : JpaRepository<Plan, Long> {
+    fun existsByMeetingId(meetingId: Long): Boolean
+
+    @Query(
+        """
+        SELECT plan
+        FROM Plan plan
+        JOIN FETCH plan.meeting meeting
+        JOIN FETCH meeting.group
+        JOIN FETCH plan.createdBy
+        WHERE plan.id = :planId
+          AND meeting.deletedAt IS NULL
+        """,
+    )
+    fun findByIdWithMeetingAndCreator(
+        @Param("planId") planId: Long,
+    ): Plan?
+
+    @Query(
+        """
+        SELECT plan
+        FROM Plan plan
+        JOIN FETCH plan.createdBy
+        WHERE plan.meeting.id = :meetingId
+          AND (:category IS NULL OR plan.category = :category)
+          AND (:pinnedOnly = FALSE OR plan.pinned = TRUE)
+          AND (
+              :cursorId IS NULL
+              OR (:cursorPinned = TRUE AND plan.pinned = FALSE)
+              OR (plan.pinned = :cursorPinned AND plan.id < :cursorId)
+          )
+        ORDER BY plan.pinned DESC, plan.id DESC
+        """,
+    )
+    fun findPageWithCreator(
+        @Param("meetingId") meetingId: Long,
+        @Param("category") category: PlanCategory?,
+        @Param("pinnedOnly") pinnedOnly: Boolean,
+        @Param("cursorPinned") cursorPinned: Boolean?,
+        @Param("cursorId") cursorId: Long?,
+        pageable: Pageable,
+    ): List<Plan>
+
+    @Query(
+        """
+        SELECT plan
+        FROM Plan plan
+        JOIN FETCH plan.createdBy
+        WHERE plan.meeting.id = :meetingId
+          AND plan.locationStatus = :locationStatus
+          AND (:category IS NULL OR plan.category = :category)
+          AND (
+              :cursorId IS NULL
+              OR (:cursorPinned = TRUE AND plan.pinned = FALSE)
+              OR (plan.pinned = :cursorPinned AND plan.id < :cursorId)
+          )
+        ORDER BY plan.pinned DESC, plan.id DESC
+        """,
+    )
+    fun findMapPage(
+        @Param("meetingId") meetingId: Long,
+        @Param("category") category: PlanCategory?,
+        @Param("locationStatus") locationStatus: LocationResolutionStatus,
+        @Param("cursorPinned") cursorPinned: Boolean?,
+        @Param("cursorId") cursorId: Long?,
+        pageable: Pageable,
+    ): List<Plan>
+}

@@ -1,0 +1,83 @@
+package org.com.belog.user.repository
+
+import jakarta.persistence.EntityManager
+import jakarta.persistence.LockModeType
+import org.com.belog.user.domain.ProfileImageSource
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.domain.User
+import org.springframework.transaction.annotation.Propagation
+import org.springframework.transaction.annotation.Transactional
+
+open class UserRepositoryCustomImpl(
+    private val entityManager: EntityManager,
+) : UserRepositoryCustom {
+    @Transactional(propagation = Propagation.MANDATORY)
+    override fun upsertSocialUser(
+        email: String,
+        provider: SocialProvider,
+        providerUserId: String,
+        socialProfileImageUrl: String?,
+    ): SocialUserUpsertResult {
+        entityManager
+            .createNativeQuery(UPSERT_SOCIAL_USER_SQL)
+            .setParameter("email", email)
+            .setParameter("provider", provider.name)
+            .setParameter("providerUserId", providerUserId)
+            .setParameter("socialProfileImageUrl", socialProfileImageUrl)
+            .setParameter("profileImageSource", ProfileImageSource.SOCIAL.name)
+            .executeUpdate()
+
+        val user = findSocialUserForUpdate(provider, providerUserId)
+        user.updateSocialProfileImageUrl(socialProfileImageUrl)
+
+        return SocialUserUpsertResult(
+            userId = requireNotNull(user.id),
+            onboardingRequired = !user.isOnboardingCompleted,
+            socialProfileImageUrl = user.socialProfileImageUrl,
+        )
+    }
+
+    private fun findSocialUserForUpdate(
+        provider: SocialProvider,
+        providerUserId: String,
+    ): User =
+        entityManager
+            .createQuery(
+                """
+                SELECT user
+                FROM User user
+                WHERE user.activeProvider = :provider
+                  AND user.activeProviderUserId = :providerUserId
+                """.trimIndent(),
+                User::class.java,
+            ).setParameter("provider", provider)
+            .setParameter("providerUserId", providerUserId)
+            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+            .singleResult
+
+    companion object {
+        private const val UPSERT_SOCIAL_USER_SQL =
+            """
+            INSERT INTO users (
+                email,
+                provider,
+                provider_user_id,
+                social_profile_image_url,
+                profile_image_source,
+                push_notification_enabled,
+                created_at,
+                updated_at
+            ) VALUES (
+                :email,
+                :provider,
+                :providerUserId,
+                :socialProfileImageUrl,
+                :profileImageSource,
+                TRUE,
+                CURRENT_TIMESTAMP(6),
+                CURRENT_TIMESTAMP(6)
+            )
+            ON DUPLICATE KEY UPDATE id = id
+            """
+    }
+}

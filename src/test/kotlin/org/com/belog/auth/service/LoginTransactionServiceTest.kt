@@ -1,0 +1,66 @@
+package org.com.belog.auth.service
+
+import org.com.belog.auth.domain.AuthTokens
+import org.com.belog.auth.domain.GoogleUserInfo
+import org.com.belog.auth.infrastructure.JwtTokenProvider
+import org.com.belog.user.domain.SocialProvider
+import org.com.belog.user.service.UserService
+import org.com.belog.user.service.result.SocialUserResult
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
+import java.time.Duration
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class LoginTransactionServiceTest {
+    private val userService = mock(UserService::class.java)
+    private val jwtTokenProvider = mock(JwtTokenProvider::class.java)
+    private val refreshTokenService = mock(RefreshTokenService::class.java)
+    private val loginTransactionService =
+        LoginTransactionService(
+            userService,
+            jwtTokenProvider,
+            refreshTokenService,
+        )
+
+    @Test
+    fun `사용자 조회 생성과 토큰 발급 및 저장을 처리한다`() {
+        val googleUserInfo =
+            GoogleUserInfo(
+                providerUserId = "google-subject",
+                email = "user@example.com",
+                profileImageUrl = "https://lh3.googleusercontent.com/profile",
+            )
+        val tokens =
+            AuthTokens(
+                accessToken = "access-token",
+                refreshToken = "refresh-token",
+                accessTokenExpiration = Duration.ofMinutes(30),
+                refreshTokenExpiration = Duration.ofDays(14),
+            )
+        `when`(
+            userService.findOrCreateSocialUser(
+                SocialProvider.GOOGLE,
+                "google-subject",
+                "user@example.com",
+                "https://lh3.googleusercontent.com/profile",
+            ),
+        ).thenReturn(
+            SocialUserResult(
+                userId = 1L,
+                onboardingRequired = true,
+                socialProfileImageUrl = "https://lh3.googleusercontent.com/profile",
+            ),
+        )
+        `when`(jwtTokenProvider.createTokens(1L)).thenReturn(tokens)
+
+        val result = loginTransactionService.login(googleUserInfo)
+
+        assertEquals(tokens, result.tokens)
+        assertTrue(result.onboardingRequired)
+        assertEquals("https://lh3.googleusercontent.com/profile", result.socialProfileImageUrl)
+        verify(refreshTokenService).saveOrUpdate(1L, "refresh-token", Duration.ofDays(14))
+    }
+}

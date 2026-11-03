@@ -1,0 +1,262 @@
+package org.com.belog.prelog.controller
+
+import org.com.belog.global.error.BusinessException
+import org.com.belog.group.domain.GroupMember
+import org.com.belog.meeting.domain.Meeting
+import org.com.belog.prelog.code.PreLogErrorCode
+import org.com.belog.prelog.domain.Plan
+import org.com.belog.prelog.domain.PlanCategory
+import org.com.belog.prelog.domain.PlanType
+import org.com.belog.prelog.service.PlanLikeService
+import org.com.belog.prelog.service.PlanLocationService
+import org.com.belog.prelog.service.PlanService
+import org.com.belog.prelog.service.PreLogService
+import org.com.belog.prelog.service.result.PlanDetailResult
+import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
+import org.mockito.Mockito.`when`
+import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
+import org.springframework.http.MediaType
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.test.context.ActiveProfiles
+import org.springframework.test.context.bean.override.mockito.MockitoBean
+import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+
+@WebMvcTest(PreLogController::class)
+@AutoConfigureMockMvc(addFilters = false)
+@ActiveProfiles("test")
+class PlanControllerTest {
+    @Autowired
+    private lateinit var mockMvc: MockMvc
+
+    @MockitoBean
+    private lateinit var planService: PlanService
+
+    @MockitoBean
+    private lateinit var planLocationService: PlanLocationService
+
+    @MockitoBean
+    private lateinit var preLogService: PreLogService
+
+    @MockitoBean
+    private lateinit var planLikeService: PlanLikeService
+
+    @Test
+    fun `메모 상세 조회 응답에 본문 전체와 수정 권한을 반환한다`() {
+        val content = "가".repeat(Plan.CONTENT_MAX_LENGTH)
+        `when`(planService.getPlanDetail(planId = 12L, userId = 15L)).thenReturn(
+            PlanDetailResult(
+                planId = 12L,
+                category = PlanCategory.OTHER,
+                title = "준비물",
+                content = content,
+                canEdit = true,
+            ),
+        )
+
+        mockMvc
+            .perform(get("/api/v1/plans/12").principal(authenticatedUser()))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S011"))
+            .andExpect(jsonPath("$.data.planId").value(12))
+            .andExpect(jsonPath("$.data.category").value("OTHER"))
+            .andExpect(jsonPath("$.data.title").value("준비물"))
+            .andExpect(jsonPath("$.data.content").value(content))
+            .andExpect(jsonPath("$.data.canEdit").value(true))
+    }
+
+    @Test
+    fun `위치 계획 상세 조회 요청은 400을 반환한다`() {
+        `when`(planService.getPlanDetail(12L, 15L)).thenThrow(BusinessException(PreLogErrorCode.PLAN_DETAIL_NOT_SUPPORTED))
+
+        mockMvc
+            .perform(get("/api/v1/plans/12").principal(authenticatedUser()))
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-E008"))
+    }
+
+    @Test
+    fun `유형과 URL 없이 메모를 수정한다`() {
+        val plan = mockLocationPlan()
+        `when`(plan.type).thenReturn(PlanType.MEMO)
+        `when`(plan.category).thenReturn(PlanCategory.OTHER)
+        `when`(plan.title).thenReturn("준비물")
+        `when`(plan.url).thenReturn(null)
+        `when`(plan.content).thenReturn("우산 챙기기")
+        `when`(
+            planService.updateMemoPlan(
+                planId = 7L,
+                userId = 15L,
+                category = PlanCategory.OTHER,
+                title = "준비물",
+                content = "우산 챙기기",
+            ),
+        ).thenReturn(plan)
+
+        mockMvc
+            .perform(
+                put("/api/v1/plans/7")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"category":"OTHER","title":"준비물","content":"우산 챙기기"}"""),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S004"))
+            .andExpect(jsonPath("$.data.planId").value(7))
+            .andExpect(jsonPath("$.data.type").value("MEMO"))
+            .andExpect(jsonPath("$.data.category").value("OTHER"))
+            .andExpect(jsonPath("$.data.title").value("준비물"))
+            .andExpect(jsonPath("$.data.content").value("우산 챙기기"))
+            .andExpect(jsonPath("$.data.url").isEmpty)
+    }
+
+    @Test
+    fun `메모 수정 본문이 공백이면 거절한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/plans/7")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"category":"OTHER","title":"준비물","content":"   "}"""),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(planService)
+    }
+
+    @Test
+    fun `LOCATION 계획을 생성한다`() {
+        val plan = mockLocationPlan()
+        `when`(
+            planLocationService.createLocationPlan(
+                meetingId = 1L,
+                creatorUserId = 15L,
+                category = PlanCategory.RESTAURANT,
+                title = "광주 맛집",
+                url = "https://place.map.kakao.com/123456",
+            ),
+        ).thenReturn(plan)
+
+        mockMvc
+            .perform(
+                post("/api/v1/meetings/1/pre-log/plans")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"type":"LOCATION","category":"RESTAURANT","title":"광주 맛집","url":"https://place.map.kakao.com/123456"}""",
+                    ),
+            ).andExpect(status().isCreated)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S001"))
+            .andExpect(jsonPath("$.message").value("계획이 생성되었습니다."))
+            .andExpect(jsonPath("$.data.planId").value(7))
+            .andExpect(jsonPath("$.data.meetingId").value(1))
+            .andExpect(jsonPath("$.data.creatorGroupMemberId").value(10))
+            .andExpect(jsonPath("$.data.type").value("LOCATION"))
+            .andExpect(jsonPath("$.data.category").value("RESTAURANT"))
+            .andExpect(jsonPath("$.data.title").value("광주 맛집"))
+            .andExpect(jsonPath("$.data.url").value("https://place.map.kakao.com/123456"))
+            .andExpect(jsonPath("$.data.content").isEmpty)
+    }
+
+    @Test
+    fun `유형과 일치하지 않는 필드를 전달하면 계획 생성을 거절한다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/meetings/1/pre-log/plans")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"type":"LOCATION","category":"RESTAURANT","title":"맛집","content":"메모"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        mockMvc
+            .perform(
+                post("/api/v1/meetings/1/pre-log/plans")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"type":"MEMO","category":"RESTAURANT","title":"맛집","url":"https://example.com/place"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E001"))
+
+        verifyNoInteractions(planService)
+        verifyNoInteractions(planLocationService)
+    }
+
+    @Test
+    fun `기존 LINK 유형으로 계획을 생성할 수 없다`() {
+        mockMvc
+            .perform(
+                post("/api/v1/meetings/1/pre-log/plans")
+                    .principal(authenticatedUser())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        """{"type":"LINK","category":"RESTAURANT","title":"맛집","url":"https://place.map.kakao.com/123456"}""",
+                    ),
+            ).andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.code").value("CMN-E002"))
+
+        verifyNoInteractions(planService)
+        verifyNoInteractions(planLocationService)
+    }
+
+    @Test
+    fun `계획을 핀 고정하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                put("/api/v1/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S007"))
+            .andExpect(jsonPath("$.message").value("계획이 핀 고정되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(planService).pinPlan(planId = 12L, userId = 15L)
+    }
+
+    @Test
+    fun `계획 핀 고정을 해제하면 성공 메시지를 반환한다`() {
+        mockMvc
+            .perform(
+                delete("/api/v1/plans/12/pin")
+                    .principal(authenticatedUser()),
+            ).andExpect(status().isOk)
+            .andExpect(jsonPath("$.code").value("PRE_LOG-S008"))
+            .andExpect(jsonPath("$.message").value("계획 핀 고정이 해제되었습니다."))
+            .andExpect(jsonPath("$.data").isEmpty)
+
+        verify(planService).unpinPlan(planId = 12L, userId = 15L)
+    }
+
+    private fun mockLocationPlan(): Plan {
+        val meeting = mock(Meeting::class.java)
+        val groupMember = mock(GroupMember::class.java)
+        val plan = mock(Plan::class.java)
+        `when`(meeting.id).thenReturn(1L)
+        `when`(groupMember.id).thenReturn(10L)
+        `when`(plan.id).thenReturn(7L)
+        `when`(plan.meeting).thenReturn(meeting)
+        `when`(plan.createdBy).thenReturn(groupMember)
+        `when`(plan.type).thenReturn(PlanType.LOCATION)
+        `when`(plan.category).thenReturn(PlanCategory.RESTAURANT)
+        `when`(plan.title).thenReturn("광주 맛집")
+        `when`(plan.url).thenReturn("https://place.map.kakao.com/123456")
+        `when`(plan.content).thenReturn(null)
+        return plan
+    }
+
+    private fun authenticatedUser(): UsernamePasswordAuthenticationToken =
+        UsernamePasswordAuthenticationToken.authenticated("15", null, emptyList())
+}
