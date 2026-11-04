@@ -74,12 +74,12 @@ jobs:
     permissions:
       contents: read
     env:
-      EC2_HOST: ${{ secrets.EC2_HOST }}
-      EC2_HOST_KEY: ${{ secrets.EC2_HOST_KEY }}
-      EC2_USER: ${{ secrets.EC2_USER }}
+      EC2_HOST: ${{ vars.EC2_HOST }}
+      EC2_HOST_KEY: ${{ vars.EC2_HOST_KEY }}
+      EC2_USER: ${{ vars.EC2_USER }}
       EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
       APP_ENV: ${{ secrets.APP_ENV }}
-      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
+      CERTBOT_EMAIL: ${{ vars.CERTBOT_EMAIL }}
       SPRING_PROFILE: ${{ inputs.spring-profile }}
       API_DOMAIN: ${{ vars.API_DOMAIN }}
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
@@ -182,7 +182,7 @@ jobs:
 
       - name: Configure Swagger credentials
         env:
-          SWAGGER_USERNAME: ${{ secrets.SWAGGER_USERNAME }}
+          SWAGGER_USERNAME: ${{ vars.SWAGGER_USERNAME }}
           SWAGGER_PASSWORD: ${{ secrets.SWAGGER_PASSWORD }}
         run: |
           test -n "$SWAGGER_USERNAME"
