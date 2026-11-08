@@ -46,4 +46,18 @@ interface UserRepository :
     fun findByIdForUpdate(
         @Param("userId") userId: Long,
     ): User?
+
+    @Query(
+        value = """
+        SELECT id
+        FROM users
+        WHERE id IN (:userIds)
+          AND deleted_at IS NULL
+        FOR SHARE
+        """,
+        nativeQuery = true,
+    )
+    fun findActiveIdsForShare(
+        @Param("userIds") userIds: Collection<Long>,
+    ): List<Long>
 }
