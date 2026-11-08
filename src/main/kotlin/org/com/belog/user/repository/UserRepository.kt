@@ -47,15 +47,14 @@ interface UserRepository :
         @Param("userId") userId: Long,
     ): User?
 
+    @Lock(LockModeType.PESSIMISTIC_READ)
     @Query(
-        value = """
-        SELECT id
-        FROM users
-        WHERE id IN (:userIds)
-          AND deleted_at IS NULL
-        FOR SHARE
+        """
+        SELECT user.id
+        FROM User user
+        WHERE user.id IN :userIds
+          AND user.deletedAt IS NULL
         """,
-        nativeQuery = true,
     )
     fun findActiveIdsForShare(
         @Param("userIds") userIds: Collection<Long>,
