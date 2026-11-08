@@ -29,6 +29,7 @@ import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.MeetingAccessChecker
 import org.com.belog.notification.service.NotificationService
+import org.com.belog.user.repository.UserRepository
 import org.com.belog.user.service.UserService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -48,21 +49,25 @@ class BillService(
     private val settlementRequestRepository: SettlementRequestRepository,
     private val userService: UserService,
     private val notificationService: NotificationService,
+    private val userRepository: UserRepository,
     private val clock: Clock,
 ) {
     @Transactional
     fun registerBill(command: RegisterBillCommand): RegisteredBill {
         validateCommand(command)
 
+        val activeParticipantUserIds = lockActiveParticipantUserIds(command)
         val meeting = findMeetingForUpdate(command.meetingId)
         val creator = meetingAccessChecker.requireParticipant(meeting, command.creatorUserId)
         val participantsByMemberId = findParticipantsByMemberId(meeting, command)
         val payer =
             participantsByMemberId[command.payerMemberId]
+                ?.takeIf { participant -> participant.groupMember.user.id in activeParticipantUserIds }
                 ?: throw BusinessException(BillLogErrorCode.PAYER_NOT_MEETING_PARTICIPANT)
         val shareParticipants =
             command.shares.map { share ->
                 participantsByMemberId[share.participantMemberId]
+                    ?.takeIf { participant -> participant.groupMember.user.id in activeParticipantUserIds }
                     ?: throw BusinessException(BillLogErrorCode.INVALID_SHARE_PARTICIPANT)
             }
 
@@ -173,6 +178,22 @@ class BillService(
 
     private fun sumAmounts(amounts: List<BigDecimal>): BigDecimal = amounts.fold(BigDecimal.ZERO, BigDecimal::add)
 
+    private fun lockActiveParticipantUserIds(command: RegisterBillCommand): Set<Long> {
+        val userIds =
+            meetingParticipantRepository
+                .findUserIdsByMeetingIdAndGroupMemberIdIn(
+                    meetingId = command.meetingId,
+                    groupMemberIds = participantMemberIds(command),
+                ).distinct()
+        if (userIds.isEmpty()) {
+            return emptySet()
+        }
+        return userRepository.findActiveIdsForShare(userIds).toSet()
+    }
+
+    private fun participantMemberIds(command: RegisterBillCommand): List<Long> =
+        (listOf(command.payerMemberId) + command.shares.map { share -> share.participantMemberId }).distinct()
+
     private fun findMeetingForUpdate(meetingId: Long): Meeting =
         meetingRepository.findByIdWithGroupForUpdate(meetingId)
             ?: throw BusinessException(MeetingErrorCode.MEETING_NOT_FOUND)
@@ -180,18 +201,14 @@ class BillService(
     private fun findParticipantsByMemberId(
         meeting: Meeting,
         command: RegisterBillCommand,
-    ): Map<Long, MeetingParticipant> {
-        val memberIds =
-            (listOf(command.payerMemberId) + command.shares.map { share -> share.participantMemberId }).distinct()
-
-        return meetingParticipantRepository
+    ): Map<Long, MeetingParticipant> =
+        meetingParticipantRepository
             .findAllByMeetingIdAndGroupMemberIdIn(
                 meetingId = checkNotNull(meeting.id) { "결제 내역 대상 만남의 ID가 없습니다." },
-                groupMemberIds = memberIds,
+                groupMemberIds = participantMemberIds(command),
             ).associateBy { participant ->
                 checkNotNull(participant.groupMember.id) { "만남 참여자의 그룹 멤버 ID가 없습니다." }
             }
-    }
 
     private fun saveBill(
         command: RegisterBillCommand,
