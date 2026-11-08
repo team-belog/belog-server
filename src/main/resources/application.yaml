@@ -30,6 +30,14 @@ springdoc:
 server:
   shutdown: graceful
 
+management:
+  metrics:
+    tags:
+      application: "${spring.application.name}"
+    distribution:
+      slo:
+        http.server.requests: 100ms, 300ms, 500ms, 1s, 3s
+
 app:
   security:
     account-number:
