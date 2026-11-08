@@ -2,6 +2,7 @@ package org.com.belog.notification.service
 
 import org.com.belog.notification.config.NotificationOutboxWorkerProperties
 import org.com.belog.notification.domain.NotificationOutbox
+import org.com.belog.notification.domain.NotificationOutboxStatus
 import org.com.belog.notification.infrastructure.PushSendOutcome
 import org.com.belog.notification.infrastructure.PushSendResult
 import org.com.belog.notification.repository.NotificationDeviceRepository
@@ -92,6 +93,15 @@ class NotificationOutboxProcessingService(
         } else {
             outbox.markFailedForRetry(now.plus(computeBackoff(outbox.attemptCount)), reason)
         }
+    }
+
+    @Transactional(readOnly = true)
+    fun countByStatuses(statuses: Set<NotificationOutboxStatus>): Map<NotificationOutboxStatus, Long> {
+        val counts =
+            notificationOutboxRepository
+                .countByStatuses(statuses)
+                .associate { statusCount -> statusCount.status to statusCount.count }
+        return statuses.associateWith { status -> counts[status] ?: 0L }
     }
 
     private fun applyRetryOrFinalFailure(

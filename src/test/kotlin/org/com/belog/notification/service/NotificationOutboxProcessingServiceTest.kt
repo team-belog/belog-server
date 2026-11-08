@@ -120,6 +120,23 @@ class NotificationOutboxProcessingServiceTest {
         assertFalse(updatedDevice.isActive)
     }
 
+    @Test
+    fun `상태별 Outbox 건수를 조회하면 해당 상태가 없는 경우 0으로 반환된다`() {
+        `when`(clock.instant()).thenReturn(Instant.parse("2026-10-09T00:00:00Z"))
+        val recipient = saveUser("recipient")
+        createProcessingOutbox(recipient, "processing-key")
+
+        val counts =
+            processingService.countByStatuses(
+                setOf(NotificationOutboxStatus.PROCESSING, NotificationOutboxStatus.FAILED),
+            )
+
+        assertEquals(
+            mapOf(NotificationOutboxStatus.PROCESSING to 1L, NotificationOutboxStatus.FAILED to 0L),
+            counts,
+        )
+    }
+
     private fun saveUser(providerUserId: String): User =
         userRepository.saveAndFlush(
             User.createSocialUser(
