@@ -14,6 +14,11 @@ spring:
     validate-migration-naming: true
     clean-disabled: true
 
+  task:
+    scheduling:
+      pool:
+        size: 5
+
   web:
     error:
       include-exception: false
