@@ -40,3 +40,8 @@ auth:
 fcm:
   project-id: "${FCM_PROJECT_ID}"
   credentials-base64: "${FCM_CREDENTIALS_BASE64}"
+
+logging:
+  structured:
+    format:
+      console: ecs
