@@ -1,0 +1,85 @@
+discovery.docker "containers" {
+	host             = "unix:///var/run/docker.sock"
+	refresh_interval = "30s"
+}
+
+discovery.relabel "belog_app" {
+	targets = discovery.docker.containers.targets
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/belog-(blue|green)"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_port_private"]
+		regex         = "8080"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_name"]
+		regex         = "/(.*)"
+		target_label  = "instance"
+	}
+
+	rule {
+		source_labels = ["__meta_docker_container_label_belog_environment"]
+		target_label  = "color"
+	}
+}
+
+prometheus.scrape "belog_app" {
+	targets         = discovery.relabel.belog_app.output
+	job_name        = "belog"
+	metrics_path    = "/actuator/prometheus"
+	scrape_interval = "60s"
+	scrape_timeout  = "10s"
+	forward_to      = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+	external_labels = {
+		env = sys.env("BELOG_ENVIRONMENT"),
+	}
+
+	endpoint {
+		url = sys.env("GRAFANA_PROM_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_PROM_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+}
+
+loki.source.docker "belog_app" {
+	host    = "unix:///var/run/docker.sock"
+	targets = discovery.relabel.belog_app.output
+	labels  = {
+		service_name = "belog",
+	}
+	forward_to = [loki.write.grafana_cloud.receiver]
+}
+
+loki.write "grafana_cloud" {
+	external_labels = {
+		env = sys.env("BELOG_ENVIRONMENT"),
+	}
+
+	endpoint {
+		url = sys.env("GRAFANA_LOKI_URL")
+
+		basic_auth {
+			username = sys.env("GRAFANA_LOKI_USER")
+			password = sys.env("GRAFANA_CLOUD_TOKEN")
+		}
+	}
+}
