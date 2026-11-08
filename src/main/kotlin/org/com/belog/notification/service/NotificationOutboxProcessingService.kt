@@ -1,7 +1,10 @@
 package org.com.belog.notification.service
 
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import org.com.belog.notification.config.NotificationOutboxWorkerProperties
 import org.com.belog.notification.domain.NotificationOutbox
+import org.com.belog.notification.domain.NotificationOutboxStatus
 import org.com.belog.notification.infrastructure.PushSendOutcome
 import org.com.belog.notification.infrastructure.PushSendResult
 import org.com.belog.notification.repository.NotificationDeviceRepository
@@ -19,7 +22,17 @@ class NotificationOutboxProcessingService(
     private val notificationDeviceRepository: NotificationDeviceRepository,
     private val properties: NotificationOutboxWorkerProperties,
     private val clock: Clock,
+    meterRegistry: MeterRegistry,
 ) {
+    private val pushSendCounters: Map<PushSendOutcome, Counter> =
+        PushSendOutcome.entries.associateWith { outcome ->
+            Counter
+                .builder(PUSH_SENDS_METRIC)
+                .description("FCM 토큰별 푸시 발송 결과")
+                .tag(OUTCOME_TAG, outcome.name.lowercase())
+                .register(meterRegistry)
+        }
+
     @Transactional
     fun reclaimStaleProcessing() {
         val staleBefore = Instant.now(clock).minus(properties.processingTimeout)
@@ -67,6 +80,8 @@ class NotificationOutboxProcessingService(
         outboxId: Long,
         results: List<PushSendResult>,
     ) {
+        results.forEach { result -> pushSendCounters.getValue(result.outcome).increment() }
+
         val outbox = notificationOutboxRepository.findById(outboxId).orElse(null) ?: return
         val now = Instant.now(clock)
 
@@ -92,6 +107,15 @@ class NotificationOutboxProcessingService(
         } else {
             outbox.markFailedForRetry(now.plus(computeBackoff(outbox.attemptCount)), reason)
         }
+    }
+
+    @Transactional(readOnly = true)
+    fun countByStatuses(statuses: Set<NotificationOutboxStatus>): Map<NotificationOutboxStatus, Long> {
+        val counts =
+            notificationOutboxRepository
+                .countByStatuses(statuses)
+                .associate { statusCount -> statusCount.status to statusCount.count }
+        return statuses.associateWith { status -> counts[status] ?: 0L }
     }
 
     private fun applyRetryOrFinalFailure(
@@ -134,5 +158,7 @@ class NotificationOutboxProcessingService(
 
     companion object {
         private const val MAX_BACKOFF_SHIFT = 10
+        private const val PUSH_SENDS_METRIC = "notification.push.sends"
+        private const val OUTCOME_TAG = "outcome"
     }
 }

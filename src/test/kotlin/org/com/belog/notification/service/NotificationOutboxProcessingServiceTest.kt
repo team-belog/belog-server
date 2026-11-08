@@ -1,5 +1,6 @@
 package org.com.belog.notification.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import org.com.belog.notification.domain.Notification
 import org.com.belog.notification.domain.NotificationDevice
 import org.com.belog.notification.domain.NotificationOutbox
@@ -51,6 +52,9 @@ class NotificationOutboxProcessingServiceTest {
 
     @Autowired
     private lateinit var userRepository: UserRepository
+
+    @Autowired
+    private lateinit var meterRegistry: MeterRegistry
 
     @MockitoBean
     private lateinit var clock: Clock
@@ -119,6 +123,50 @@ class NotificationOutboxProcessingServiceTest {
         val updatedDevice = notificationDeviceRepository.findById(requireNotNull(device.id)).orElseThrow()
         assertFalse(updatedDevice.isActive)
     }
+
+    @Test
+    fun `발송 결과를 반영하면 토큰별 발송 결과가 결과 유형별로 집계된다`() {
+        `when`(clock.instant()).thenReturn(Instant.parse("2026-10-09T00:00:00Z"))
+        val recipient = saveUser("recipient")
+        val outbox = createProcessingOutbox(recipient, "push-metric-key")
+        val successBefore = pushSendCount("success")
+        val invalidTokenBefore = pushSendCount("invalid_token")
+        val results =
+            listOf(
+                PushSendResult("token-success", PushSendOutcome.SUCCESS),
+                PushSendResult("token-invalid-1", PushSendOutcome.INVALID_TOKEN),
+                PushSendResult("token-invalid-2", PushSendOutcome.INVALID_TOKEN),
+            )
+
+        processingService.applyResults(requireNotNull(outbox.id), results)
+
+        assertEquals(successBefore + 1, pushSendCount("success"))
+        assertEquals(invalidTokenBefore + 2, pushSendCount("invalid_token"))
+    }
+
+    @Test
+    fun `상태별 Outbox 건수를 조회하면 해당 상태가 없는 경우 0으로 반환된다`() {
+        `when`(clock.instant()).thenReturn(Instant.parse("2026-10-09T00:00:00Z"))
+        val recipient = saveUser("recipient")
+        createProcessingOutbox(recipient, "processing-key")
+
+        val counts =
+            processingService.countByStatuses(
+                setOf(NotificationOutboxStatus.PROCESSING, NotificationOutboxStatus.FAILED),
+            )
+
+        assertEquals(
+            mapOf(NotificationOutboxStatus.PROCESSING to 1L, NotificationOutboxStatus.FAILED to 0L),
+            counts,
+        )
+    }
+
+    private fun pushSendCount(outcome: String): Double =
+        meterRegistry
+            .get("notification.push.sends")
+            .tag("outcome", outcome)
+            .counter()
+            .count()
 
     private fun saveUser(providerUserId: String): User =
         userRepository.saveAndFlush(

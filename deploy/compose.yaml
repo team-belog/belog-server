@@ -49,6 +49,30 @@ services:
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
 
+  alloy:
+    image: grafana/alloy:v1.21.3
+    container_name: belog-alloy
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    env_file:
+      - ${BELOG_ALLOY_ENV_FILE:-./.env.alloy}
+    environment:
+      BELOG_ENVIRONMENT: ${BELOG_SPRING_PROFILE:-dev}
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy/data
+    networks:
+      - belog-network
+
+volumes:
+  alloy-data:
+
 networks:
   belog-network:
     name: belog-network

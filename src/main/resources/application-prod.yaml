@@ -27,7 +27,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health, prometheus
   endpoint:
     health:
       show-details: never
@@ -40,3 +40,8 @@ auth:
 fcm:
   project-id: "${FCM_PROJECT_ID}"
   credentials-base64: "${FCM_CREDENTIALS_BASE64}"
+
+logging:
+  structured:
+    format:
+      console: ecs

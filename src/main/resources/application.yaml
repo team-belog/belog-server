@@ -14,6 +14,11 @@ spring:
     validate-migration-naming: true
     clean-disabled: true
 
+  task:
+    scheduling:
+      pool:
+        size: 5
+
   web:
     error:
       include-exception: false
@@ -29,6 +34,14 @@ springdoc:
 
 server:
   shutdown: graceful
+
+management:
+  metrics:
+    tags:
+      application: "${spring.application.name}"
+    distribution:
+      slo:
+        http.server.requests: 100ms, 300ms, 500ms, 1s, 3s
 
 app:
   security:
