@@ -65,6 +65,20 @@ interface MeetingParticipantRepository : JpaRepository<MeetingParticipant, Long>
 
     @Query(
         """
+        SELECT groupMember.user.id
+        FROM MeetingParticipant participant
+        JOIN participant.groupMember groupMember
+        WHERE participant.meeting.id = :meetingId
+          AND groupMember.id IN :groupMemberIds
+        """,
+    )
+    fun findUserIdsByMeetingIdAndGroupMemberIdIn(
+        @Param("meetingId") meetingId: Long,
+        @Param("groupMemberIds") groupMemberIds: Collection<Long>,
+    ): List<Long>
+
+    @Query(
+        """
         SELECT participant
         FROM MeetingParticipant participant
         JOIN FETCH participant.meeting meeting
