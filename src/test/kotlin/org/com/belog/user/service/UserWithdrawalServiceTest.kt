@@ -7,9 +7,14 @@ import org.com.belog.billlog.domain.BillCurrency
 import org.com.belog.billlog.domain.BillShare
 import org.com.belog.billlog.domain.BillSplitType
 import org.com.belog.billlog.domain.SettlementRequest
+import org.com.belog.billlog.repository.BillItemRepository
 import org.com.belog.billlog.repository.BillRepository
 import org.com.belog.billlog.repository.BillShareRepository
 import org.com.belog.billlog.repository.SettlementRequestRepository
+import org.com.belog.billlog.service.BillService
+import org.com.belog.billlog.service.command.BillItemCommand
+import org.com.belog.billlog.service.command.BillShareCommand
+import org.com.belog.billlog.service.command.RegisterBillCommand
 import org.com.belog.global.error.BusinessException
 import org.com.belog.group.domain.Group
 import org.com.belog.group.domain.GroupMember
@@ -23,6 +28,8 @@ import org.com.belog.meeting.domain.MeetingParticipant
 import org.com.belog.meeting.repository.MeetingParticipantRepository
 import org.com.belog.meeting.repository.MeetingRepository
 import org.com.belog.meeting.service.MeetingServiceTest
+import org.com.belog.notification.repository.NotificationOutboxRepository
+import org.com.belog.notification.repository.NotificationRepository
 import org.com.belog.user.domain.Bank
 import org.com.belog.user.domain.BankAccount
 import org.com.belog.user.domain.SocialProvider
@@ -36,12 +43,17 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Import
 import org.springframework.test.annotation.DirtiesContext
 import org.springframework.test.context.ActiveProfiles
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.mysql.MySQLContainer
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
@@ -84,10 +96,28 @@ class UserWithdrawalServiceTest {
     @Autowired
     private lateinit var refreshTokenRepository: RefreshTokenRepository
 
+    @Autowired
+    private lateinit var billService: BillService
+
+    @Autowired
+    private lateinit var billItemRepository: BillItemRepository
+
+    @Autowired
+    private lateinit var notificationOutboxRepository: NotificationOutboxRepository
+
+    @Autowired
+    private lateinit var notificationRepository: NotificationRepository
+
+    @Autowired
+    private lateinit var transactionManager: PlatformTransactionManager
+
     @AfterEach
     fun cleanUp() {
+        notificationOutboxRepository.deleteAllInBatch()
+        notificationRepository.deleteAllInBatch()
         billShareRepository.deleteAllInBatch()
         settlementRequestRepository.deleteAllInBatch()
+        billItemRepository.deleteAllInBatch()
         billRepository.deleteAllInBatch()
         meetingParticipantRepository.deleteAllInBatch()
         meetingRepository.deleteAllInBatch()
@@ -203,6 +233,112 @@ class UserWithdrawalServiceTest {
         assertEquals(BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS, exception.errorCode)
         assertUnchanged(context)
     }
+
+    @Test
+    fun `탈퇴가 커밋되기 전에 탈퇴자를 부담자로 지정한 결제 등록이 들어오면 결제 등록이 거절된다`() {
+        val context = saveRaceContext("KL12MN")
+
+        val (withdrawal, bill) =
+            runWhileHoldingCommit(
+                holdingCommit = { userWithdrawalService.withdraw(requireNotNull(context.member.user.id)) },
+                contending = { billService.registerBill(createBillCommand(context)) },
+            )
+
+        assertTrue(withdrawal.isSuccess)
+        assertEquals(BillLogErrorCode.INVALID_SHARE_PARTICIPANT, (bill.exceptionOrNull() as? BusinessException)?.errorCode)
+        assertEquals(0, settlementRequestRepository.count())
+    }
+
+    @Test
+    fun `결제 등록이 커밋되기 전에 부담자가 탈퇴하면 탈퇴가 거절된다`() {
+        val context = saveRaceContext("MN12OP")
+
+        val (bill, withdrawal) =
+            runWhileHoldingCommit(
+                holdingCommit = { billService.registerBill(createBillCommand(context)) },
+                contending = { userWithdrawalService.withdraw(requireNotNull(context.member.user.id)) },
+            )
+
+        assertTrue(bill.isSuccess)
+        assertEquals(
+            BillLogErrorCode.UNSETTLED_SETTLEMENT_REQUEST_EXISTS,
+            (withdrawal.exceptionOrNull() as? BusinessException)?.errorCode,
+        )
+        assertTrue(userRepository.findById(requireNotNull(context.member.user.id)).orElseThrow().isActive)
+    }
+
+    private fun runWhileHoldingCommit(
+        holdingCommit: () -> Unit,
+        contending: () -> Unit,
+    ): Pair<Result<Unit>, Result<Unit>> {
+        val executor = Executors.newFixedThreadPool(2)
+        val workDone = CountDownLatch(1)
+        try {
+            val holder =
+                executor.submit<Result<Unit>> {
+                    runCatching {
+                        TransactionTemplate(transactionManager).executeWithoutResult {
+                            holdingCommit()
+                            workDone.countDown()
+                            Thread.sleep(COMMIT_HOLD_MILLIS)
+                        }
+                    }.also { workDone.countDown() }
+                }
+            val contender =
+                executor.submit<Result<Unit>> {
+                    workDone.await()
+                    runCatching { contending() }
+                }
+            return holder.get(RACE_TIMEOUT_SECONDS, TimeUnit.SECONDS) to contender.get(RACE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    private fun saveRaceContext(inviteCode: String): RaceContext {
+        val group = groupRepository.saveAndFlush(createGroup(inviteCode))
+        val payer = saveOwner(group, "race-payer-$inviteCode", "결제자")
+        val member = saveGroupMember(group, "race-member-$inviteCode", "부담자")
+        val meeting =
+            meetingRepository.saveAndFlush(
+                Meeting.createFixed(
+                    group = group,
+                    creator = payer,
+                    name = "저녁 모임",
+                    location = null,
+                    dateRange = MeetingDateRange(LocalDate.of(2026, 9, 25), LocalDate.of(2026, 9, 26)),
+                    confirmedAt = Instant.parse("2026-09-20T00:00:00Z"),
+                    currentDate = LocalDate.of(2026, 9, 20),
+                ),
+            )
+        meetingParticipantRepository.saveAllAndFlush(
+            listOf(MeetingParticipant.create(meeting, payer), MeetingParticipant.create(meeting, member)),
+        )
+        return RaceContext(meetingId = requireNotNull(meeting.id), payer = payer, member = member)
+    }
+
+    private fun createBillCommand(context: RaceContext): RegisterBillCommand =
+        RegisterBillCommand(
+            meetingId = context.meetingId,
+            creatorUserId = requireNotNull(context.payer.user.id),
+            title = "저녁 식사",
+            payerMemberId = requireNotNull(context.payer.id),
+            currency = BillCurrency.KRW,
+            totalAmount = BigDecimal.valueOf(20_000L),
+            splitType = BillSplitType.EQUAL_SPLIT,
+            items = listOf(BillItemCommand(name = "식사", amount = BigDecimal.valueOf(20_000L))),
+            shares =
+                listOf(
+                    BillShareCommand(participantMemberId = requireNotNull(context.payer.id), amount = BigDecimal.valueOf(10_000L)),
+                    BillShareCommand(participantMemberId = requireNotNull(context.member.id), amount = BigDecimal.valueOf(10_000L)),
+                ),
+        )
+
+    private data class RaceContext(
+        val meetingId: Long,
+        val payer: GroupMember,
+        val member: GroupMember,
+    )
 
     private fun assertUnchanged(context: BillContext) {
         val payer = userRepository.findById(requireNotNull(context.payerMember.user.id)).orElseThrow()
@@ -337,6 +473,9 @@ class UserWithdrawalServiceTest {
     }
 
     companion object {
+        private const val COMMIT_HOLD_MILLIS = 1_000L
+        private const val RACE_TIMEOUT_SECONDS = 30L
+
         @Container
         @ServiceConnection
         @JvmField

@@ -2,8 +2,8 @@
 
 set -Eeuo pipefail
 
-if [[ $# -ne 8 ]]; then
-  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <nginx-bootstrap-config> <cleanup-script> <renewal-script> <image-prune-script> <maintenance-config-script>" >&2
+if [[ $# -ne 10 ]]; then
+  echo "Usage: $0 <image-ref> <compose-file> <nginx-config> <nginx-bootstrap-config> <cleanup-script> <renewal-script> <image-prune-script> <maintenance-config-script> <alloy-config> <alloy-start-script>" >&2
   exit 1
 fi
 
@@ -15,6 +15,8 @@ CLEANUP_SCRIPT_SOURCE="$5"
 RENEWAL_SCRIPT_SOURCE="$6"
 IMAGE_PRUNE_SCRIPT_SOURCE="$7"
 MAINTENANCE_CONFIG_SCRIPT_SOURCE="$8"
+ALLOY_CONFIG_SOURCE="$9"
+ALLOY_START_SCRIPT_SOURCE="${10}"
 DEPLOY_DIR="${BELOG_DEPLOY_DIR:-${HOME}/belog}"
 COMPOSE_FILE="${DEPLOY_DIR}/compose.yaml"
 NGINX_DIR="${DEPLOY_DIR}/nginx"
@@ -28,6 +30,9 @@ SPRING_PROFILE="${BELOG_SPRING_PROFILE:-prod}"
 DOMAIN="${BELOG_DOMAIN:-}"
 CERTBOT_EMAIL="${BELOG_CERTBOT_EMAIL:-}"
 ENV_FILE="${DEPLOY_DIR}/.env.${SPRING_PROFILE}"
+ALLOY_ENV_FILE="${DEPLOY_DIR}/.env.alloy.${SPRING_PROFILE}"
+ALLOY_CONTAINER_NAME="belog-alloy"
+MONITORING_ENABLED="${BELOG_MONITORING_ENABLED:-false}"
 ACTIVE_COLOR_FILE="${DEPLOY_DIR}/active-color"
 ACTIVE_IMAGE_FILE="${DEPLOY_DIR}/active-image"
 CANDIDATE_COLOR_FILE="${DEPLOY_DIR}/candidate-color"
@@ -65,12 +70,24 @@ for required_file in \
   "$RENEWAL_SCRIPT_SOURCE" \
   "$IMAGE_PRUNE_SCRIPT_SOURCE" \
   "$MAINTENANCE_CONFIG_SCRIPT_SOURCE" \
+  "$ALLOY_CONFIG_SOURCE" \
+  "$ALLOY_START_SCRIPT_SOURCE" \
   "${NGINX_DIR}/swagger.htpasswd"; do
   if [[ ! -r "$required_file" ]]; then
     echo "Required deployment file is missing: $required_file" >&2
     exit 1
   fi
 done
+
+if [[ "$MONITORING_ENABLED" != true && "$MONITORING_ENABLED" != false ]]; then
+  echo "BELOG_MONITORING_ENABLED must be true or false." >&2
+  exit 1
+fi
+
+if [[ "$MONITORING_ENABLED" == true && ! -r "$ALLOY_ENV_FILE" ]]; then
+  echo "Monitoring is enabled, but the Alloy environment file is missing: $ALLOY_ENV_FILE" >&2
+  exit 1
+fi
 
 if [[ ! "$HEALTH_CHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
   || [[ ! "$HEALTH_CHECK_INTERVAL_SECONDS" =~ ^[1-9][0-9]*$ ]] \
@@ -376,3 +393,25 @@ echo "Activated $IMAGE_REF on $target_color through the Nginx container"
 
 BELOG_DOMAIN="$DOMAIN" "$installed_maintenance_config_script"
 echo "Configured certificate renewal and image cleanup schedules"
+
+installed_alloy_start_script="${DEPLOY_DIR}/start-alloy.sh"
+install -m 700 "$ALLOY_START_SCRIPT_SOURCE" "$installed_alloy_start_script"
+
+monitoring_failed=false
+
+if [[ "$MONITORING_ENABLED" == true ]]; then
+  if ! BELOG_DEPLOY_DIR="$DEPLOY_DIR" "$installed_alloy_start_script" "$SPRING_PROFILE" "$ALLOY_CONFIG_SOURCE"; then
+    echo "::error::Grafana Alloy setup failed. Recover only Alloy on the server with: ${installed_alloy_start_script} ${SPRING_PROFILE}"
+    monitoring_failed=true
+  fi
+elif docker container inspect "$ALLOY_CONTAINER_NAME" >/dev/null 2>&1; then
+  docker rm --force "$ALLOY_CONTAINER_NAME" >/dev/null
+  echo "Removed Grafana Alloy because monitoring is disabled"
+else
+  echo "Skipping Grafana Alloy because monitoring is disabled"
+fi
+
+if [[ "$monitoring_failed" == true ]]; then
+  echo "Application deployment succeeded on $target_color, but monitoring setup failed." >&2
+  exit 1
+fi

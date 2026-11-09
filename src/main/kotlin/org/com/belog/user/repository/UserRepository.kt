@@ -46,4 +46,17 @@ interface UserRepository :
     fun findByIdForUpdate(
         @Param("userId") userId: Long,
     ): User?
+
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query(
+        """
+        SELECT user.id
+        FROM User user
+        WHERE user.id IN :userIds
+          AND user.deletedAt IS NULL
+        """,
+    )
+    fun findActiveIdsForShare(
+        @Param("userIds") userIds: Collection<Long>,
+    ): List<Long>
 }

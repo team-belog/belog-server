@@ -1,6 +1,7 @@
 package org.com.belog.notification.repository
 
 import org.com.belog.notification.domain.NotificationOutbox
+import org.com.belog.notification.domain.NotificationOutboxStatus
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -22,4 +23,19 @@ interface NotificationOutboxRepository :
     fun reclaimStaleProcessing(
         @Param("staleBefore") staleBefore: Instant,
     ): Int
+
+    @Query(
+        """
+        SELECT new org.com.belog.notification.repository.NotificationOutboxStatusCount(
+            outbox.status,
+            COUNT(outbox.id)
+        )
+        FROM NotificationOutbox outbox
+        WHERE outbox.status IN :statuses
+        GROUP BY outbox.status
+        """,
+    )
+    fun countByStatuses(
+        @Param("statuses") statuses: Collection<NotificationOutboxStatus>,
+    ): List<NotificationOutboxStatusCount>
 }
